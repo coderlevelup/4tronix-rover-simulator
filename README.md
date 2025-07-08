@@ -80,7 +80,7 @@ This should show a window with a small, simple representation of the Rover and i
 
 ## Using the Simulator
 
-Once the simulator UI is running, you can run Python programs to control it. Normally, programs that control the M.A.R.S. Rover have something like this near the top:
+Once the simulator UI is running, you can run Python programs to control it. Have in mind that if, for example, you have started the emulator using Visual Studio Code, then you should start a new terminal to control the Rover. Normally, programs that control the M.A.R.S. Rover have something like this near the top:
 
 ```py
 import rover
