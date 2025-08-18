@@ -201,6 +201,7 @@
 
         // WebRTC handling
         const TEST_STREAM_URL = 'wss://test.webrtc.org/websocket';
+        const UV4L_STREAM_URL = `ws://${window.location.hostname}:8080/stream/webrtc`;
         
         async function initCamera() {
             const video = document.getElementById('video');
@@ -227,18 +228,25 @@
                     console.error('Error setting up test stream:', e);
                 }
             } else {
-                // Running on real device - use local camera
+                // Running on real device - use UV4L WebRTC stream
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { 
-                            width: 640,
-                            height: 480,
-                            frameRate: { ideal: 10, max: 15 }
+                    const pc = new RTCPeerConnection();
+                    const ws = new WebSocket(UV4L_STREAM_URL);
+                    
+                    ws.onmessage = async (e) => {
+                        if (e.data.startsWith('offer')) {
+                            await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(e.data.slice(6))));
+                            const answer = await pc.createAnswer();
+                            await pc.setLocalDescription(answer);
+                            ws.send('answer:' + JSON.stringify(answer));
                         }
-                    });
-                    video.srcObject = stream;
+                    };
+                    
+                    pc.ontrack = (event) => {
+                        video.srcObject = event.streams[0];
+                    };
                 } catch (e) {
-                    console.error('Error accessing camera:', e);
+                    console.error('Error connecting to UV4L stream:', e);
                 }
             }
         }
