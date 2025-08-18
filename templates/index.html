@@ -24,93 +24,117 @@
         .sequence-grid select {
             height: 40px;
         }
+        .nav-tabs .nav-link {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div class="container text-center mt-5">
         <h1>Rover Control</h1>
-        
-        <!-- Manual Controls -->
-        <h3>Manual Control</h3>
-        <div class="control-grid">
-            <div></div>
-            <button class="btn btn-primary" onclick="sendCommand('forward')">Forward</button>
-            <div></div>
-            <button class="btn btn-primary" onclick="sendCommand('spin_left')">Spin Left</button>
-            <button class="btn btn-danger" onclick="sendCommand('stop')">Stop</button>
-            <button class="btn btn-primary" onclick="sendCommand('spin_right')">Spin Right</button>
-            <div></div>
-            <button class="btn btn-primary" onclick="sendCommand('backward')">Backward</button>
-            <div></div>
-        </div>
 
-        <!-- Sequence Builder -->
-        <h3 class="mt-4">Instruction Sequence</h3>
-        <div class="sequence-grid">
-            <!-- Instruction 1 -->
-            <select class="form-select" id="cmd1">
-                <option value="">Select command...</option>
-                <option value="forward">Forward</option>
-                <option value="backward">Backward</option>
-                <option value="spin_left">Spin Left</option>
-                <option value="spin_right">Spin Right</option>
-            </select>
-            <select class="form-select" id="time1">
-                <option value="1">1 second</option>
-                <option value="2">2 seconds</option>
-                <option value="3">3 seconds</option>
-            </select>
-            <button class="btn btn-secondary" onclick="clearInstruction(1)">Clear</button>
+        <!-- Navigation tabs -->
+        <ul class="nav nav-tabs mt-4" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual" type="button" role="tab">
+                    Manual Control
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="sequence-tab" data-bs-toggle="tab" data-bs-target="#sequence" type="button" role="tab">
+                    Sequence Builder
+                </button>
+            </li>
+        </ul>
 
-            <!-- Instructions 2-4 (repeat above pattern) -->
-            <select class="form-select" id="cmd2">
-                <option value="">Select command...</option>
-                <option value="forward">Forward</option>
-                <option value="backward">Backward</option>
-                <option value="spin_left">Spin Left</option>
-                <option value="spin_right">Spin Right</option>
-            </select>
-            <select class="form-select" id="time2">
-                <option value="1">1 second</option>
-                <option value="2">2 seconds</option>
-                <option value="3">3 seconds</option>
-            </select>
-            <button class="btn btn-secondary" onclick="clearInstruction(2)">Clear</button>
+        <!-- Tab content -->
+        <div class="tab-content mt-4">
+            <!-- Manual Control Tab -->
+            <div class="tab-pane fade show active" id="manual" role="tabpanel">
+                <div class="control-grid">
+                    <div></div>
+                    <button class="btn btn-primary" onclick="sendCommand('forward')">Forward</button>
+                    <div></div>
+                    <button class="btn btn-primary" onclick="sendCommand('spin_left')">Spin Left</button>
+                    <button class="btn btn-danger" onclick="sendCommand('stop')">Stop</button>
+                    <button class="btn btn-primary" onclick="sendCommand('spin_right')">Spin Right</button>
+                    <div></div>
+                    <button class="btn btn-primary" onclick="sendCommand('backward')">Backward</button>
+                    <div></div>
+                </div>
+            </div>
 
-            <select class="form-select" id="cmd3">
-                <option value="">Select command...</option>
-                <option value="forward">Forward</option>
-                <option value="backward">Backward</option>
-                <option value="spin_left">Spin Left</option>
-                <option value="spin_right">Spin Right</option>
-            </select>
-            <select class="form-select" id="time3">
-                <option value="1">1 second</option>
-                <option value="2">2 seconds</option>
-                <option value="3">3 seconds</option>
-            </select>
-            <button class="btn btn-secondary" onclick="clearInstruction(3)">Clear</button>
+            <!-- Sequence Builder Tab -->
+            <div class="tab-pane fade" id="sequence" role="tabpanel">
+                <div class="sequence-grid">
+                    <!-- Instruction 1 -->
+                    <select class="form-select" id="cmd1">
+                        <option value="">Select command...</option>
+                        <option value="forward">Forward</option>
+                        <option value="backward">Backward</option>
+                        <option value="spin_left">Spin Left</option>
+                        <option value="spin_right">Spin Right</option>
+                    </select>
+                    <select class="form-select" id="time1">
+                        <option value="1">1 second</option>
+                        <option value="2">2 seconds</option>
+                        <option value="3">3 seconds</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="clearInstruction(1)">Clear</button>
 
-            <select class="form-select" id="cmd4">
-                <option value="">Select command...</option>
-                <option value="forward">Forward</option>
-                <option value="backward">Backward</option>
-                <option value="spin_left">Spin Left</option>
-                <option value="spin_right">Spin Right</option>
-            </select>
-            <select class="form-select" id="time4">
-                <option value="1">1 second</option>
-                <option value="2">2 seconds</option>
-                <option value="3">3 seconds</option>
-            </select>
-            <button class="btn btn-secondary" onclick="clearInstruction(4)">Clear</button>
-        </div>
-        
-        <div class="mt-3">
-            <button class="btn btn-success btn-lg" onclick="runSequence()">Run Sequence</button>
+                    <!-- Instructions 2-4 (repeat above pattern) -->
+                    <select class="form-select" id="cmd2">
+                        <option value="">Select command...</option>
+                        <option value="forward">Forward</option>
+                        <option value="backward">Backward</option>
+                        <option value="spin_left">Spin Left</option>
+                        <option value="spin_right">Spin Right</option>
+                    </select>
+                    <select class="form-select" id="time2">
+                        <option value="1">1 second</option>
+                        <option value="2">2 seconds</option>
+                        <option value="3">3 seconds</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="clearInstruction(2)">Clear</button>
+
+                    <select class="form-select" id="cmd3">
+                        <option value="">Select command...</option>
+                        <option value="forward">Forward</option>
+                        <option value="backward">Backward</option>
+                        <option value="spin_left">Spin Left</option>
+                        <option value="spin_right">Spin Right</option>
+                    </select>
+                    <select class="form-select" id="time3">
+                        <option value="1">1 second</option>
+                        <option value="2">2 seconds</option>
+                        <option value="3">3 seconds</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="clearInstruction(3)">Clear</button>
+
+                    <select class="form-select" id="cmd4">
+                        <option value="">Select command...</option>
+                        <option value="forward">Forward</option>
+                        <option value="backward">Backward</option>
+                        <option value="spin_left">Spin Left</option>
+                        <option value="spin_right">Spin Right</option>
+                    </select>
+                    <select class="form-select" id="time4">
+                        <option value="1">1 second</option>
+                        <option value="2">2 seconds</option>
+                        <option value="3">3 seconds</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="clearInstruction(4)">Clear</button>
+                </div>
+                
+                <div class="mt-3">
+                    <button class="btn btn-success btn-lg" onclick="runSequence()">Run Sequence</button>
+                </div>
+            </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function sendCommand(cmd) {
             fetch(`/command/${cmd}`, {
