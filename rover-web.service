@@ -1,0 +1,13 @@
+[Unit]
+Description=Rover Web Control Interface
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/mars/4tronix-rover-simulator
+ExecStart=/home/mars/4tronix-rover-simulator/env/bin/python web_interface.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
