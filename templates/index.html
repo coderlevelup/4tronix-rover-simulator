@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rover Control</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 300px;
+            margin: 20px auto;
+        }
+        .control-grid button {
+            height: 80px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container text-center mt-5">
+        <h1>Rover Control</h1>
+        <div class="control-grid">
+            <div></div>
+            <button class="btn btn-primary" onclick="sendCommand('forward')">Forward</button>
+            <div></div>
+            <button class="btn btn-primary" onclick="sendCommand('spin_left')">Spin Left</button>
+            <button class="btn btn-danger" onclick="sendCommand('stop')">Stop</button>
+            <button class="btn btn-primary" onclick="sendCommand('spin_right')">Spin Right</button>
+            <div></div>
+            <button class="btn btn-primary" onclick="sendCommand('backward')">Backward</button>
+            <div></div>
+        </div>
+    </div>
+
+    <script>
+        function sendCommand(cmd) {
+            fetch(`/command/${cmd}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({speed: 100})
+            }).then(response => response.json())
+              .then(data => console.log(data))
+              .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+</html>
