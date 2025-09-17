@@ -1,15 +1,16 @@
 # Mars Rover Simple Drive Mode
 # Similar to motortest.py but integrates servo steering
-# Moves: Forward, Reverse, turn Right, turn Left, Stop
+# Moves: Forward, Reverse, turn Right, turn Left, Stop 
 # Press Ctrl-C to stop
 
 from __future__ import print_function
-import time
+import rover, time
 
-# choose between real rover and simulator
-import roversimulator as rover
-#import rover
-
+#======================================================================
+# Reading single character by forcing stdin to raw mode
+import sys
+import tty
+import termios
 
 # Servo numbers
 servo_FL = 9
@@ -18,47 +19,21 @@ servo_FR = 15
 servo_RR = 13
 servo_MA = 0
 
-
-# this turns out not to work on Windows.
-# #======================================================================
-# # Reading single character by forcing stdin to raw mode
-# import sys
-# import tty
-# import termios
-
-# def readchar():
-#     fd = sys.stdin.fileno()
-#     old_settings = termios.tcgetattr(fd)
-#     try:
-#         tty.setraw(sys.stdin.fileno())
-#         ch = sys.stdin.read(1)
-#     finally:
-#         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-#     if ch == '0x03':
-#         raise KeyboardInterrupt
-#     return ch
-
-# only works on Windows...
-import msvcrt
 def readchar():
-    key = msvcrt.getch()
-    val = 0
-    for v in key:
-        val = v + (val << 8)
-    return chr(val)
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(sys.stdin.fileno())
+        ch = sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    if ch == '0x03':
+        raise KeyboardInterrupt
+    return ch
 
 def readkey(getchar_fn=None):
     getchar = getchar_fn or readchar
     c1 = getchar()
-    if ord(c1) == 0xe0:
-        # On Windows, we get this with arrow keys
-        # and it's followed by a number indicating
-        # direction
-        d = getchar()
-        if d == 'K': return chr(19) # Left
-        if d == 'M': return chr(18) # Right
-        if d == 'H': return chr(16) # Up
-        if d == 'P': return chr(17) # Left
     if ord(c1) != 0x1b:
         return c1
     c2 = getchar()
@@ -66,8 +41,6 @@ def readkey(getchar_fn=None):
         return c1
     c3 = getchar()
     return chr(0x10 + ord(c3) - 65)  # 16=Up, 17=Down, 18=Right, 19=Left arrows
-
-    
 
 # End of single character reading
 #======================================================================
@@ -99,6 +72,13 @@ def goRight():
     rover.setServo(servo_RR, -20)
 
 
+def pivot():
+    rover.setServo(servo_FL, 50)
+    rover.setServo(servo_FR, -50)
+    rover.setServo(servo_RL, -50)
+    rover.setServo(servo_RR, 50)
+
+
 
 speed = 60
 
@@ -120,10 +100,10 @@ try:
         if keyp == 'w' or ord(keyp) == 16:
             goForward()
             print ('Forward', speed)
-        elif keyp == 'z' or ord(keyp) == 17:
+        elif keyp == 's' or ord(keyp) == 17:
             goReverse()
             print ('Reverse', speed)
-        elif keyp == 's' or ord(keyp) == 18:
+        elif keyp == 'd' or ord(keyp) == 18:
             goRight()
             print ('Go Right', speed)
         elif keyp == 'a' or ord(keyp) == 19:
@@ -145,11 +125,23 @@ try:
             rover.setServo(servo_RL, 0)
             rover.setServo(servo_RR, 0)
             print ('Brake')
+        elif keyp == '[':
+            pivot()
+            rover.spinLeft(50)
+        elif keyp == ']':
+            pivot()
+            rover.spinRight(50)
         elif ord(keyp) == 3:
             break
+        else:
+            rover.stop()
+
+
+
 
 except KeyboardInterrupt:
     pass
 
 finally:
     rover.cleanup()
+    
