@@ -151,6 +151,11 @@ def forward(speed):
     if (lDir == -1 or rDir == -1):
         brake()
         sleep(0.2)
+    # Reset servos to 0 degrees
+    setServo(9, 0)   # servo_FL
+    setServo(15, 0)  # servo_FR
+    setServo(11, 0)  # servo_RL
+    setServo(13, 0)  # servo_RR
     # p.ChangeDutyCycle(speed)
     # q.ChangeDutyCycle(0)
     # a.ChangeDutyCycle(speed)
@@ -168,6 +173,11 @@ def reverse(speed):
     if (lDir == 1 or rDir == 1):
         brake()
         sleep(0.2)
+    # Reset servos to 0 degrees
+    setServo(9, 0)   # servo_FL
+    setServo(15, 0)  # servo_FR
+    setServo(11, 0)  # servo_RL
+    setServo(13, 0)  # servo_RR
     # p.ChangeDutyCycle(0)
     # q.ChangeDutyCycle(speed)
     # a.ChangeDutyCycle(0)
@@ -185,6 +195,11 @@ def spinLeft(speed):
     if (lDir == 1 or rDir == -1):
         brake()
         sleep(0.2)
+    # Set servos for pivot mode
+    setServo(9, 50)   # servo_FL
+    setServo(15, -50) # servo_FR
+    setServo(11, -50) # servo_RL
+    setServo(13, 50)  # servo_RR
     # p.ChangeDutyCycle(0)
     # q.ChangeDutyCycle(speed)
     # a.ChangeDutyCycle(speed)
@@ -202,6 +217,11 @@ def spinRight(speed):
     if (lDir == -1 or rDir == 1):
         brake()
         sleep(0.2)
+    # Set servos for pivot mode
+    setServo(9, 50)   # servo_FL
+    setServo(15, -50) # servo_FR
+    setServo(11, -50) # servo_RL
+    setServo(13, 50)  # servo_RR
     # p.ChangeDutyCycle(speed)
     # q.ChangeDutyCycle(0)
     # a.ChangeDutyCycle(0)
