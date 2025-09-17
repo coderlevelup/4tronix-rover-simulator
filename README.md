@@ -177,9 +177,12 @@ time.sleep(3000)
 rover.forward(0)
 ```
 
-# Notes on the web interface
+# Notes on the web interface (Experimental)
 
 A web control interface for the 4tronix M.A.R.S. Rover.
+
+Note: you likely don't need this, but it is nice for an interactive activity with beginners.
+Note2: it is very experimental and isn't sure to work.
 
 ## Setup
 
