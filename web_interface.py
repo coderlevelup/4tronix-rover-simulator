@@ -13,7 +13,9 @@ commands = {
     'backward': lambda: rover.reverse(speed),
     'spin_left': lambda: rover.spinLeft(speed),
     'spin_right': lambda: rover.spinRight(speed),
-    'stop': lambda: rover.stop()
+    'stop': lambda: rover.stop(),
+    'turn_forward': lambda: rover.turnForward(speed, speed),
+    'turn_reverse': lambda: rover.turnReverse(speed, speed)
 }
 
 @app.route('/')
@@ -29,6 +31,22 @@ def handle_command(cmd):
         commands[cmd]()
         return jsonify({'status': 'success'})
     return jsonify({'status': 'error', 'message': 'Invalid command'}), 400
+
+@app.route('/command/turn_forward', methods=['POST'])
+def handle_turn_forward():
+    data = request.json or {}
+    left_speed = data.get('leftSpeed', 50)
+    right_speed = data.get('rightSpeed', 50)
+    rover.turnForward(left_speed, right_speed)
+    return jsonify({'status': 'success'})
+
+@app.route('/command/turn_reverse', methods=['POST'])
+def handle_turn_reverse():
+    data = request.json or {}
+    left_speed = data.get('leftSpeed', 50)
+    right_speed = data.get('rightSpeed', 50)
+    rover.turnReverse(left_speed, right_speed)
+    return jsonify({'status': 'success'})
 
 @app.route('/sequence', methods=['POST'])
 def handle_sequence():
@@ -56,9 +74,6 @@ def handle_sequence():
 if __name__ == '__main__':
     # Use port 80 only if on Linux and running as root
     port = 80 if os.name == 'posix' and os.geteuid() == 0 else 5000
-    app.run(host='0.0.0.0', port=port)
-if __name__ == '__main__':
-    # Use port 80 only if on Linux and running as root
-    port = 80 if os.name == 'posix' and os.geteuid() == 0 else 5000
-    app.run(host='0.0.0.0', port=port)
+    # Enable debug mode with auto-reload
+    app.run(host='0.0.0.0', port=port, debug=True)
 
