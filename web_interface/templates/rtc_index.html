@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rover Control - WebRTC</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .main-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        .camera-panel {
+            flex: 0 0 50%;
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-right: 2px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+        }
+        .camera-feed {
+            flex: 1;
+            margin-bottom: 20px;
+        }
+        .camera-feed:last-child {
+            margin-bottom: 0;
+        }
+        .control-panel {
+            flex: 1;
+            padding: 20px;
+        }
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 300px;
+            margin: 20px auto;
+        }
+        .control-grid button {
+            height: 80px;
+        }
+        .camera-container {
+            text-align: center;
+            margin: 20px auto;
+            position: relative;
+        }
+        #camera-feed {
+            width: 100%;
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            background-color: #000;
+        }
+        .camera-title {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #495057;
+        }
+        .connection-status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .connection-status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .connection-status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .connection-status.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+            }
+            .camera-panel {
+                flex: none;
+                border-right: none;
+                border-bottom: 2px solid #dee2e6;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Camera Panel -->
+        <div class="camera-panel">
+            <h2 class="camera-title">Rover Camera Feed</h2>
+            
+            <!-- Connection Status -->
+            <div id="connection-status" class="connection-status disconnected">
+                Disconnected
+            </div>
+            
+            <!-- Camera Feed -->
+            <div class="camera-container">
+                <canvas id="camera-feed" width="640" height="480"></canvas>
+                <div id="camera-message" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; text-align: center; justify-content: center; font-size: 16px; font-weight: bold; color: white; pointer-events: none; padding: 20px; box-sizing: border-box; text-shadow: 0 0 5px black;">
+                    Connecting...
+                </div>
+            </div>
+            
+            <!-- Connection Controls -->
+            <div class="mt-3">
+                <button id="connect-btn" class="btn btn-primary">Connect</button>
+                <button id="disconnect-btn" class="btn btn-secondary" disabled>Disconnect</button>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <h1 class="text-center mb-4">Rover Control</h1>
+
+            <!-- Manual Control -->
+            <div class="control-grid">
+                <div></div>
+                <button class="btn btn-primary" onclick="sendCommand('forward')">Forward</button>
+                <div></div>
+                <button class="btn btn-primary" onclick="sendCommand('spin_left')">Spin Left</button>
+                <button class="btn btn-danger" onclick="sendCommand('stop')">Stop</button>
+                <button class="btn btn-primary" onclick="sendCommand('spin_right')">Spin Right</button>
+                <div></div>
+                <button class="btn btn-primary" onclick="sendCommand('backward')">Backward</button>
+                <div></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // RTC Client implementation
+        class RTCClient {
+            constructor(websocketUrl = 'ws://localhost:8889') {
+                this.websocketUrl = websocketUrl;
+                this.websocket = null;
+                this.connected = false;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 10;
+                this.reconnectInterval = 5000; // 5 seconds
+                this.reconnectTimeout = null;
+                
+                // Canvas setup
+                this.canvas = document.getElementById('camera-feed');
+                this.ctx = this.canvas.getContext('2d');
+                this.stream = this.canvas.captureStream(10); // 10 FPS
+                
+                // UI elements
+                this.connectionStatus = document.getElementById('connection-status');
+                this.cameraMessage = document.getElementById('camera-message');
+                this.connectBtn = document.getElementById('connect-btn');
+                this.disconnectBtn = document.getElementById('disconnect-btn');
+                
+                // Setup event listeners
+                this.setupEventListeners();
+            }
+            
+            setupEventListeners() {
+                this.connectBtn.addEventListener('click', () => this.connect());
+                this.disconnectBtn.addEventListener('click', () => this.disconnect());
+            }
+            
+            async connect() {
+                if (this.connected) return;
+                
+                this.updateConnectionStatus('connecting', 'Connecting...');
+                this.connectBtn.disabled = true;
+                
+                try {
+                    this.websocket = new WebSocket(this.websocketUrl);
+                    
+                    this.websocket.onopen = () => {
+                        this.connected = true;
+                        this.reconnectAttempts = 0;
+                        this.updateConnectionStatus('connected', 'Connected');
+                        this.connectBtn.disabled = true;
+                        this.disconnectBtn.disabled = false;
+                        this.hideCameraMessage();
+                        console.log('Connected to WebSocket server');
+                    };
+                    
+                    this.websocket.onmessage = (event) => {
+                        console.log('Raw WebSocket message received:', event.data.substring(0, 100) + '...');
+                        this.handleMessage(event.data);
+                    };
+                    
+                    this.websocket.onclose = () => {
+                        this.connected = false;
+                        this.updateConnectionStatus('disconnected', 'Disconnected');
+                        this.connectBtn.disabled = false;
+                        this.disconnectBtn.disabled = true;
+                        this.showCameraMessage('Disconnected');
+                        console.log('WebSocket connection closed');
+                        this.handleReconnect();
+                    };
+                    
+                    this.websocket.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        this.updateConnectionStatus('disconnected', 'Connection Error');
+                    };
+                    
+                } catch (error) {
+                    console.error('Failed to connect:', error);
+                    this.updateConnectionStatus('disconnected', 'Connection Failed');
+                    this.connectBtn.disabled = false;
+                    this.handleReconnect();
+                }
+            }
+            
+            disconnect() {
+                if (this.websocket) {
+                    this.websocket.close();
+                    this.websocket = null;
+                }
+                this.connected = false;
+                this.updateConnectionStatus('disconnected', 'Disconnected');
+                this.connectBtn.disabled = false;
+                this.disconnectBtn.disabled = true;
+                this.showCameraMessage('Disconnected');
+                
+                if (this.reconnectTimeout) {
+                    clearTimeout(this.reconnectTimeout);
+                    this.reconnectTimeout = null;
+                }
+            }
+            
+            handleReconnect() {
+                if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                    console.log('Max reconnection attempts reached');
+                    return;
+                }
+                
+                this.reconnectAttempts++;
+                console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+                
+                this.reconnectTimeout = setTimeout(() => {
+                    if (!this.connected) {
+                        this.connect();
+                    }
+                }, this.reconnectInterval);
+            }
+            
+            handleMessage(data) {
+                try {
+                    const message = JSON.parse(data);
+                    
+                    if (message.type === 'frame') {
+                        console.log('Received frame data, length:', message.data ? message.data.length : 'undefined');
+                        this.displayFrame(message.data);
+                    } else {
+                        console.log('Received message:', message);
+                    }
+                } catch (error) {
+                    console.error('Error parsing message:', error);
+                }
+            }
+            
+            displayFrame(frameData) {
+                try {
+                    console.log('Displaying frame, data length:', frameData ? frameData.length : 'undefined');
+                    // Create image from base64 data
+                    const img = new Image();
+                    img.onload = () => {
+                        console.log('Image loaded successfully, drawing to canvas');
+                        // Clear canvas
+                        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                        
+                        // Draw image on canvas
+                        this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+                        
+                        // Hide loading message
+                        this.hideCameraMessage();
+                    };
+                    img.onerror = (error) => {
+                        console.error('Error loading image:', error);
+                    };
+                    img.src = 'data:image/jpeg;base64,' + frameData;
+                } catch (error) {
+                    console.error('Error displaying frame:', error);
+                }
+            }
+            
+            updateConnectionStatus(status, message) {
+                this.connectionStatus.className = `connection-status ${status}`;
+                this.connectionStatus.textContent = message;
+            }
+            
+            showCameraMessage(message) {
+                this.cameraMessage.textContent = message;
+                this.cameraMessage.style.display = 'flex';
+            }
+            
+            hideCameraMessage() {
+                this.cameraMessage.style.display = 'none';
+            }
+            
+            sendMessage(message) {
+                if (this.connected && this.websocket) {
+                    this.websocket.send(JSON.stringify(message));
+                } else {
+                    console.warn('Cannot send message: not connected');
+                }
+            }
+        }
+        
+        // Initialize RTC client
+        const rtcClient = new RTCClient();
+        
+        // Rover control functions
+        function sendCommand(cmd, speed = 100) {
+            fetch(`/command/${cmd}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({speed: speed})
+            }).then(response => response.json())
+              .then(data => console.log(data))
+              .catch(error => console.error('Error:', error));
+        }
+        
+        // Auto-connect on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-connect after a short delay
+            setTimeout(() => {
+                rtcClient.connect();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

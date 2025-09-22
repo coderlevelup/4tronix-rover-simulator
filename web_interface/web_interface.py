@@ -23,7 +23,7 @@ commands = {
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('rtc_index.html')
 
 @app.route('/command/<cmd>', methods=['POST'])
 def handle_command(cmd):
