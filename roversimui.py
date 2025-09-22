@@ -54,10 +54,17 @@ import sys
 import math
 from time import time
 import json
+import cv2
+import numpy as np
+import threading
+import asyncio
+import websockets
+import base64
+from io import BytesIO
 
-from PyQt6.QtCore import QThread, QObject, QTimer, pyqtSignal, QRectF, Qt
+from PyQt6.QtCore import QThread, QObject, QTimer, pyqtSignal, QRectF, Qt, QBuffer
 from PyQt6.QtWidgets import QApplication, QLabel, QWidget, QGraphicsScene, QGraphicsView,QGraphicsRectItem, QGraphicsItemGroup, QGraphicsPixmapItem
-from PyQt6.QtGui import QPixmap, QTransform, QColor, QPen, QBrush
+from PyQt6.QtGui import QPixmap, QTransform, QColor, QPen, QBrush, QImage
 
 from flask import Flask, request
 
@@ -69,6 +76,150 @@ servo_RR = 13
 servo_MA = 0
 
 showSteeringCalcs = False
+
+# WebRTC Streaming class
+class WebRTCStreamer(QObject):
+    frame_captured = pyqtSignal(object)  # Signal to emit captured frames
+    
+    def __init__(self, main_window):
+        super().__init__()
+        self.main_window = main_window
+        self.clients = set()
+        self.running = False
+        self.current_frame = None
+        self.frame_ready = False
+        self.frame_captured.connect(self._on_frame_captured)
+        
+    def start_streaming(self):
+        self.running = True
+        self.stream_thread = threading.Thread(target=self._stream_loop)
+        self.stream_thread.daemon = True
+        self.stream_thread.start()
+        
+        # Start frame capture timer in main thread
+        self.capture_timer = QTimer()
+        self.capture_timer.timeout.connect(self._capture_frame_safe)
+        self.capture_timer.start(100)  # 10 FPS
+        
+    def stop_streaming(self):
+        self.running = False
+        if hasattr(self, 'capture_timer'):
+            self.capture_timer.stop()
+        
+    def _stream_loop(self):
+        asyncio.run(self._websocket_server())
+        
+    async def _websocket_server(self):
+        async def handle_client(websocket, path):
+            self.clients.add(websocket)
+            try:
+                await websocket.wait_closed()
+            finally:
+                self.clients.remove(websocket)
+                
+        async with websockets.serve(handle_client, "localhost", 8889):
+            frame_sent_count = 0
+            while self.running:
+                if self.clients and self.frame_ready and self.current_frame is not None:
+                    # Use the thread-safe captured frame
+                    frame = self.current_frame
+                    if frame is not None:
+                        try:
+                            # Convert to base64 and send to all clients
+                            _, buffer = cv2.imencode('.jpg', frame)
+                            frame_b64 = base64.b64encode(buffer).decode('utf-8')
+                            message = json.dumps({"type": "frame", "data": frame_b64})
+                            
+                            # Send to all connected clients
+                            disconnected = set()
+                            for client in self.clients:
+                                try:
+                                    await client.send(message)
+                                except websockets.exceptions.ConnectionClosed:
+                                    disconnected.add(client)
+                            self.clients -= disconnected
+                            
+                            # Mark frame as sent
+                            self.frame_ready = False
+                            frame_sent_count += 1
+                            if frame_sent_count % 30 == 0:  # Print every 30 frames
+                                print(f"Frame sent to {len(self.clients)} clients")
+                                
+                        except Exception as e:
+                            print(f"Error sending frame: {e}")
+                elif self.clients:
+                    # Only print waiting message occasionally to avoid spam
+                    if frame_sent_count % 100 == 0:
+                        print(f"Waiting for frame... clients: {len(self.clients)}")
+                
+                await asyncio.sleep(0.1)  # ~10 FPS for stability
+                
+    def _capture_frame_safe(self):
+        """Thread-safe frame capture from main Qt thread"""
+        try:
+            if not self.running:
+                return
+                
+            # Get the graphics view
+            view = self.main_window.roverIcon
+            
+            # Check if view is still valid
+            if not view or not hasattr(view, 'grab'):
+                return
+            
+            # Create a pixmap from the view
+            pixmap = view.grab()
+            
+            if pixmap.isNull():
+                return
+            
+            # Convert QPixmap to numpy array using the most reliable method
+            qimg = pixmap.toImage()
+            width = qimg.width()
+            height = qimg.height()
+            
+            if width == 0 or height == 0:
+                return
+            
+            # Use the most reliable method: save to buffer and decode
+            buffer = QBuffer()
+            buffer.open(QBuffer.OpenModeFlag.WriteOnly)
+            success = qimg.save(buffer, "PNG")
+            buffer.close()
+            
+            if not success:
+                return
+            
+            # Convert buffer to numpy array
+            data = buffer.data()
+            nparr = np.frombuffer(data, np.uint8)
+            rgb = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            
+            if rgb is None:
+                return
+            
+            # Resize to a reasonable size for streaming
+            rgb = cv2.resize(rgb, (640, 480))
+            
+            # Emit the frame to be processed by the streaming thread
+            self.frame_captured.emit(rgb)
+            
+        except Exception as e:
+            print(f"Error in thread-safe capture: {e}")
+    
+    def _on_frame_captured(self, frame):
+        """Handle captured frame from main thread"""
+        self.current_frame = frame
+        self.frame_ready = True
+        # Debug: print frame info occasionally
+        if hasattr(self, '_frame_count'):
+            self._frame_count += 1
+        else:
+            self._frame_count = 1
+        
+        if self._frame_count % 30 == 0:  # Print every 30 frames (3 seconds at 10fps)
+            print(f"Frame captured: {frame.shape if frame is not None else 'None'}")
+    
 
 # Receives requests
 class ServerWorker(QObject):
@@ -267,6 +418,7 @@ class Rover:
 class MainWindow(QWidget):
     rover = Rover()
     updateTimer = QTimer()
+    streamer = None
 
     # Visualized Rover parts
 
@@ -280,7 +432,7 @@ class MainWindow(QWidget):
     visRoverWheelBL = QGraphicsItemGroup()
     visRoverWheelBR = QGraphicsItemGroup()
 
-    def __init__(self, parent=None):
+    def __init__(self, enable_streaming=False, parent=None):
         QWidget.__init__(self, parent)
 
         self.setWindowTitle("M.A.R.S. Rover")
@@ -351,6 +503,12 @@ class MainWindow(QWidget):
 
         self.updateTimer.timeout.connect(self.on_update_timer)
         self.updateTimer.start(100)
+        
+        # Initialize WebRTC streaming if enabled
+        if enable_streaming:
+            self.streamer = WebRTCStreamer(self)
+            self.streamer.start_streaming()
+            print("WebRTC streaming enabled on port 8889")
 
     def on_change(self, s):
         print(s)
@@ -399,8 +557,20 @@ class MainWindow(QWidget):
         self.visRoverWheelBL.setTransform(QTransform().rotate(self.rover.servos[servo_RL]))
         self.visRoverWheelBR.setTransform(QTransform().rotate(self.rover.servos[servo_RR]))
 
-app = QApplication([])
-
-window = MainWindow()
-window.show()
-sys.exit(app.exec())
+if __name__ == "__main__":
+    # Parse command line arguments
+    enable_streaming = "--stream" in sys.argv or "-s" in sys.argv
+    
+    app = QApplication([])
+    
+    window = MainWindow(enable_streaming=enable_streaming)
+    window.show()
+    
+    if enable_streaming:
+        print("Starting rover simulator with WebRTC streaming...")
+        print("Use --stream or -s flag to enable streaming")
+    else:
+        print("Starting rover simulator without streaming...")
+        print("Use --stream or -s flag to enable WebRTC streaming")
+    
+    sys.exit(app.exec())
