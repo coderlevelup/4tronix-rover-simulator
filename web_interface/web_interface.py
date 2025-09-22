@@ -1,8 +1,11 @@
 from flask import Flask, render_template, jsonify, request
-import roversimulator as rover
-import os
 import sys
+import os
 import time  # Import time module for sleep
+
+# Add parent directory to path to import roversimulator
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import roversimulator as rover
 
 app = Flask(__name__)
 rover.init(40)  # Initialize with LED brightness of 40

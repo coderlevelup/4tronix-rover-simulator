@@ -282,21 +282,30 @@
     <div class="main-container">
         <!-- Camera Panel (Always Visible) -->
         <div class="camera-panel">
-            <!-- Rover Mast Cam -->
-            <div class="camera-feed">
-                <h2 class="camera-title">Rover Mast Cam</h2>
-                <div class="camera-container">
-                    <video id="rover-camera-feed" autoplay muted playsinline style="width: 100%; max-width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: rgb(30, 30, 30);"></video>
-                    <div id="rover-camera-message" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; text-align: center; justify-content: center; font-size: 16px; font-weight: bold; color: white; pointer-events: none; padding: 20px; box-sizing: border-box; text-shadow: 0 0 5px black;">Connecting...</div>
+            <!-- Mode Toggle -->
+            <div class="mode-toggle mb-3">
+                <div class="form-check form-switch d-flex align-items-center">
+                    <span class="me-2" id="simLabel">Sim</span>
+                    <input class="form-check-input" type="checkbox" id="modeToggle" onchange="toggleMode()">
+                    <span class="ms-2" id="realLabel">Real</span>
                 </div>
             </div>
             
             <!-- Satellite Cam -->
             <div class="camera-feed">
-                <h2 class="camera-title">Satellite View</h2>
+                <h2 class="camera-title" id="satellite-camera-title">Satellite View</h2>
                 <div class="camera-container">
                     <video id="satellite-camera-feed" autoplay muted playsinline style="width: 100%; max-width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: rgb(30, 30, 30);"></video>
                     <div id="satellite-camera-message" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; text-align: center; justify-content: center; font-size: 16px; font-weight: bold; color: white; pointer-events: none; padding: 20px; box-sizing: border-box; text-shadow: 0 0 5px black;">Connecting...</div>
+                </div>
+            </div>
+            
+            <!-- Rover Mast Cam -->
+            <div class="camera-feed">
+                <h2 class="camera-title" id="rover-camera-title">Rover Mast Cam</h2>
+                <div class="camera-container">
+                    <video id="rover-camera-feed" autoplay muted playsinline style="width: 100%; max-width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: rgb(30, 30, 30);"></video>
+                    <div id="rover-camera-message" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; text-align: center; justify-content: center; font-size: 16px; font-weight: bold; color: white; pointer-events: none; padding: 20px; box-sizing: border-box; text-shadow: 0 0 5px black;">Connecting...</div>
                 </div>
             </div>
         </div>
@@ -414,7 +423,7 @@
                 <div class="row">
                     <div class="col-md-8">
                         <div id="blocklyDiv" style="height: 500px; width: 100%; border: 1px solid #ccc;"></div>
-                    </div>
+        </div>
                     <div class="col-md-4">
                         <div class="card">
                             <div class="card-header">
@@ -496,7 +505,7 @@
         }
 
         // WebRTC Camera Feed Implementation
-        const retryPause = 2000;
+        const retryPause = 5000; // Increased retry delay
         
         // Camera configurations
         const cameras = {
@@ -504,31 +513,221 @@
                 video: document.getElementById('rover-camera-feed'),
                 message: document.getElementById('rover-camera-message'),
                 whepUrl: 'http://marspi.local:8889/cam/whep',
+                simUrl: 'ws://localhost:8889',
                 pc: null,
                 restartTimeout: null,
                 sessionUrl: '',
                 offerData: '',
-                queuedCandidates: []
+                queuedCandidates: [],
+                websocket: null
             },
             satellite: {
                 video: document.getElementById('satellite-camera-feed'),
                 message: document.getElementById('satellite-camera-message'),
                 whepUrl: 'http://marsorbit.local:8889/cam/whep',
+                simUrl: 'ws://localhost:8889',
                 pc: null,
                 restartTimeout: null,
                 sessionUrl: '',
                 offerData: '',
-                queuedCandidates: []
+                queuedCandidates: [],
+                websocket: null
             }
         };
         
+        let isSimulationMode = true;
+        
         let defaultControls = false;
+        
+        // Mode toggle function with debounce
+        let toggleTimeout = null;
+        function toggleMode() {
+            // Clear any pending toggle
+            if (toggleTimeout) {
+                clearTimeout(toggleTimeout);
+            }
+            
+            // Debounce the toggle to prevent rapid switching
+            toggleTimeout = setTimeout(() => {
+                const toggle = document.getElementById('modeToggle');
+                const roverTitle = document.getElementById('rover-camera-title');
+                const satelliteTitle = document.getElementById('satellite-camera-title');
+                const roverFeed = document.getElementById('rover-camera-feed').parentElement;
+                const satelliteFeed = document.getElementById('satellite-camera-feed').parentElement;
+                
+                isSimulationMode = !toggle.checked;
+                
+                if (isSimulationMode) {
+                    roverTitle.textContent = 'Rover Simulator';
+                    satelliteTitle.textContent = 'Satellite View';
+                    // Hide rover feed completely, show only satellite feed
+                    roverFeed.style.display = 'none';
+                    satelliteFeed.style.display = 'block';
+                } else {
+                    roverTitle.textContent = 'Rover Mast Cam';
+                    satelliteTitle.textContent = 'Satellite View';
+                    // Show both feeds with satellite at top
+                    roverFeed.style.display = 'block';
+                    satelliteFeed.style.display = 'block';
+                }
+                
+                // Restart camera feeds with new mode
+                restartCameraFeeds();
+            }, 300); // 300ms debounce
+        }
+        
+        // WebSocket handling for simulator
+        function connectSimulatorWebSocket(camera) {
+            if (camera.websocket) {
+                camera.websocket.close();
+            }
+            
+            // Prevent multiple connection attempts
+            if (camera.connecting) {
+                return;
+            }
+            camera.connecting = true;
+            
+            camera.websocket = new WebSocket(camera.simUrl);
+            
+            camera.websocket.onopen = function() {
+                camera.connecting = false;
+                camera.reconnectAttempts = 0;
+                setMessage(camera, '');
+            };
+            
+            camera.websocket.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'frame') {
+                        // Only process frames for satellite camera in simulation mode
+                        if (camera.video.id === 'rover-camera-feed' && isSimulationMode) {
+                            return;
+                        }
+                        
+                        // Only update if we have a valid frame
+                        if (data.data && data.data.length > 0) {
+                            // Create image from base64 data
+                            const img = new Image();
+                            img.onload = function() {
+                                // Only update if we're still in simulation mode
+                                if (!isSimulationMode) {
+                                    return;
+                                }
+                                
+                                // Throttle updates to prevent excessive processing
+                                if (camera.lastFrameTime) {
+                                    const timeSinceLastFrame = Date.now() - camera.lastFrameTime;
+                                    if (timeSinceLastFrame < 100) { // Max 10 FPS
+                                        return;
+                                    }
+                                }
+                                camera.lastFrameTime = Date.now();
+                                
+                                // Create or reuse canvas for this camera
+                                if (!camera.canvas) {
+                                    camera.canvas = document.createElement('canvas');
+                                    camera.ctx = camera.canvas.getContext('2d');
+                                    camera.canvas.width = img.width;
+                                    camera.canvas.height = img.height;
+                                    
+                                    // Create stream once and reuse it
+                                    camera.stream = camera.canvas.captureStream(10); // Match simulator FPS
+                                    camera.video.srcObject = camera.stream;
+                                }
+                                
+                                // Update canvas with new image
+                                camera.ctx.drawImage(img, 0, 0);
+                                
+                                // Hide loading message
+                                setMessage(camera, '');
+                            };
+                            img.onerror = function(e) {
+                                console.error('Error loading image:', e);
+                            };
+                            img.src = 'data:image/jpeg;base64,' + data.data;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error processing simulator frame:', e);
+                }
+            };
+            
+            camera.websocket.onclose = function(event) {
+                camera.connecting = false;
+                
+                // Only show message and retry if we're still in simulation mode
+                if (isSimulationMode) {
+                    setMessage(camera, 'Simulator disconnected');
+                    
+                    // Only retry if we haven't exceeded max attempts
+                    if (!camera.reconnectAttempts || camera.reconnectAttempts < 5) {
+                        camera.reconnectAttempts = (camera.reconnectAttempts || 0) + 1;
+                        setTimeout(() => {
+                            if (isSimulationMode) {
+                                connectSimulatorWebSocket(camera);
+                            }
+                        }, retryPause * camera.reconnectAttempts); // Exponential backoff
+                    }
+                }
+            };
+            
+            camera.websocket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                camera.connecting = false;
+                if (isSimulationMode) {
+                    setMessage(camera, 'Simulator connection error');
+                }
+            };
+        }
+        
+        // Restart camera feeds based on current mode
+        function restartCameraFeeds() {
+            Object.values(cameras).forEach(camera => {
+                // Close existing connections
+                if (camera.pc) {
+                    camera.pc.close();
+                    camera.pc = null;
+                }
+                if (camera.websocket) {
+                    camera.websocket.close();
+                    camera.websocket = null;
+                }
+                
+                // Clean up canvas and stream
+                if (camera.canvas) {
+                    camera.canvas = null;
+                    camera.ctx = null;
+                    camera.stream = null;
+                }
+                
+                // Clear restart timeout
+                if (camera.restartTimeout) {
+                    clearTimeout(camera.restartTimeout);
+                    camera.restartTimeout = null;
+                }
+                
+                // Reset connection state
+                camera.connecting = false;
+                camera.reconnectAttempts = 0;
+                
+                // Start appropriate connection
+                if (isSimulationMode) {
+                    connectSimulatorWebSocket(camera);
+                } else {
+                    loadStream(camera);
+                }
+            });
+        }
 
         const setMessage = (camera, str) => {
             if (str !== '') {
                 camera.video.controls = false;
+                camera.video.style.display = 'none';
             } else {
                 camera.video.controls = defaultControls;
+                camera.video.style.display = 'block';
             }
             camera.message.innerText = str;
         };
@@ -843,9 +1042,23 @@
 
         const init = () => {
             loadAttributesFromQuery();
-            // Initialize both camera feeds
-            loadStream(cameras.rover);
-            loadStream(cameras.satellite);
+            
+            // Set initial display state for simulation mode
+            const roverFeed = document.getElementById('rover-camera-feed').parentElement;
+            const satelliteFeed = document.getElementById('satellite-camera-feed').parentElement;
+            
+            if (isSimulationMode) {
+                // Hide rover feed, show satellite feed in simulation mode
+                roverFeed.style.display = 'none';
+                satelliteFeed.style.display = 'block';
+            } else {
+                // Show both feeds in real rover mode
+                roverFeed.style.display = 'block';
+                satelliteFeed.style.display = 'block';
+            }
+            
+            // Initialize camera feeds based on current mode
+            restartCameraFeeds();
         };
 
         // Initialize camera feeds when page loads
