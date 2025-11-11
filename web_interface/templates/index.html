@@ -8,7 +8,7 @@
             display: flex;
             min-height: 100vh;
         }
-        .camera-panel {
+        .simulator-panel {
             flex: 0 0 50%;
             background-color: #f8f9fa;
             padding: 20px;
@@ -51,10 +51,32 @@
             font-size: 1.2em;
             font-weight: bold;
         }
-        .camera-container {
+        .simulator-container {
             text-align: center;
             margin: 20px auto;
             position: relative;
+        }
+        .connection-status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .connection-status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .connection-status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .connection-status.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
         }
         #blocklyDiv {
             display: none;
@@ -254,14 +276,14 @@
         .blocklyZoom:hover {
             fill: #f0f0f0;
         }
-        #camera-feed {
+        #simulator-feed {
             width: 100%;
             max-width: 100%;
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             background-color: #000;
         }
-        .camera-title {
+        .simulator-title {
             text-align: center;
             margin-bottom: 20px;
             color: #495057;
@@ -270,7 +292,7 @@
             .main-container {
                 flex-direction: column;
             }
-            .camera-panel {
+            .simulator-panel {
                 flex: none;
                 border-right: none;
                 border-bottom: 2px solid #dee2e6;
@@ -280,33 +302,27 @@
 </head>
 <body>
     <div class="main-container">
-        <!-- Camera Panel (Always Visible) -->
-        <div class="camera-panel">
-            <!-- Mode Toggle -->
-            <div class="mode-toggle mb-3">
-                <div class="form-check form-switch d-flex align-items-center">
-                    <span class="me-2" id="simLabel">Sim</span>
-                    <input class="form-check-input" type="checkbox" id="modeToggle" onchange="toggleMode()">
-                    <span class="ms-2" id="realLabel">Real</span>
+        <!-- Simulator Panel -->
+        <div class="simulator-panel">
+            <h2 class="simulator-title" id="simulator-title">Simulator View</h2>
+
+            <!-- Connection Status -->
+            <div id="connection-status" class="connection-status disconnected">
+                Disconnected
+            </div>
+
+            <!-- Simulator Feed -->
+            <div class="simulator-container">
+                <canvas id="simulator-feed" width="640" height="480"></canvas>
+                <div id="simulator-message" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; text-align: center; justify-content: center; font-size: 16px; font-weight: bold; color: white; pointer-events: none; padding: 20px; box-sizing: border-box; text-shadow: 0 0 5px black;">
+                    Connecting to simulator...
                 </div>
             </div>
-            
-            <!-- Satellite Cam -->
-            <div class="camera-feed">
-                <h2 class="camera-title" id="satellite-camera-title">Satellite View</h2>
-                <div class="camera-container">
-                    <video id="satellite-camera-feed" autoplay muted playsinline style="width: 100%; max-width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: rgb(30, 30, 30);"></video>
-                    <div id="satellite-camera-message" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; text-align: center; justify-content: center; font-size: 16px; font-weight: bold; color: white; pointer-events: none; padding: 20px; box-sizing: border-box; text-shadow: 0 0 5px black;">Connecting...</div>
-                </div>
-            </div>
-            
-            <!-- Rover Mast Cam -->
-            <div class="camera-feed">
-                <h2 class="camera-title" id="rover-camera-title">Rover Mast Cam</h2>
-                <div class="camera-container">
-                    <video id="rover-camera-feed" autoplay muted playsinline style="width: 100%; max-width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); background: rgb(30, 30, 30);"></video>
-                    <div id="rover-camera-message" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; text-align: center; justify-content: center; font-size: 16px; font-weight: bold; color: white; pointer-events: none; padding: 20px; box-sizing: border-box; text-shadow: 0 0 5px black;">Connecting...</div>
-                </div>
+
+            <!-- Connection Controls -->
+            <div class="mt-3">
+                <button id="connect-btn" class="btn btn-primary">Connect</button>
+                <button id="disconnect-btn" class="btn btn-secondary" disabled>Disconnect</button>
             </div>
         </div>
 
@@ -314,16 +330,25 @@
         <div class="control-panel">
             <h1 class="text-center mb-4">Rover Control</h1>
 
+            <!-- Target Selector -->
+            <div class="mb-4 text-center">
+                <div class="btn-group" role="group" aria-label="Rover Target">
+                    <input type="radio" class="btn-check" name="target" id="target-simulator" value="simulator" autocomplete="off" checked>
+                    <label class="btn btn-outline-primary" for="target-simulator">Simulator</label>
+
+                    <input type="radio" class="btn-check" name="target" id="target-marspi" value="marspi" autocomplete="off">
+                    <label class="btn btn-outline-primary" for="target-marspi">MarsPI (Real Rover)</label>
+                </div>
+                <div id="target-status" class="mt-2 text-muted">
+                    <small>Connected to: <span id="current-target">simulator</span></small>
+                </div>
+            </div>
+
         <!-- Navigation tabs -->
             <ul class="nav nav-tabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual" type="button" role="tab">
                     Manual Control
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="sequence-tab" data-bs-toggle="tab" data-bs-target="#sequence" type="button" role="tab">
-                    Sequence Builder
                 </button>
             </li>
             <li class="nav-item" role="presentation">
@@ -350,102 +375,16 @@
                 </div>
             </div>
 
-            <!-- Sequence Builder Tab -->
-            <div class="tab-pane fade" id="sequence" role="tabpanel">
-                <div class="sequence-grid">
-                    <!-- Instruction 1 -->
-                    <select class="form-select" id="cmd1">
-                        <option value="">Select command...</option>
-                        <option value="forward">Forward</option>
-                        <option value="backward">Backward</option>
-                        <option value="spin_left">Spin Left</option>
-                        <option value="spin_right">Spin Right</option>
-                    </select>
-                    <select class="form-select" id="time1">
-                        <option value="1">1 second</option>
-                        <option value="2">2 seconds</option>
-                        <option value="3">3 seconds</option>
-                    </select>
-                    <button class="btn btn-secondary" onclick="clearInstruction(1)">Clear</button>
-
-                    <!-- Instructions 2-4 (repeat above pattern) -->
-                    <select class="form-select" id="cmd2">
-                        <option value="">Select command...</option>
-                        <option value="forward">Forward</option>
-                        <option value="backward">Backward</option>
-                        <option value="spin_left">Spin Left</option>
-                        <option value="spin_right">Spin Right</option>
-                    </select>
-                    <select class="form-select" id="time2">
-                        <option value="1">1 second</option>
-                        <option value="2">2 seconds</option>
-                        <option value="3">3 seconds</option>
-                    </select>
-                    <button class="btn btn-secondary" onclick="clearInstruction(2)">Clear</button>
-
-                    <select class="form-select" id="cmd3">
-                        <option value="">Select command...</option>
-                        <option value="forward">Forward</option>
-                        <option value="backward">Backward</option>
-                        <option value="spin_left">Spin Left</option>
-                        <option value="spin_right">Spin Right</option>
-                    </select>
-                    <select class="form-select" id="time3">
-                        <option value="1">1 second</option>
-                        <option value="2">2 seconds</option>
-                        <option value="3">3 seconds</option>
-                    </select>
-                    <button class="btn btn-secondary" onclick="clearInstruction(3)">Clear</button>
-
-                    <select class="form-select" id="cmd4">
-                        <option value="">Select command...</option>
-                        <option value="forward">Forward</option>
-                        <option value="backward">Backward</option>
-                        <option value="spin_left">Spin Left</option>
-                        <option value="spin_right">Spin Right</option>
-                    </select>
-                    <select class="form-select" id="time4">
-                        <option value="1">1 second</option>
-                        <option value="2">2 seconds</option>
-                        <option value="3">3 seconds</option>
-                    </select>
-                    <button class="btn btn-secondary" onclick="clearInstruction(4)">Clear</button>
-                </div>
-                
-                <div class="mt-3">
-                    <button class="btn btn-success btn-lg" onclick="runSequence()">Run Sequence</button>
-                </div>
-                </div>
-            </div>
-
             <!-- Blockly Programming Tab -->
             <div class="tab-pane fade" id="blockly" role="tabpanel">
-                <div class="row">
-                    <div class="col-md-8">
-                        <div id="blocklyDiv" style="height: 500px; width: 100%; border: 1px solid #ccc;"></div>
-        </div>
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Code Controls</h5>
-                            </div>
-                            <div class="card-body">
-
-
-                                <div class="mb-3">
-                                    <label for="blocklyCode" class="form-label">Python Code</label>
-                                    <textarea class="form-control" id="blocklyCode" rows="10" readonly></textarea>
-                                </div>
-                                
-                                <div class="d-grid gap-2">
-                                    <button class="btn btn-primary" onclick="runBlocklyCode()">Run Code</button>
-                                    <button class="btn btn-danger" onclick="stopRover()">Stop Rover</button>
-
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <!-- Code Controls -->
+                <div class="mb-3 text-center">
+                    <button class="btn btn-primary btn-lg me-2" onclick="runBlocklyCode()">Run Code</button>
+                    <button class="btn btn-danger btn-lg" onclick="stopRover()">Stop Rover</button>
                 </div>
+
+                <!-- Blockly Editor -->
+                <div id="blocklyDiv" style="height: 500px; width: 100%; border: 1px solid #ccc;"></div>
             </div>
         </div>
     </div>
@@ -473,599 +412,301 @@
               .catch(error => console.error('Error:', error));
         }
 
-        function clearInstruction(num) {
-            document.getElementById(`cmd${num}`).value = '';
-            document.getElementById(`time${num}`).value = '1';
+        // Target switching functions
+        function switchTarget(targetName) {
+            fetch(`/target/${targetName}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById('current-target').textContent = data.target;
+                    console.log(`Switched to ${data.target}: ${data.url}`);
+                } else {
+                    console.error('Failed to switch target:', data.message);
+                    alert('Failed to switch target: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error switching target:', error);
+                alert('Error switching target. Is the server running?');
+            });
         }
 
-        function runSequence() {
-            const sequence = [];
-            for (let i = 1; i <= 4; i++) {
-                const cmd = document.getElementById(`cmd${i}`).value;
-                const time = document.getElementById(`time${i}`).value;
-                if (cmd) {
-                    sequence.push({cmd, time});
-                }
-            }
-            
-            if (sequence.length === 0) {
-                alert('Please add at least one instruction');
-                return;
+        function loadCurrentTarget() {
+            fetch('/target')
+            .then(response => response.json())
+            .then(data => {
+                const currentTarget = data.current;
+                document.getElementById('current-target').textContent = currentTarget;
+                document.getElementById(`target-${currentTarget}`).checked = true;
+            })
+            .catch(error => console.error('Error loading target:', error));
+        }
+
+
+        // Video streaming client (handles both simulator and Pi camera)
+        class VideoStreamClient {
+            constructor() {
+                this.streamUrls = {
+                    'simulator': 'ws://localhost:8889',
+                    'marspi': 'ws://localhost:8890'  // Pi AI camera stream
+                };
+                this.currentTarget = 'simulator';
+                this.websocketUrl = this.streamUrls[this.currentTarget];
+                this.websocket = null;
+                this.connected = false;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 10;
+                this.reconnectInterval = 5000;
+                this.reconnectTimeout = null;
+
+                // Canvas setup
+                this.canvas = document.getElementById('simulator-feed');
+                this.ctx = this.canvas.getContext('2d');
+
+                // UI elements
+                this.connectionStatus = document.getElementById('connection-status');
+                this.simulatorMessage = document.getElementById('simulator-message');
+                this.connectBtn = document.getElementById('connect-btn');
+                this.disconnectBtn = document.getElementById('disconnect-btn');
+
+                // Setup event listeners
+                this.setupEventListeners();
             }
 
-            fetch('/sequence', {
+            setupEventListeners() {
+                this.connectBtn.addEventListener('click', () => this.connect());
+                this.disconnectBtn.addEventListener('click', () => this.disconnect());
+            }
+
+            switchTarget(target) {
+                // Disconnect from current stream
+                if (this.connected) {
+                    this.disconnect();
+                }
+
+                // Update target and URL
+                this.currentTarget = target;
+                this.websocketUrl = this.streamUrls[target];
+                this.reconnectAttempts = 0;
+
+                // Update UI title
+                const title = document.querySelector('.simulator-title');
+                if (target === 'simulator') {
+                    title.textContent = 'Simulator View';
+                } else {
+                    title.textContent = 'Pi AI Camera View';
+                }
+
+                // Auto-connect to new stream
+                setTimeout(() => {
+                    this.connect();
+                }, 500);
+            }
+
+            async connect() {
+                if (this.connected) return;
+
+                this.updateConnectionStatus('connecting', 'Connecting...');
+                this.connectBtn.disabled = true;
+
+                try {
+                    this.websocket = new WebSocket(this.websocketUrl);
+
+                    this.websocket.onopen = () => {
+                        this.connected = true;
+                        this.reconnectAttempts = 0;
+                        this.updateConnectionStatus('connected', 'Connected');
+                        this.connectBtn.disabled = true;
+                        this.disconnectBtn.disabled = false;
+                        this.hideSimulatorMessage();
+                        console.log('Connected to simulator stream');
+                    };
+
+                    this.websocket.onmessage = (event) => {
+                        this.handleMessage(event.data);
+                    };
+
+                    this.websocket.onclose = () => {
+                        this.connected = false;
+                        this.updateConnectionStatus('disconnected', 'Disconnected');
+                        this.connectBtn.disabled = false;
+                        this.disconnectBtn.disabled = true;
+                        this.showSimulatorMessage('Disconnected');
+                        console.log('Simulator stream closed');
+                        this.handleReconnect();
+                    };
+
+                    this.websocket.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        this.updateConnectionStatus('disconnected', 'Connection Error');
+                    };
+
+                } catch (error) {
+                    console.error('Failed to connect:', error);
+                    this.updateConnectionStatus('disconnected', 'Connection Failed');
+                    this.connectBtn.disabled = false;
+                    this.handleReconnect();
+                }
+            }
+
+            disconnect() {
+                if (this.websocket) {
+                    this.websocket.close();
+                    this.websocket = null;
+                }
+                this.connected = false;
+                this.updateConnectionStatus('disconnected', 'Disconnected');
+                this.connectBtn.disabled = false;
+                this.disconnectBtn.disabled = true;
+                this.showSimulatorMessage('Disconnected');
+
+                if (this.reconnectTimeout) {
+                    clearTimeout(this.reconnectTimeout);
+                    this.reconnectTimeout = null;
+                }
+            }
+
+            handleReconnect() {
+                if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                    console.log('Max reconnection attempts reached');
+                    this.showSimulatorMessage('Start simulator with --stream flag');
+                    return;
+                }
+
+                this.reconnectAttempts++;
+                console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+
+                this.reconnectTimeout = setTimeout(() => {
+                    if (!this.connected) {
+                        this.connect();
+                    }
+                }, this.reconnectInterval);
+            }
+
+            handleMessage(data) {
+                try {
+                    const message = JSON.parse(data);
+
+                    if (message.type === 'frame') {
+                        this.displayFrame(message.data);
+                    }
+                } catch (error) {
+                    console.error('Error parsing message:', error);
+                }
+            }
+
+            displayFrame(frameData) {
+                try {
+                    const img = new Image();
+                    img.onload = () => {
+                        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                        this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+                        this.hideSimulatorMessage();
+                    };
+                    img.onerror = (error) => {
+                        console.error('Error loading image:', error);
+                    };
+                    img.src = 'data:image/jpeg;base64,' + frameData;
+                } catch (error) {
+                    console.error('Error displaying frame:', error);
+                }
+            }
+
+            updateConnectionStatus(status, message) {
+                this.connectionStatus.className = `connection-status ${status}`;
+                this.connectionStatus.textContent = message;
+            }
+
+            showSimulatorMessage(message) {
+                this.simulatorMessage.textContent = message;
+                this.simulatorMessage.style.display = 'flex';
+            }
+
+            hideSimulatorMessage() {
+                this.simulatorMessage.style.display = 'none';
+            }
+        }
+
+        // Initialize video stream client
+        const streamClient = new VideoStreamClient();
+
+        // Rover control functions
+        function sendCommand(cmd, speed = 100) {
+            fetch(`/command/${cmd}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({sequence})
+                body: JSON.stringify({speed: speed})
             }).then(response => response.json())
               .then(data => console.log(data))
               .catch(error => console.error('Error:', error));
         }
 
-        // WebRTC Camera Feed Implementation
-        const retryPause = 5000; // Increased retry delay
-        
-        // Camera configurations
-        const cameras = {
-            rover: {
-                video: document.getElementById('rover-camera-feed'),
-                message: document.getElementById('rover-camera-message'),
-                whepUrl: 'http://marspi.local:8889/cam/whep',
-                simUrl: 'ws://localhost:8889',
-                pc: null,
-                restartTimeout: null,
-                sessionUrl: '',
-                offerData: '',
-                queuedCandidates: [],
-                websocket: null
-            },
-            satellite: {
-                video: document.getElementById('satellite-camera-feed'),
-                message: document.getElementById('satellite-camera-message'),
-                whepUrl: 'http://marsorbit.local:8889/cam/whep',
-                simUrl: 'ws://localhost:8889',
-                pc: null,
-                restartTimeout: null,
-                sessionUrl: '',
-                offerData: '',
-                queuedCandidates: [],
-                websocket: null
-            }
-        };
-        
-        let isSimulationMode = true;
-        
-        let defaultControls = false;
-        
-        // Mode toggle function with debounce
-        let toggleTimeout = null;
-        function toggleMode() {
-            // Clear any pending toggle
-            if (toggleTimeout) {
-                clearTimeout(toggleTimeout);
-            }
-            
-            // Debounce the toggle to prevent rapid switching
-            toggleTimeout = setTimeout(() => {
-                const toggle = document.getElementById('modeToggle');
-                const roverTitle = document.getElementById('rover-camera-title');
-                const satelliteTitle = document.getElementById('satellite-camera-title');
-                const roverFeed = document.getElementById('rover-camera-feed').parentElement;
-                const satelliteFeed = document.getElementById('satellite-camera-feed').parentElement;
-                
-                isSimulationMode = !toggle.checked;
-                
-                if (isSimulationMode) {
-                    roverTitle.textContent = 'Rover Simulator';
-                    satelliteTitle.textContent = 'Satellite View';
-                    // Hide rover feed completely, show only satellite feed
-                    roverFeed.style.display = 'none';
-                    satelliteFeed.style.display = 'block';
-                } else {
-                    roverTitle.textContent = 'Rover Mast Cam';
-                    satelliteTitle.textContent = 'Satellite View';
-                    // Show both feeds with satellite at top
-                    roverFeed.style.display = 'block';
-                    satelliteFeed.style.display = 'block';
-                }
-                
-                // Restart camera feeds with new mode
-                restartCameraFeeds();
-            }, 300); // 300ms debounce
-        }
-        
-        // WebSocket handling for simulator
-        function connectSimulatorWebSocket(camera) {
-            if (camera.websocket) {
-                camera.websocket.close();
-            }
-            
-            // Prevent multiple connection attempts
-            if (camera.connecting) {
-                return;
-            }
-            camera.connecting = true;
-            
-            camera.websocket = new WebSocket(camera.simUrl);
-            
-            camera.websocket.onopen = function() {
-                camera.connecting = false;
-                camera.reconnectAttempts = 0;
-                setMessage(camera, '');
-            };
-            
-            camera.websocket.onmessage = function(event) {
-                try {
-                    const data = JSON.parse(event.data);
-                    
-                    if (data.type === 'frame') {
-                        // Only process frames for satellite camera in simulation mode
-                        if (camera.video.id === 'rover-camera-feed' && isSimulationMode) {
-                            return;
-                        }
-                        
-                        // Only update if we have a valid frame
-                        if (data.data && data.data.length > 0) {
-                            // Create image from base64 data
-                            const img = new Image();
-                            img.onload = function() {
-                                // Only update if we're still in simulation mode
-                                if (!isSimulationMode) {
-                                    return;
-                                }
-                                
-                                // Throttle updates to prevent excessive processing
-                                if (camera.lastFrameTime) {
-                                    const timeSinceLastFrame = Date.now() - camera.lastFrameTime;
-                                    if (timeSinceLastFrame < 100) { // Max 10 FPS
-                                        return;
-                                    }
-                                }
-                                camera.lastFrameTime = Date.now();
-                                
-                                // Create or reuse canvas for this camera
-                                if (!camera.canvas) {
-                                    camera.canvas = document.createElement('canvas');
-                                    camera.ctx = camera.canvas.getContext('2d');
-                                    camera.canvas.width = img.width;
-                                    camera.canvas.height = img.height;
-                                    
-                                    // Create stream once and reuse it
-                                    camera.stream = camera.canvas.captureStream(10); // Match simulator FPS
-                                    camera.video.srcObject = camera.stream;
-                                }
-                                
-                                // Update canvas with new image
-                                camera.ctx.drawImage(img, 0, 0);
-                                
-                                // Hide loading message
-                                setMessage(camera, '');
-                            };
-                            img.onerror = function(e) {
-                                console.error('Error loading image:', e);
-                            };
-                            img.src = 'data:image/jpeg;base64,' + data.data;
-                        }
-                    }
-                } catch (e) {
-                    console.error('Error processing simulator frame:', e);
-                }
-            };
-            
-            camera.websocket.onclose = function(event) {
-                camera.connecting = false;
-                
-                // Only show message and retry if we're still in simulation mode
-                if (isSimulationMode) {
-                    setMessage(camera, 'Simulator disconnected');
-                    
-                    // Only retry if we haven't exceeded max attempts
-                    if (!camera.reconnectAttempts || camera.reconnectAttempts < 5) {
-                        camera.reconnectAttempts = (camera.reconnectAttempts || 0) + 1;
-                        setTimeout(() => {
-                            if (isSimulationMode) {
-                                connectSimulatorWebSocket(camera);
-                            }
-                        }, retryPause * camera.reconnectAttempts); // Exponential backoff
-                    }
-                }
-            };
-            
-            camera.websocket.onerror = function(error) {
-                console.error('WebSocket error:', error);
-                camera.connecting = false;
-                if (isSimulationMode) {
-                    setMessage(camera, 'Simulator connection error');
-                }
-            };
-        }
-        
-        // Restart camera feeds based on current mode
-        function restartCameraFeeds() {
-            Object.values(cameras).forEach(camera => {
-                // Close existing connections
-                if (camera.pc) {
-                    camera.pc.close();
-                    camera.pc = null;
-                }
-                if (camera.websocket) {
-                    camera.websocket.close();
-                    camera.websocket = null;
-                }
-                
-                // Clean up canvas and stream
-                if (camera.canvas) {
-                    camera.canvas = null;
-                    camera.ctx = null;
-                    camera.stream = null;
-                }
-                
-                // Clear restart timeout
-                if (camera.restartTimeout) {
-                    clearTimeout(camera.restartTimeout);
-                    camera.restartTimeout = null;
-                }
-                
-                // Reset connection state
-                camera.connecting = false;
-                camera.reconnectAttempts = 0;
-                
-                // Start appropriate connection
-                if (isSimulationMode) {
-                    connectSimulatorWebSocket(camera);
-                } else {
-                    loadStream(camera);
-                }
-            });
-        }
-
-        const setMessage = (camera, str) => {
-            if (str !== '') {
-                camera.video.controls = false;
-                camera.video.style.display = 'none';
-            } else {
-                camera.video.controls = defaultControls;
-                camera.video.style.display = 'block';
-            }
-            camera.message.innerText = str;
-        };
-
-        const unquoteCredential = (v) => (
-            JSON.parse(`"${v}"`)
-        );
-
-        const linkToIceServers = (links) => (
-            (links !== null) ? links.split(', ').map((link) => {
-                const m = link.match(/^<(.+?)>; rel="ice-server"(; username="(.*?)"; credential="(.*?)"; credential-type="password")?/i);
-                const ret = {
-                    urls: [m[1]],
-                };
-
-                if (m[3] !== undefined) {
-                    ret.username = unquoteCredential(m[3]);
-                    ret.credential = unquoteCredential(m[4]);
-                    ret.credentialType = 'password';
-                }
-
-                return ret;
-            }) : []
-        );
-
-        const parseOffer = (offer) => {
-            const ret = {
-                iceUfrag: '',
-                icePwd: '',
-                medias: [],
-            };
-
-            for (const line of offer.split('\r\n')) {
-                if (line.startsWith('m=')) {
-                    ret.medias.push(line.slice('m='.length));
-                } else if (ret.iceUfrag === '' && line.startsWith('a=ice-ufrag:')) {
-                    ret.iceUfrag = line.slice('a=ice-ufrag:'.length);
-                } else if (ret.icePwd === '' && line.startsWith('a=ice-pwd:')) {
-                    ret.icePwd = line.slice('a=ice-pwd:'.length);
-                }
-            }
-
-            return ret;
-        };
-
-        const enableStereoOpus = (section) => {
-            let opusPayloadFormat = '';
-            let lines = section.split('\r\n');
-
-            for (let i = 0; i < lines.length; i++) {
-                if (lines[i].startsWith('a=rtpmap:') && lines[i].toLowerCase().includes('opus/')) {
-                    opusPayloadFormat = lines[i].slice('a=rtpmap:'.length).split(' ')[0];
-                    break;
-                }
-            }
-
-            if (opusPayloadFormat === '') {
-                return section;
-            }
-
-            for (let i = 0; i < lines.length; i++) {
-                if (lines[i].startsWith('a=fmtp:' + opusPayloadFormat + ' ')) {
-                    if (!lines[i].includes('stereo')) {
-                        lines[i] += ';stereo=1';
-                    }
-                    if (!lines[i].includes('sprop-stereo')) {
-                        lines[i] += ';sprop-stereo=1';
-                    }
-                }
-            }
-
-            return lines.join('\r\n');
-        };
-
-        const editOffer = (offer) => {
-            const sections = offer.sdp.split('m=');
-
-            for (let i = 0; i < sections.length; i++) {
-                const section = sections[i];
-                if (section.startsWith('audio')) {
-                    sections[i] = enableStereoOpus(section);
-                }
-            }
-
-            offer.sdp = sections.join('m=');
-        };
-
-        const generateSdpFragment = (od, candidates) => {
-            const candidatesByMedia = {};
-            for (const candidate of candidates) {
-                const mid = candidate.sdpMLineIndex;
-                if (candidatesByMedia[mid] === undefined) {
-                    candidatesByMedia[mid] = [];
-                }
-                candidatesByMedia[mid].push(candidate);
-            }
-
-            let frag = 'a=ice-ufrag:' + od.iceUfrag + '\r\n'
-                + 'a=ice-pwd:' + od.icePwd + '\r\n';
-
-            let mid = 0;
-
-            for (const media of od.medias) {
-                if (candidatesByMedia[mid] !== undefined) {
-                    frag += 'm=' + media + '\r\n'
-                        + 'a=mid:' + mid + '\r\n';
-
-                    for (const candidate of candidatesByMedia[mid]) {
-                        frag += 'a=' + candidate.candidate + '\r\n';
-                    }
-                }
-                mid++;
-            }
-
-            return frag;
-        };
-
-        const loadStream = (camera) => {
-            requestICEServers(camera);
-        };
-
-        const onError = (camera, err) => {
-            if (camera.restartTimeout === null) {
-                console.error('WebRTC Error for', camera.whepUrl, ':', err);
-                setMessage(camera, err + ', retrying in some seconds');
-
-                if (camera.pc !== null) {
-                    camera.pc.close();
-                    camera.pc = null;
-                }
-
-                camera.restartTimeout = window.setTimeout(() => {
-                    camera.restartTimeout = null;
-                    loadStream(camera);
-                }, retryPause);
-
-                if (camera.sessionUrl) {
-                    fetch(camera.sessionUrl, {
-                        method: 'DELETE',
-                    });
-                }
-                camera.sessionUrl = '';
-
-                camera.queuedCandidates = [];
-            }
-        };
-
-        const sendLocalCandidates = (camera, candidates) => {
-            fetch(camera.sessionUrl + window.location.search, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/trickle-ice-sdpfrag',
-                    'If-Match': '*',
-                },
-                body: generateSdpFragment(camera.offerData, candidates),
-            })
-                .then((res) => {
-                    switch (res.status) {
-                    case 204:
-                        break;
-                    case 404:
-                        throw new Error('stream not found');
-                    default:
-                        throw new Error(`bad status code ${res.status}`);
-                    }
-                })
-                .catch((err) => {
-                    onError(camera, err.toString());
-                });
-        };
-
-        const onLocalCandidate = (camera, evt) => {
-            if (camera.restartTimeout !== null) {
-                return;
-            }
-
-            if (evt.candidate !== null) {
-                if (camera.sessionUrl === '') {
-                    camera.queuedCandidates.push(evt.candidate);
-                } else {
-                    sendLocalCandidates(camera, [evt.candidate])
-                }
-            }
-        };
-
-        const onRemoteAnswer = (camera, sdp) => {
-            if (camera.restartTimeout !== null) {
-                return;
-            }
-
-            camera.pc.setRemoteDescription(new RTCSessionDescription({
-                type: 'answer',
-                sdp,
-            }));
-
-            if (camera.queuedCandidates.length !== 0) {
-                sendLocalCandidates(camera, camera.queuedCandidates);
-                camera.queuedCandidates = [];
-            }
-        };
-
-        const sendOffer = (camera, offer) => {
-            // Use correct WHEP endpoint
-            fetch(camera.whepUrl + window.location.search, {
+        // Target switching functions
+        function switchTarget(targetName) {
+            fetch(`/target/${targetName}`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/sdp',
-                },
-                body: offer.sdp,
+                    'Content-Type': 'application/json',
+                }
             })
-                .then((res) => {
-                    switch (res.status) {
-                    case 201:
-                        break;
-                    case 404:
-                        throw new Error('stream not found');
-                    default:
-                        throw new Error(`bad status code ${res.status}`);
-                    }
-                    camera.sessionUrl = new URL(res.headers.get('location'), camera.whepUrl.replace('/whep', '')).toString();
-                    return res.text();
-                })
-                .then((sdp) => onRemoteAnswer(camera, sdp))
-                .catch((err) => {
-                    onError(camera, err.toString());
-                });
-        };
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById('current-target').textContent = data.target;
+                    console.log(`Switched to ${data.target}: ${data.url}`);
 
-        const createOffer = (camera) => {
-            camera.pc.createOffer()
-                .then((offer) => {
-                    editOffer(offer);
-                    camera.offerData = parseOffer(offer.sdp);
-                    camera.pc.setLocalDescription(offer);
-                    sendOffer(camera, offer);
-                });
-        };
-
-        const onConnectionState = (camera) => {
-            if (camera.restartTimeout !== null) {
-                return;
-            }
-
-            if (camera.pc.iceConnectionState === 'disconnected') {
-                onError(camera, 'peer connection disconnected');
-            }
-        };
-
-        const onTrack = (camera, evt) => {
-            setMessage(camera, '');
-            camera.video.srcObject = evt.streams[0];
-        };
-
-        const requestICEServers = (camera) => {
-            const url = camera.whepUrl + window.location.search;
-            console.log('Requesting ICE servers from:', url);
-            
-            fetch(url, {
-                method: 'OPTIONS',
+                    // Switch video stream
+                    streamClient.switchTarget(data.target);
+                } else {
+                    console.error('Failed to switch target:', data.message);
+                    alert('Failed to switch target: ' + data.message);
+                }
             })
-                .then((res) => {
-                    console.log('ICE servers response status:', res.status);
-                    if (!res.ok) {
-                        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-                    }
-                    
-                    camera.pc = new RTCPeerConnection({
-                        iceServers: linkToIceServers(res.headers.get('Link')),
-                        sdpSemantics: 'unified-plan',
-                    });
-
-                    const direction = 'sendrecv';
-                    camera.pc.addTransceiver('video', { direction });
-                    camera.pc.addTransceiver('audio', { direction });
-
-                    camera.pc.onicecandidate = (evt) => onLocalCandidate(camera, evt);
-                    camera.pc.oniceconnectionstatechange = () => onConnectionState(camera);
-                    camera.pc.ontrack = (evt) => onTrack(camera, evt);
-
-                    createOffer(camera);
-                })
-                .catch((err) => {
-                    console.error('ICE servers request failed:', err);
-                    onError(camera, err.toString());
-                });
-        };
-
-        const parseBoolString = (str, defaultVal) => {
-            str = (str || '');
-
-            if (['1', 'yes', 'true'].includes(str.toLowerCase())) {
-                return true;
-            }
-            if (['0', 'no', 'false'].includes(str.toLowerCase())) {
-                return false;
-            }
-            return defaultVal;
-        };
-
-        const loadAttributesFromQuery = () => {
-            const params = new URLSearchParams(window.location.search);
-            defaultControls = parseBoolString(params.get('controls'), true);
-            
-            // Set attributes for all cameras
-            Object.values(cameras).forEach(camera => {
-                camera.video.controls = defaultControls;
-                camera.video.muted = parseBoolString(params.get('muted'), true);
-                camera.video.autoplay = parseBoolString(params.get('autoplay'), true);
-                camera.video.playsInline = parseBoolString(params.get('playsinline'), true);
+            .catch(error => {
+                console.error('Error switching target:', error);
+                alert('Error switching target. Is the server running?');
             });
-        };
+        }
 
-        const init = () => {
-            loadAttributesFromQuery();
-            
-            // Set initial display state for simulation mode
-            const roverFeed = document.getElementById('rover-camera-feed').parentElement;
-            const satelliteFeed = document.getElementById('satellite-camera-feed').parentElement;
-            
-            if (isSimulationMode) {
-                // Hide rover feed, show satellite feed in simulation mode
-                roverFeed.style.display = 'none';
-                satelliteFeed.style.display = 'block';
-            } else {
-                // Show both feeds in real rover mode
-                roverFeed.style.display = 'block';
-                satelliteFeed.style.display = 'block';
-            }
-            
-            // Initialize camera feeds based on current mode
-            restartCameraFeeds();
-        };
+        function loadCurrentTarget() {
+            fetch('/target')
+            .then(response => response.json())
+            .then(data => {
+                const currentTarget = data.current;
+                document.getElementById('current-target').textContent = currentTarget;
+                document.getElementById(`target-${currentTarget}`).checked = true;
+            })
+            .catch(error => console.error('Error loading target:', error));
+        }
 
-        // Initialize camera feeds when page loads
+        // Initialize page when DOM loads
         document.addEventListener('DOMContentLoaded', function() {
-            init();
             // Set manual tab as active by default
             showTab('manual');
+
+            // Load current target
+            loadCurrentTarget();
+
+            // Setup target radio button listeners
+            document.querySelectorAll('input[name="target"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        switchTarget(e.target.value);
+                    }
+                });
+            });
+
+            // Auto-connect to simulator stream after a short delay
+            setTimeout(() => {
+                streamClient.connect();
+            }, 1000);
         });
 
         function showTab(tabName) {
@@ -1133,11 +774,6 @@
             showTab('manual');
         });
 
-        document.getElementById('sequence-tab').addEventListener('click', function (event) {
-            event.preventDefault();
-            showTab('sequence');
-        });
-
         document.getElementById('blockly-tab').addEventListener('click', function (event) {
             event.preventDefault();
             showTab('blockly');
@@ -1193,8 +829,6 @@
                     isDragging = true;
                 } else if (event.type === Blockly.Events.BLOCK_DRAG_END) {
                     isDragging = false;
-                    // Update code when drag ends
-                    updateGeneratedCode();
                 }
             });
             
@@ -1218,11 +852,7 @@
                     if (updateTimeout) {
                         clearTimeout(updateTimeout);
                     }
-                    
-                    updateTimeout = setTimeout(function() {
-                        updateGeneratedCode();
-                    }, 50); // Small delay to ensure operations are complete
-                }
+                    }
             });
         }
 
@@ -1249,6 +879,7 @@
                 <category name="LEDs" colour="#FF6B6B">
                     <block type="rover_set_led"></block>
                 </category>
+                <category name="Variables" colour="#A55B80" custom="VARIABLE"></category>
                 <category name="Logic" colour="#5C81A6">
                     <block type="controls_if"></block>
                     <block type="logic_compare"></block>
@@ -1273,11 +904,12 @@
                 init: function() {
                     this.appendDummyInput()
                         .appendField("Move Forward")
-                        .appendField(new Blockly.FieldNumber(50, 0, 100), "SPEED");
+                        .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "TIME")
+                        .appendField("seconds");
                     this.setPreviousStatement(true, null);
                     this.setNextStatement(true, null);
                     this.setColour("#2196F3");
-                    this.setTooltip("Move the rover forward at specified speed");
+                    this.setTooltip("Move the rover forward for specified time in seconds");
                 }
             };
 
@@ -1286,11 +918,12 @@
                 init: function() {
                     this.appendDummyInput()
                         .appendField("Move Backward")
-                        .appendField(new Blockly.FieldNumber(50, 0, 100), "SPEED");
+                        .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "TIME")
+                        .appendField("seconds");
                     this.setPreviousStatement(true, null);
                     this.setNextStatement(true, null);
                     this.setColour("#2196F3");
-                    this.setTooltip("Move the rover backward at specified speed");
+                    this.setTooltip("Move the rover backward for specified time in seconds");
                 }
             };
 
@@ -1299,11 +932,12 @@
                 init: function() {
                     this.appendDummyInput()
                         .appendField("Spin Left")
-                        .appendField(new Blockly.FieldNumber(50, 0, 100), "SPEED");
+                        .appendField(new Blockly.FieldNumber(0.5, 0.1, 10, 0.1), "TIME")
+                        .appendField("seconds");
                     this.setPreviousStatement(true, null);
                     this.setNextStatement(true, null);
                     this.setColour("#2196F3");
-                    this.setTooltip("Spin the rover left at specified speed");
+                    this.setTooltip("Spin the rover left for specified time in seconds");
                 }
             };
 
@@ -1312,11 +946,12 @@
                 init: function() {
                     this.appendDummyInput()
                         .appendField("Spin Right")
-                        .appendField(new Blockly.FieldNumber(50, 0, 100), "SPEED");
+                        .appendField(new Blockly.FieldNumber(0.5, 0.1, 10, 0.1), "TIME")
+                        .appendField("seconds");
                     this.setPreviousStatement(true, null);
                     this.setNextStatement(true, null);
                     this.setColour("#2196F3");
-                    this.setTooltip("Spin the rover right at specified speed");
+                    this.setTooltip("Spin the rover right for specified time in seconds");
                 }
             };
 
@@ -1433,23 +1068,23 @@
 
             // Generate Python code for custom blocks
             Blockly.Python['rover_forward'] = function(block) {
-                const speed = block.getFieldValue('SPEED');
-                return `rover.forward(${speed})\n`;
+                const time = block.getFieldValue('TIME');
+                return `rover.forward(100)\ntime.sleep(${time})\nrover.stop()\n`;
             };
 
             Blockly.Python['rover_backward'] = function(block) {
-                const speed = block.getFieldValue('SPEED');
-                return `rover.reverse(${speed})\n`;
+                const time = block.getFieldValue('TIME');
+                return `rover.reverse(100)\ntime.sleep(${time})\nrover.stop()\n`;
             };
 
             Blockly.Python['rover_spin_left'] = function(block) {
-                const speed = block.getFieldValue('SPEED');
-                return `rover.spinLeft(${speed})\n`;
+                const time = block.getFieldValue('TIME');
+                return `rover.spinLeft(100)\ntime.sleep(${time})\nrover.stop()\n`;
             };
 
             Blockly.Python['rover_spin_right'] = function(block) {
-                const speed = block.getFieldValue('SPEED');
-                return `rover.spinRight(${speed})\n`;
+                const time = block.getFieldValue('TIME');
+                return `rover.spinRight(100)\ntime.sleep(${time})\nrover.stop()\n`;
             };
 
             Blockly.Python['rover_stop'] = function(block) {
@@ -1505,30 +1140,6 @@
             };
         }
 
-        function updateGeneratedCode() {
-            if (workspace) {
-                try {
-                    // Try Python generator first
-                    if (typeof Blockly.Python !== 'undefined') {
-                        const code = Blockly.Python.workspaceToCode(workspace);
-                        console.log('Generated Python code:', code);
-                        document.getElementById('blocklyCode').value = code;
-                    } else {
-                        // Fallback to custom code generation
-                        const code = generateCustomCode(workspace);
-                        console.log('Generated custom code:', code);
-                        document.getElementById('blocklyCode').value = code;
-                    }
-                } catch (error) {
-                    console.error('Code generation error:', error);
-                    // Fallback to custom code generation
-                    const code = generateCustomCode(workspace);
-                    document.getElementById('blocklyCode').value = code;
-                }
-            } else {
-                console.log('No workspace available for code generation');
-            }
-        }
 
         function generateCustomCode(workspace) {
             const blocks = workspace.getTopBlocks(false);
@@ -1545,43 +1156,43 @@
         function generateBlockChain(block, processedBlocks) {
             let code = '';
             let currentBlock = block;
-            
+
             while (currentBlock) {
                 // Skip if we've already processed this block
                 if (processedBlocks.has(currentBlock.id)) {
                     console.log('Skipping duplicate block:', currentBlock.type, currentBlock.id);
                     break;
                 }
-                
+
                 processedBlocks.add(currentBlock.id);
-                code += generateBlockCode(currentBlock);
+                code += generateBlockCode(currentBlock, processedBlocks);
                 currentBlock = currentBlock.getNextBlock();
             }
-            
+
             return code;
         }
 
-        function generateBlockCode(block) {
+        function generateBlockCode(block, processedBlocks) {
             const type = block.type;
             let code = '';
             console.log('Generating code for block:', type, block.id);
             
             switch (type) {
                 case 'rover_forward':
-                    const speed = block.getFieldValue('SPEED') || 50;
-                    code = `rover.forward(${speed})\n`;
+                    const fwdTime = block.getFieldValue('TIME') || 1;
+                    code = `rover.forward(100)\ntime.sleep(${fwdTime})\nrover.stop()\n`;
                     break;
                 case 'rover_backward':
-                    const backSpeed = block.getFieldValue('SPEED') || 50;
-                    code = `rover.reverse(${backSpeed})\n`;
+                    const backTime = block.getFieldValue('TIME') || 1;
+                    code = `rover.reverse(100)\ntime.sleep(${backTime})\nrover.stop()\n`;
                     break;
                 case 'rover_spin_left':
-                    const leftSpeed = block.getFieldValue('SPEED') || 50;
-                    code = `rover.spinLeft(${leftSpeed})\n`;
+                    const leftTime = block.getFieldValue('TIME') || 0.5;
+                    code = `rover.spinLeft(100)\ntime.sleep(${leftTime})\nrover.stop()\n`;
                     break;
                 case 'rover_spin_right':
-                    const rightSpeed = block.getFieldValue('SPEED') || 50;
-                    code = `rover.spinRight(${rightSpeed})\n`;
+                    const rightTime = block.getFieldValue('TIME') || 0.5;
+                    code = `rover.spinRight(100)\ntime.sleep(${rightTime})\nrover.stop()\n`;
                     break;
                 case 'rover_stop':
                     code = `rover.stop()\n`;
@@ -1597,14 +1208,14 @@
                     code = `rover.turnReverse(${leftRevSpeed}, ${rightRevSpeed})\n`;
                     break;
                 case 'rover_wait':
-                    const time = block.getFieldValue('TIME') || 1;
-                    code = `time.sleep(${time})\n`;
+                    const waitTime = block.getFieldValue('TIME') || 1;
+                    code = `time.sleep(${waitTime})\n`;
                     break;
                 case 'rover_repeat':
                     const times = block.getFieldValue('TIMES') || 3;
                     const doBlock = block.getInputTargetBlock('DO');
                     if (doBlock) {
-                        let doCode = generateBlockChain(doBlock);
+                        let doCode = generateBlockChain(doBlock, processedBlocks);
                         // Indent the code properly
                         const indentedCode = doCode.split('\n').map(line => '    ' + line).join('\n');
                         code = `for i in range(${times}):\n${indentedCode}`;
@@ -1613,7 +1224,7 @@
                 case 'rover_if_obstacle':
                     const ifBlock = block.getInputTargetBlock('DO');
                     if (ifBlock) {
-                        let ifCode = generateBlockChain(ifBlock);
+                        let ifCode = generateBlockChain(ifBlock, processedBlocks);
                         // Indent the code properly
                         const indentedCode = ifCode.split('\n').map(line => '    ' + line).join('\n');
                         code = `if rover.irAll():\n${indentedCode}`;
@@ -1684,41 +1295,78 @@
         function parseBlocklyCode(code, speed) {
             const commands = [];
             const lines = code.split('\n');
-            
-            for (let line of lines) {
-                line = line.trim();
-                if (line.includes('rover.forward(')) {
-                    const speedMatch = line.match(/rover\.forward\((\d+)\)/);
+
+            let i = 0;
+            while (i < lines.length) {
+                const line = lines[i].trimEnd();
+                const trimmedLine = line.trim();
+
+                // Check for loop
+                const loopMatch = trimmedLine.match(/^for\s+\w+\s+in\s+range\((\d+)\):/);
+                if (loopMatch) {
+                    const iterations = parseInt(loopMatch[1]);
+                    const indent = line.match(/^(\s*)/)[0].length;
+
+                    // Collect loop body
+                    const loopBody = [];
+                    i++;
+                    while (i < lines.length) {
+                        const bodyLine = lines[i];
+                        const bodyIndent = bodyLine.match(/^(\s*)/)[0].length;
+
+                        // Check if still in loop body
+                        if (bodyLine.trim() && bodyIndent <= indent) {
+                            break;
+                        }
+                        if (bodyLine.trim()) {
+                            loopBody.push(bodyLine);
+                        }
+                        i++;
+                    }
+
+                    // Parse loop body and repeat
+                    for (let iter = 0; iter < iterations; iter++) {
+                        const loopCommands = parseBlocklyCode(loopBody.join('\n'), speed);
+                        commands.push(...loopCommands);
+                    }
+                    continue;
+                }
+
+                // Parse individual commands
+                if (trimmedLine.includes('rover.forward(')) {
+                    const speedMatch = trimmedLine.match(/rover\.forward\((\d+)\)/);
                     commands.push({cmd: 'forward', speed: speedMatch ? parseInt(speedMatch[1]) : speed});
-                } else if (line.includes('rover.reverse(')) {
-                    const speedMatch = line.match(/rover\.reverse\((\d+)\)/);
+                } else if (trimmedLine.includes('rover.reverse(')) {
+                    const speedMatch = trimmedLine.match(/rover\.reverse\((\d+)\)/);
                     commands.push({cmd: 'backward', speed: speedMatch ? parseInt(speedMatch[1]) : speed});
-                } else if (line.includes('rover.spinLeft(')) {
-                    const speedMatch = line.match(/rover\.spinLeft\((\d+)\)/);
+                } else if (trimmedLine.includes('rover.spinLeft(')) {
+                    const speedMatch = trimmedLine.match(/rover\.spinLeft\((\d+)\)/);
                     commands.push({cmd: 'spin_left', speed: speedMatch ? parseInt(speedMatch[1]) : speed});
-                } else if (line.includes('rover.spinRight(')) {
-                    const speedMatch = line.match(/rover\.spinRight\((\d+)\)/);
+                } else if (trimmedLine.includes('rover.spinRight(')) {
+                    const speedMatch = trimmedLine.match(/rover\.spinRight\((\d+)\)/);
                     commands.push({cmd: 'spin_right', speed: speedMatch ? parseInt(speedMatch[1]) : speed});
-                } else if (line.includes('rover.stop()')) {
+                } else if (trimmedLine.includes('rover.stop()')) {
                     commands.push({cmd: 'stop', speed: 0});
-                } else if (line.includes('rover.turnForward(')) {
-                    const match = line.match(/rover\.turnForward\((\d+),\s*(\d+)\)/);
+                } else if (trimmedLine.includes('rover.turnForward(')) {
+                    const match = trimmedLine.match(/rover\.turnForward\((\d+),\s*(\d+)\)/);
                     if (match) {
                         commands.push({cmd: 'turn_forward', leftSpeed: parseInt(match[1]), rightSpeed: parseInt(match[2])});
                     }
-                } else if (line.includes('rover.turnReverse(')) {
-                    const match = line.match(/rover\.turnReverse\((\d+),\s*(\d+)\)/);
+                } else if (trimmedLine.includes('rover.turnReverse(')) {
+                    const match = trimmedLine.match(/rover\.turnReverse\((\d+),\s*(\d+)\)/);
                     if (match) {
                         commands.push({cmd: 'turn_reverse', leftSpeed: parseInt(match[1]), rightSpeed: parseInt(match[2])});
                     }
-                } else if (line.includes('time.sleep(')) {
-                    const timeMatch = line.match(/time\.sleep\(([\d.]+)\)/);
+                } else if (trimmedLine.includes('time.sleep(')) {
+                    const timeMatch = trimmedLine.match(/time\.sleep\(([\d.]+)\)/);
                     if (timeMatch) {
                         commands.push({cmd: 'wait', time: parseFloat(timeMatch[1])});
                     }
                 }
+
+                i++;
             }
-            
+
             return commands;
         }
 
@@ -1789,7 +1437,6 @@
         function clearBlocklyWorkspace() {
             if (workspace) {
                 workspace.clear();
-                updateGeneratedCode();
             }
         }
 
@@ -1809,7 +1456,6 @@
                     const xml = Blockly.Xml.textToDom(xmlText);
                     workspace.clear();
                     Blockly.Xml.domToWorkspace(xml, workspace);
-                    updateGeneratedCode();
                     alert('Code loaded from browser storage');
                 } else {
                     alert('No saved code found');

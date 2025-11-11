@@ -33,7 +33,7 @@ commands = {
 
 @app.route('/')
 def index():
-    return render_template('rtc_index.html')
+    return render_template('index.html')
 
 @app.route('/target', methods=['GET'])
 def get_target():
