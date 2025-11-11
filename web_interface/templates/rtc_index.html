@@ -1,27 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Rover Control - WebRTC</title>
+    <title>Rover Control</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .main-container {
             display: flex;
             min-height: 100vh;
         }
-        .camera-panel {
+        .simulator-panel {
             flex: 0 0 50%;
             background-color: #f8f9fa;
             padding: 20px;
             border-right: 2px solid #dee2e6;
             display: flex;
             flex-direction: column;
-        }
-        .camera-feed {
-            flex: 1;
-            margin-bottom: 20px;
-        }
-        .camera-feed:last-child {
-            margin-bottom: 0;
         }
         .control-panel {
             flex: 1;
@@ -37,19 +30,19 @@
         .control-grid button {
             height: 80px;
         }
-        .camera-container {
+        .simulator-container {
             text-align: center;
             margin: 20px auto;
             position: relative;
         }
-        #camera-feed {
+        #simulator-feed {
             width: 100%;
             max-width: 100%;
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             background-color: #000;
         }
-        .camera-title {
+        .simulator-title {
             text-align: center;
             margin-bottom: 20px;
             color: #495057;
@@ -80,7 +73,7 @@
             .main-container {
                 flex-direction: column;
             }
-            .camera-panel {
+            .simulator-panel {
                 flex: none;
                 border-right: none;
                 border-bottom: 2px solid #dee2e6;
@@ -90,23 +83,23 @@
 </head>
 <body>
     <div class="main-container">
-        <!-- Camera Panel -->
-        <div class="camera-panel">
-            <h2 class="camera-title">Rover Camera Feed</h2>
-            
+        <!-- Simulator Panel -->
+        <div class="simulator-panel">
+            <h2 class="simulator-title">Simulator View</h2>
+
             <!-- Connection Status -->
             <div id="connection-status" class="connection-status disconnected">
                 Disconnected
             </div>
-            
-            <!-- Camera Feed -->
-            <div class="camera-container">
-                <canvas id="camera-feed" width="640" height="480"></canvas>
-                <div id="camera-message" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; text-align: center; justify-content: center; font-size: 16px; font-weight: bold; color: white; pointer-events: none; padding: 20px; box-sizing: border-box; text-shadow: 0 0 5px black;">
-                    Connecting...
+
+            <!-- Simulator Feed -->
+            <div class="simulator-container">
+                <canvas id="simulator-feed" width="640" height="480"></canvas>
+                <div id="simulator-message" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; text-align: center; justify-content: center; font-size: 16px; font-weight: bold; color: white; pointer-events: none; padding: 20px; box-sizing: border-box; text-shadow: 0 0 5px black;">
+                    Connecting to simulator...
                 </div>
             </div>
-            
+
             <!-- Connection Controls -->
             <div class="mt-3">
                 <button id="connect-btn" class="btn btn-primary">Connect</button>
@@ -117,6 +110,20 @@
         <!-- Control Panel -->
         <div class="control-panel">
             <h1 class="text-center mb-4">Rover Control</h1>
+
+            <!-- Target Selector -->
+            <div class="mb-4 text-center">
+                <div class="btn-group" role="group" aria-label="Rover Target">
+                    <input type="radio" class="btn-check" name="target" id="target-simulator" value="simulator" autocomplete="off" checked>
+                    <label class="btn btn-outline-primary" for="target-simulator">Simulator</label>
+
+                    <input type="radio" class="btn-check" name="target" id="target-marspi" value="marspi" autocomplete="off">
+                    <label class="btn btn-outline-primary" for="target-marspi">MarsPI (Real Rover)</label>
+                </div>
+                <div id="target-status" class="mt-2 text-muted">
+                    <small>Connected to: <span id="current-target">simulator</span></small>
+                </div>
+            </div>
 
             <!-- Manual Control -->
             <div class="control-grid">
@@ -130,81 +137,108 @@
                 <button class="btn btn-primary" onclick="sendCommand('backward')">Backward</button>
                 <div></div>
             </div>
-        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // RTC Client implementation
-        class RTCClient {
-            constructor(websocketUrl = 'ws://localhost:8889') {
-                this.websocketUrl = websocketUrl;
+        // Video streaming client (handles both simulator and Pi camera)
+        class VideoStreamClient {
+            constructor() {
+                this.streamUrls = {
+                    'simulator': 'ws://localhost:8889',
+                    'marspi': 'ws://localhost:8890'  // Pi AI camera stream
+                };
+                this.currentTarget = 'simulator';
+                this.websocketUrl = this.streamUrls[this.currentTarget];
                 this.websocket = null;
                 this.connected = false;
                 this.reconnectAttempts = 0;
                 this.maxReconnectAttempts = 10;
-                this.reconnectInterval = 5000; // 5 seconds
+                this.reconnectInterval = 5000;
                 this.reconnectTimeout = null;
-                
+
                 // Canvas setup
-                this.canvas = document.getElementById('camera-feed');
+                this.canvas = document.getElementById('simulator-feed');
                 this.ctx = this.canvas.getContext('2d');
-                this.stream = this.canvas.captureStream(10); // 10 FPS
-                
+
                 // UI elements
                 this.connectionStatus = document.getElementById('connection-status');
-                this.cameraMessage = document.getElementById('camera-message');
+                this.simulatorMessage = document.getElementById('simulator-message');
                 this.connectBtn = document.getElementById('connect-btn');
                 this.disconnectBtn = document.getElementById('disconnect-btn');
-                
+
                 // Setup event listeners
                 this.setupEventListeners();
             }
-            
+
             setupEventListeners() {
                 this.connectBtn.addEventListener('click', () => this.connect());
                 this.disconnectBtn.addEventListener('click', () => this.disconnect());
             }
-            
+
+            switchTarget(target) {
+                // Disconnect from current stream
+                if (this.connected) {
+                    this.disconnect();
+                }
+
+                // Update target and URL
+                this.currentTarget = target;
+                this.websocketUrl = this.streamUrls[target];
+                this.reconnectAttempts = 0;
+
+                // Update UI title
+                const title = document.querySelector('.simulator-title');
+                if (target === 'simulator') {
+                    title.textContent = 'Simulator View';
+                } else {
+                    title.textContent = 'Pi AI Camera View';
+                }
+
+                // Auto-connect to new stream
+                setTimeout(() => {
+                    this.connect();
+                }, 500);
+            }
+
             async connect() {
                 if (this.connected) return;
-                
+
                 this.updateConnectionStatus('connecting', 'Connecting...');
                 this.connectBtn.disabled = true;
-                
+
                 try {
                     this.websocket = new WebSocket(this.websocketUrl);
-                    
+
                     this.websocket.onopen = () => {
                         this.connected = true;
                         this.reconnectAttempts = 0;
                         this.updateConnectionStatus('connected', 'Connected');
                         this.connectBtn.disabled = true;
                         this.disconnectBtn.disabled = false;
-                        this.hideCameraMessage();
-                        console.log('Connected to WebSocket server');
+                        this.hideSimulatorMessage();
+                        console.log('Connected to simulator stream');
                     };
-                    
+
                     this.websocket.onmessage = (event) => {
-                        console.log('Raw WebSocket message received:', event.data.substring(0, 100) + '...');
                         this.handleMessage(event.data);
                     };
-                    
+
                     this.websocket.onclose = () => {
                         this.connected = false;
                         this.updateConnectionStatus('disconnected', 'Disconnected');
                         this.connectBtn.disabled = false;
                         this.disconnectBtn.disabled = true;
-                        this.showCameraMessage('Disconnected');
-                        console.log('WebSocket connection closed');
+                        this.showSimulatorMessage('Disconnected');
+                        console.log('Simulator stream closed');
                         this.handleReconnect();
                     };
-                    
+
                     this.websocket.onerror = (error) => {
                         console.error('WebSocket error:', error);
                         this.updateConnectionStatus('disconnected', 'Connection Error');
                     };
-                    
+
                 } catch (error) {
                     console.error('Failed to connect:', error);
                     this.updateConnectionStatus('disconnected', 'Connection Failed');
@@ -212,7 +246,7 @@
                     this.handleReconnect();
                 }
             }
-            
+
             disconnect() {
                 if (this.websocket) {
                     this.websocket.close();
@@ -222,60 +256,50 @@
                 this.updateConnectionStatus('disconnected', 'Disconnected');
                 this.connectBtn.disabled = false;
                 this.disconnectBtn.disabled = true;
-                this.showCameraMessage('Disconnected');
-                
+                this.showSimulatorMessage('Disconnected');
+
                 if (this.reconnectTimeout) {
                     clearTimeout(this.reconnectTimeout);
                     this.reconnectTimeout = null;
                 }
             }
-            
+
             handleReconnect() {
                 if (this.reconnectAttempts >= this.maxReconnectAttempts) {
                     console.log('Max reconnection attempts reached');
+                    this.showSimulatorMessage('Start simulator with --stream flag');
                     return;
                 }
-                
+
                 this.reconnectAttempts++;
                 console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-                
+
                 this.reconnectTimeout = setTimeout(() => {
                     if (!this.connected) {
                         this.connect();
                     }
                 }, this.reconnectInterval);
             }
-            
+
             handleMessage(data) {
                 try {
                     const message = JSON.parse(data);
-                    
+
                     if (message.type === 'frame') {
-                        console.log('Received frame data, length:', message.data ? message.data.length : 'undefined');
                         this.displayFrame(message.data);
-                    } else {
-                        console.log('Received message:', message);
                     }
                 } catch (error) {
                     console.error('Error parsing message:', error);
                 }
             }
-            
+
             displayFrame(frameData) {
                 try {
-                    console.log('Displaying frame, data length:', frameData ? frameData.length : 'undefined');
-                    // Create image from base64 data
                     const img = new Image();
                     img.onload = () => {
-                        console.log('Image loaded successfully, drawing to canvas');
-                        // Clear canvas
                         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-                        
-                        // Draw image on canvas
                         this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
-                        
-                        // Hide loading message
-                        this.hideCameraMessage();
+                        this.hideSimulatorMessage();
                     };
                     img.onerror = (error) => {
                         console.error('Error loading image:', error);
@@ -285,33 +309,25 @@
                     console.error('Error displaying frame:', error);
                 }
             }
-            
+
             updateConnectionStatus(status, message) {
                 this.connectionStatus.className = `connection-status ${status}`;
                 this.connectionStatus.textContent = message;
             }
-            
-            showCameraMessage(message) {
-                this.cameraMessage.textContent = message;
-                this.cameraMessage.style.display = 'flex';
+
+            showSimulatorMessage(message) {
+                this.simulatorMessage.textContent = message;
+                this.simulatorMessage.style.display = 'flex';
             }
-            
-            hideCameraMessage() {
-                this.cameraMessage.style.display = 'none';
-            }
-            
-            sendMessage(message) {
-                if (this.connected && this.websocket) {
-                    this.websocket.send(JSON.stringify(message));
-                } else {
-                    console.warn('Cannot send message: not connected');
-                }
+
+            hideSimulatorMessage() {
+                this.simulatorMessage.style.display = 'none';
             }
         }
-        
-        // Initialize RTC client
-        const rtcClient = new RTCClient();
-        
+
+        // Initialize video stream client
+        const streamClient = new VideoStreamClient();
+
         // Rover control functions
         function sendCommand(cmd, speed = 100) {
             fetch(`/command/${cmd}`, {
@@ -324,12 +340,62 @@
               .then(data => console.log(data))
               .catch(error => console.error('Error:', error));
         }
-        
+
+        // Target switching functions
+        function switchTarget(targetName) {
+            fetch(`/target/${targetName}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById('current-target').textContent = data.target;
+                    console.log(`Switched to ${data.target}: ${data.url}`);
+
+                    // Switch video stream
+                    streamClient.switchTarget(data.target);
+                } else {
+                    console.error('Failed to switch target:', data.message);
+                    alert('Failed to switch target: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error switching target:', error);
+                alert('Error switching target. Is the server running?');
+            });
+        }
+
+        function loadCurrentTarget() {
+            fetch('/target')
+            .then(response => response.json())
+            .then(data => {
+                const currentTarget = data.current;
+                document.getElementById('current-target').textContent = currentTarget;
+                document.getElementById(`target-${currentTarget}`).checked = true;
+            })
+            .catch(error => console.error('Error loading target:', error));
+        }
+
         // Auto-connect on page load
         document.addEventListener('DOMContentLoaded', function() {
-            // Auto-connect after a short delay
+            // Load current target
+            loadCurrentTarget();
+
+            // Setup target radio button listeners
+            document.querySelectorAll('input[name="target"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        switchTarget(e.target.value);
+                    }
+                });
+            });
+
+            // Auto-connect to simulator stream after a short delay
             setTimeout(() => {
-                rtcClient.connect();
+                streamClient.connect();
             }, 1000);
         });
     </script>

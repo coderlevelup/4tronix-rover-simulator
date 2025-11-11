@@ -135,9 +135,35 @@ Access the web interface at:
 - Development: http://localhost:5000
 - Production: http://[raspberry-pi-ip]
 
+### Switching Between Simulator and Real Rover
+
+The web interface now supports switching between the simulator and real rover hardware:
+
+1. **Simulator Mode** (default):
+   - Connect to: `http://127.0.0.1:8523/`
+   - Use this for development and testing
+   - Make sure `roversimui.py` is running
+
+2. **MarsPI Mode** (real rover):
+   - Connect to: `http://marspi.local:8523/`
+   - Use this to control the real rover
+   - Make sure the rover server is running on the Raspberry Pi:
+     ```bash
+     cd real-rover
+     sudo python3 rover_server.py
+     ```
+
+**To switch targets:**
+- Use the radio buttons at the top of the control panel
+- Select "Simulator" or "MarsPI (Real Rover)"
+- The connection will automatically switch to the selected target
+
+**Note:** The MarsPI hostname (`marspi.local`) should be configured on your Raspberry Pi. If you use a different hostname, update `ROVER_TARGETS` in `web_interface.py`.
+
 ## Features
 
 - Real-time rover control via web interface
+- **Toggle between simulator and real rover** without restarting
 - Camera feed integration (on Raspberry Pi)
 - Sequence programming for automated movements
 - Responsive design for mobile and desktop

@@ -1,0 +1,25 @@
+# Requirements for Raspberry Pi
+# Install with: pip3 install -r requirements_pi.txt
+
+# Camera
+picamera2>=0.3.12
+
+# Computer Vision
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# TensorFlow Lite (use tflite-runtime for Pi)
+# Install with: pip3 install tflite-runtime
+# OR if that fails: pip3 install tensorflow-lite
+
+# WebSocket
+websockets>=11.0
+
+# Web server (for rover_server.py)
+Flask>=2.3.0
+requests>=2.30.0
+
+# Hardware (already installed on Pi OS)
+# RPi.GPIO
+# rpi_ws281x
+# smbus
