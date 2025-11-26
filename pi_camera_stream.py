@@ -222,14 +222,13 @@ async def camera_loop():
             # Draw bounding boxes for detections
             for det in detections:
                 x, y, w, h = det['box']
-                label = det['label']
                 confidence = det['confidence']
 
                 # Draw bounding box
                 draw.rectangle([(x, y), (x + w, y + h)], outline="lime", width=3)
 
-                # Draw label with background
-                label_text = f"{label} {confidence:.1%}"
+                # Draw confidence percentage only
+                label_text = f"{confidence:.0%}"
                 text_bbox = draw.textbbox((x, y - 20), label_text, font=font)
                 draw.rectangle(text_bbox, fill="lime")
                 draw.text((x, y - 20), label_text, fill="black", font=font)
