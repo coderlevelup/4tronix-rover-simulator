@@ -72,9 +72,13 @@ async def camera_loop():
             # Capture frame
             frame = camera.capture_array()
 
+            # Convert BGR to RGB (picamera2 outputs BGR despite RGB888 config)
+            import numpy as np
+            frame_rgb = frame[:, :, ::-1]  # Reverse color channels
+
             # Convert to JPEG
             from PIL import Image
-            img = Image.fromarray(frame)
+            img = Image.fromarray(frame_rgb)
             buffer = io.BytesIO()
             img.save(buffer, format='JPEG', quality=70)
 
