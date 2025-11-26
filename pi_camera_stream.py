@@ -28,19 +28,57 @@ def setup_camera():
     """Initialize the Pi AI Camera"""
     global camera
     logger.info("Initializing Pi AI Camera...")
-    camera = Picamera2()
 
-    # Configure for streaming with AI detection
-    config = camera.create_video_configuration(
-        main={"size": (640, 480), "format": "RGB888"},
-        controls={"FrameRate": 15}
-    )
-    camera.configure(config)
+    try:
+        # Import IMX500 helpers
+        from picamera2.devices.imx500 import IMX500, NetworkIntrinsics
+        from picamera2.devices.imx500.postprocess import postprocess_nanodet_detection
 
-    # Start the camera and wait for it to be ready
-    camera.start()
+        camera = Picamera2(IMX500.IMX500)
+        imx500 = IMX500(camera)
 
-    logger.info("Pi AI Camera initialized successfully with object detection enabled")
+        # Load default object detection model
+        logger.info("Loading IMX500 object detection model...")
+        model_file = "/usr/share/imx500-models/imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk"
+        imx500.load_network(model_file)
+
+        # Configure camera with IMX500
+        config = camera.create_video_configuration(
+            main={"size": (640, 480), "format": "RGB888"},
+            controls={"FrameRate": 15},
+            buffer_count=6
+        )
+
+        # Set up object detection post-processing
+        imx500.set_postprocess(postprocess_nanodet_detection)
+
+        camera.configure(config)
+        camera.start()
+
+        logger.info("IMX500 object detection enabled successfully")
+
+    except ImportError as e:
+        logger.warning(f"IMX500 support not available, using basic camera mode: {e}")
+        # Fall back to basic camera without AI
+        camera = Picamera2()
+        config = camera.create_video_configuration(
+            main={"size": (640, 480), "format": "RGB888"},
+            controls={"FrameRate": 15}
+        )
+        camera.configure(config)
+        camera.start()
+    except Exception as e:
+        logger.warning(f"Could not load IMX500 model, using basic camera mode: {e}")
+        # Fall back to basic camera
+        camera = Picamera2()
+        config = camera.create_video_configuration(
+            main={"size": (640, 480), "format": "RGB888"},
+            controls={"FrameRate": 15}
+        )
+        camera.configure(config)
+        camera.start()
+
+    logger.info("Pi AI Camera initialized successfully")
 
 
 async def broadcast_frame(frame_data):
@@ -94,37 +132,71 @@ async def camera_loop():
             draw = ImageDraw.Draw(img)
 
             # Check for AI detections in metadata
-            if metadata and 'IMX500Results' in metadata:
-                detections = metadata['IMX500Results']
+            detections = []
+            if metadata:
+                # Try different metadata keys that might contain detections
+                if 'imx500_results' in metadata:
+                    detections = metadata['imx500_results']
+                elif 'IMX500Results' in metadata:
+                    detections = metadata['IMX500Results']
+                elif 'detections' in metadata:
+                    detections = metadata['detections']
 
-                # Parse and draw bounding boxes
-                if detections and len(detections) > 0:
-                    for detection in detections:
-                        # IMX500 returns: [class_id, confidence, x_min, y_min, x_max, y_max]
-                        if len(detection) >= 6:
+                # Log metadata keys for debugging (first frame only)
+                if not hasattr(camera_loop, 'logged_metadata'):
+                    logger.info(f"Available metadata keys: {list(metadata.keys())}")
+                    camera_loop.logged_metadata = True
+
+            # Parse and draw bounding boxes
+            if detections and len(detections) > 0:
+                logger.info(f"Found {len(detections)} detections")
+                for i, detection in enumerate(detections):
+                    try:
+                        # Try different detection formats
+                        if isinstance(detection, dict):
+                            # Dictionary format: {'bbox': [...], 'category': ..., 'score': ...}
+                            bbox = detection.get('bbox', detection.get('box'))
+                            confidence = detection.get('score', detection.get('confidence', 1.0))
+                            class_id = detection.get('category', detection.get('class_id', 0))
+
+                            if bbox and len(bbox) >= 4:
+                                x_min, y_min, x_max, y_max = bbox[:4]
+                                # Scale to display resolution if needed
+                                if x_max <= 1.0:  # Normalized coordinates
+                                    x_min = int(x_min * 640)
+                                    y_min = int(y_min * 480)
+                                    x_max = int(x_max * 640)
+                                    y_max = int(y_max * 480)
+                        elif len(detection) >= 6:
+                            # Array format: [class_id, confidence, x_min, y_min, x_max, y_max]
                             class_id = int(detection[0])
                             confidence = detection[1]
-                            x_min = int(detection[2] * 640)
-                            y_min = int(detection[3] * 480)
-                            x_max = int(detection[4] * 640)
-                            y_max = int(detection[5] * 480)
+                            x_min = int(detection[2] * 640) if detection[2] <= 1.0 else int(detection[2])
+                            y_min = int(detection[3] * 480) if detection[3] <= 1.0 else int(detection[3])
+                            x_max = int(detection[4] * 640) if detection[4] <= 1.0 else int(detection[4])
+                            y_max = int(detection[5] * 480) if detection[5] <= 1.0 else int(detection[5])
+                        else:
+                            continue
 
-                            # Only show detections with confidence > 50%
-                            if confidence > 0.5:
-                                # Draw bounding box
-                                draw.rectangle(
-                                    [(x_min, y_min), (x_max, y_max)],
-                                    outline="lime",
-                                    width=3
-                                )
+                        # Only show detections with confidence > 30%
+                        if confidence > 0.3:
+                            # Draw bounding box
+                            draw.rectangle(
+                                [(x_min, y_min), (x_max, y_max)],
+                                outline="lime",
+                                width=3
+                            )
 
-                                # Draw label with confidence
-                                label = f"Object {class_id}: {confidence:.1%}"
+                            # Draw label with confidence
+                            label = f"Object {class_id}: {confidence:.1%}"
 
-                                # Draw background for text
-                                bbox = draw.textbbox((x_min, y_min - 20), label, font=font)
-                                draw.rectangle(bbox, fill="lime")
-                                draw.text((x_min, y_min - 20), label, fill="black", font=font)
+                            # Draw background for text
+                            bbox = draw.textbbox((x_min, max(y_min - 20, 0)), label, font=font)
+                            draw.rectangle(bbox, fill="lime")
+                            draw.text((x_min, max(y_min - 20, 0)), label, fill="black", font=font)
+
+                    except Exception as e:
+                        logger.error(f"Error drawing detection {i}: {e}")
 
             # Convert to JPEG
             buffer = io.BytesIO()
