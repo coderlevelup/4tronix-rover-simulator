@@ -92,7 +92,7 @@ async def camera_loop():
             await asyncio.sleep(0.1)
 
 
-async def handle_client(websocket, path):
+async def handle_client(websocket):
     """Handle new WebSocket client connection"""
     client_addr = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
     logger.info(f"Client connected: {client_addr}")
