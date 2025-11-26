@@ -32,7 +32,6 @@ def setup_camera():
     try:
         # Import IMX500 helpers
         from picamera2.devices.imx500 import IMX500, NetworkIntrinsics
-        from picamera2.devices.imx500.postprocess import postprocess_nanodet_detection
 
         camera = Picamera2(IMX500.IMX500)
         imx500 = IMX500(camera)
@@ -49,8 +48,15 @@ def setup_camera():
             buffer_count=6
         )
 
-        # Set up object detection post-processing
-        imx500.set_postprocess(postprocess_nanodet_detection)
+        # Try to set up post-processing if available
+        try:
+            from picamera2.devices.imx500.postprocess import postprocess_nanodet_detection
+            imx500.set_postprocess(postprocess_nanodet_detection)
+            logger.info("Using nanodet postprocessing")
+        except ImportError:
+            # Postprocessing not available, but IMX500 may still provide raw results
+            logger.info("Postprocessing not available, using raw IMX500 output")
+            pass
 
         camera.configure(config)
         camera.start()
