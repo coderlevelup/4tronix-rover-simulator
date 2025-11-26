@@ -33,7 +33,7 @@ def setup_camera():
         # Import IMX500 helpers
         from picamera2.devices.imx500 import IMX500, NetworkIntrinsics
 
-        camera = Picamera2(IMX500.IMX500)
+        camera = Picamera2()
         imx500 = IMX500(camera)
 
         # Load default object detection model
