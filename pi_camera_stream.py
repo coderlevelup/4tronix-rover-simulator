@@ -101,14 +101,13 @@ async def handle_client(websocket, path):
     clients.add(websocket)
 
     try:
-        # Keep connection alive
-        async for message in websocket:
-            # Handle any client messages if needed
-            pass
+        # Keep connection alive by waiting for close
+        await websocket.wait_closed()
     except websockets.exceptions.ConnectionClosed:
         logger.info(f"Client disconnected: {client_addr}")
     finally:
-        clients.remove(websocket)
+        clients.discard(websocket)
+        logger.info(f"Client removed: {client_addr}")
 
 
 async def main():
