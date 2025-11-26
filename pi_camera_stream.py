@@ -30,14 +30,17 @@ def setup_camera():
     logger.info("Initializing Pi AI Camera...")
     camera = Picamera2()
 
-    # Configure for streaming - lower resolution for better performance
+    # Configure for streaming with AI detection
     config = camera.create_video_configuration(
         main={"size": (640, 480), "format": "RGB888"},
         controls={"FrameRate": 15}
     )
     camera.configure(config)
+
+    # Start the camera and wait for it to be ready
     camera.start()
-    logger.info("Pi AI Camera initialized successfully")
+
+    logger.info("Pi AI Camera initialized successfully with object detection enabled")
 
 
 async def broadcast_frame(frame_data):
@@ -66,19 +69,64 @@ async def broadcast_frame(frame_data):
 async def camera_loop():
     """Continuously capture and broadcast frames"""
     logger.info("Starting camera capture loop...")
+    from PIL import Image, ImageDraw, ImageFont
+    import numpy as np
+
+    # Try to load a font for labels
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
+    except:
+        font = ImageFont.load_default()
 
     while True:
         try:
-            # Capture frame
-            frame = camera.capture_array()
+            # Capture frame with metadata
+            request = camera.capture_request()
+            frame = request.make_array("main")
+            metadata = request.get_metadata()
+            request.release()
 
             # Convert BGR to RGB (picamera2 outputs BGR despite RGB888 config)
-            import numpy as np
             frame_rgb = frame[:, :, ::-1]  # Reverse color channels
 
-            # Convert to JPEG
-            from PIL import Image
+            # Convert to PIL Image for drawing
             img = Image.fromarray(frame_rgb)
+            draw = ImageDraw.Draw(img)
+
+            # Check for AI detections in metadata
+            if metadata and 'IMX500Results' in metadata:
+                detections = metadata['IMX500Results']
+
+                # Parse and draw bounding boxes
+                if detections and len(detections) > 0:
+                    for detection in detections:
+                        # IMX500 returns: [class_id, confidence, x_min, y_min, x_max, y_max]
+                        if len(detection) >= 6:
+                            class_id = int(detection[0])
+                            confidence = detection[1]
+                            x_min = int(detection[2] * 640)
+                            y_min = int(detection[3] * 480)
+                            x_max = int(detection[4] * 640)
+                            y_max = int(detection[5] * 480)
+
+                            # Only show detections with confidence > 50%
+                            if confidence > 0.5:
+                                # Draw bounding box
+                                draw.rectangle(
+                                    [(x_min, y_min), (x_max, y_max)],
+                                    outline="lime",
+                                    width=3
+                                )
+
+                                # Draw label with confidence
+                                label = f"Object {class_id}: {confidence:.1%}"
+
+                                # Draw background for text
+                                bbox = draw.textbbox((x_min, y_min - 20), label, font=font)
+                                draw.rectangle(bbox, fill="lime")
+                                draw.text((x_min, y_min - 20), label, fill="black", font=font)
+
+            # Convert to JPEG
             buffer = io.BytesIO()
             img.save(buffer, format='JPEG', quality=70)
 
