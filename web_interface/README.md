@@ -58,7 +58,7 @@ pip3 install flask requests
 #### 2. Clone or Update Repository on Pi 5
 
 ```bash
-# On the Pi 5 (first time)
+# On the Pi 5 (first time, as user mars)
 git clone https://github.com/coderlevelup/4tronix-rover-simulator.git
 cd 4tronix-rover-simulator
 
@@ -93,10 +93,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/4tronix-rover-simulator/web_interface
-Environment=PYTHONPATH=/home/pi/4tronix-rover-simulator
-ExecStart=/usr/bin/python3 /home/pi/4tronix-rover-simulator/web_interface/web_interface.py
+User=mars
+WorkingDirectory=/home/mars/4tronix-rover-simulator/web_interface
+Environment=PYTHONPATH=/home/mars/4tronix-rover-simulator
+ExecStart=/usr/bin/python3 /home/mars/4tronix-rover-simulator/web_interface/web_interface.py
 Restart=always
 RestartSec=10
 
@@ -296,7 +296,7 @@ Common issues:
 - Check simulator is on port 8523
 
 **For Real Rover:**
-- Verify rover server is running: `ssh pi@marspi.local "sudo systemctl status rover-server.service"`
+- Verify rover server is running: `ssh mars@marspi.local "sudo systemctl status rover-server.service"`
 - Check network connectivity: `ping marspi.local`
 - Ensure rover Pi Zero is powered and on same network
 

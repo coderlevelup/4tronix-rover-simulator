@@ -30,7 +30,7 @@ pip3 install flask RPi.GPIO rpi_ws281x smbus
 ### 2. Clone or Update Repository on Raspberry Pi
 
 ```bash
-# On the Raspberry Pi (first time)
+# On the Raspberry Pi (first time, as user mars)
 git clone https://github.com/coderlevelup/4tronix-rover-simulator.git
 cd 4tronix-rover-simulator
 
@@ -77,10 +77,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/4tronix-rover-simulator/real-rover
-Environment=PYTHONPATH=/home/pi/4tronix-rover-simulator
-ExecStart=/usr/bin/python3 /home/pi/4tronix-rover-simulator/real-rover/rover_server.py
+User=mars
+WorkingDirectory=/home/mars/4tronix-rover-simulator/real-rover
+Environment=PYTHONPATH=/home/mars/4tronix-rover-simulator
+ExecStart=/usr/bin/python3 /home/mars/4tronix-rover-simulator/real-rover/rover_server.py
 Restart=always
 RestartSec=10
 
@@ -195,7 +195,7 @@ sudo journalctl -u rover-server.service -n 50
 Common issues:
 - Missing dependencies: `pip3 install 4tronix-marsrover flask`
 - Wrong file path: Verify paths in service file
-- GPIO permissions: Service runs as `pi` user (should have GPIO access)
+- GPIO permissions: Service runs as `mars` user (should have GPIO access)
 
 ### Port Already in Use
 

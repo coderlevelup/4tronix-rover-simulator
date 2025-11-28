@@ -72,7 +72,7 @@ sudo raspi-config
 ### 1. Clone or Update Repository on Pi 5
 
 ```bash
-# On the Pi 5 (first time)
+# On the Pi 5 (first time, as user mars)
 git clone https://github.com/coderlevelup/4tronix-rover-simulator.git
 cd 4tronix-rover-simulator
 
