@@ -55,11 +55,16 @@ sudo apt install -y python3-flask python3-requests
 pip3 install flask requests
 ```
 
-#### 2. Copy Files to Pi 5
+#### 2. Clone or Update Repository on Pi 5
 
 ```bash
-# From your development machine
-scp -r web_interface pi@mro.local:~/4tronix-rover-simulator/
+# On the Pi 5 (first time)
+git clone https://github.com/coderlevelup/4tronix-rover-simulator.git
+cd 4tronix-rover-simulator
+
+# Or update existing repository
+cd ~/4tronix-rover-simulator
+git pull
 ```
 
 #### 3. Test Manual Run

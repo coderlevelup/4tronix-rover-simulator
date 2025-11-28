@@ -69,24 +69,24 @@ sudo raspi-config
 
 ## Deploy Camera Stream Script
 
-### 1. Copy Script to Pi
+### 1. Clone or Update Repository on Pi 5
 
 ```bash
-# From your development machine
-scp pi_camera_stream.py pi@mro.local:~/
+# On the Pi 5 (first time)
+git clone https://github.com/coderlevelup/4tronix-rover-simulator.git
+cd 4tronix-rover-simulator
+
+# Or update existing repository
+cd ~/4tronix-rover-simulator
+git pull
 ```
 
-### 2. Make Executable
-
-```bash
-chmod +x ~/pi_camera_stream.py
-```
-
-### 3. Test Manually
+### 2. Test Manually
 
 ```bash
 # Run the stream
-python3 ~/pi_camera_stream.py
+cd ~/4tronix-rover-simulator
+python3 pi_camera_stream.py
 ```
 
 You should see output like:

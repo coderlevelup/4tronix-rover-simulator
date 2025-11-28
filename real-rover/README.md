@@ -27,11 +27,16 @@ pip3 install 4tronix-marsrover
 pip3 install flask RPi.GPIO rpi_ws281x smbus
 ```
 
-### 2. Copy Files to Raspberry Pi
+### 2. Clone or Update Repository on Raspberry Pi
 
 ```bash
-# From your development machine
-scp -r real-rover pi@marspi.local:~/4tronix-rover-simulator/
+# On the Raspberry Pi (first time)
+git clone https://github.com/coderlevelup/4tronix-rover-simulator.git
+cd 4tronix-rover-simulator
+
+# Or update existing repository
+cd ~/4tronix-rover-simulator
+git pull
 ```
 
 ## Usage
