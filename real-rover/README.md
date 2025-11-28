@@ -77,7 +77,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=mars
+User=root
 WorkingDirectory=/home/mars/4tronix-rover-simulator/real-rover
 Environment=PYTHONPATH=/home/mars/4tronix-rover-simulator
 ExecStart=/usr/bin/python3 /home/mars/4tronix-rover-simulator/real-rover/rover_server.py
@@ -195,7 +195,7 @@ sudo journalctl -u rover-server.service -n 50
 Common issues:
 - Missing dependencies: `pip3 install 4tronix-marsrover flask`
 - Wrong file path: Verify paths in service file
-- GPIO permissions: Service runs as `mars` user (should have GPIO access)
+- GPIO permissions: Service runs as `root` user for full hardware access
 
 ### Port Already in Use
 
