@@ -15,8 +15,8 @@ ROVER_TARGETS = {
     'marspi': 'http://marspi.local:8523/'
 }
 
-# Current target (default to simulator)
-current_target = 'simulator'
+# Current target (default to marspi)
+current_target = 'marspi'
 rover = RoverWebDriver(ROVER_TARGETS[current_target])
 rover.init(40)  # Initialize with LED brightness of 40
 
