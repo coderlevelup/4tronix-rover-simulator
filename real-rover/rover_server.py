@@ -209,14 +209,14 @@ def control_rover():
                 degrees = data.get('degrees', 20)
                 seconds = data.get('seconds', 1.0)
                 speed = data.get('speed', 60)
-                # Set servos for left steering
+                # Move forward first
+                rover.forward(speed)
+                stop_spin_animation()
+                # Then set servos for left steering (after forward, in case forward resets them)
                 rover.setServo(9, -degrees)   # Front left
                 rover.setServo(15, -degrees)  # Front right
                 rover.setServo(11, degrees)   # Rear left
                 rover.setServo(13, degrees)   # Rear right
-                # Move forward
-                rover.forward(speed)
-                stop_spin_animation()
                 # Set front LEDs blue for forward movement
                 blue = rover.fromRGB(0, 0, 255)
                 white = rover.fromRGB(255, 255, 255)
@@ -242,14 +242,14 @@ def control_rover():
                 degrees = data.get('degrees', 20)
                 seconds = data.get('seconds', 1.0)
                 speed = data.get('speed', 60)
-                # Set servos for right steering
+                # Move forward first
+                rover.forward(speed)
+                stop_spin_animation()
+                # Then set servos for right steering (after forward, in case forward resets them)
                 rover.setServo(9, degrees)    # Front left
                 rover.setServo(15, degrees)   # Front right
                 rover.setServo(11, -degrees)  # Rear left
                 rover.setServo(13, -degrees)  # Rear right
-                # Move forward
-                rover.forward(speed)
-                stop_spin_animation()
                 # Set front LEDs blue for forward movement
                 blue = rover.fromRGB(0, 0, 255)
                 white = rover.fromRGB(255, 255, 255)
