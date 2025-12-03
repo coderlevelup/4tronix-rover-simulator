@@ -33,7 +33,7 @@ def animate_spin_leds(direction):
     """Animate LEDs in a rotating pattern for spin commands"""
     global animation_running
     green = rover.fromRGB(0, 255, 0)
-    off = rover.fromRGB(0, 0, 0)
+    white = rover.fromRGB(255, 255, 255)
 
     # LED positions: 0 (rear left), 1 (front left), 2 (front right), 3 (rear right)
     # Clockwise (spin right): 1 -> 2 -> 3 -> 0 (front left -> front right -> rear right -> rear left)
@@ -46,12 +46,12 @@ def animate_spin_leds(direction):
 
     idx = 0
     while animation_running:
-        # Set current LED to green, others to off
+        # Set current LED to green, others to white
         for i in range(4):
             if i == sequence[idx]:
                 rover.setPixel(i, green)
             else:
-                rover.setPixel(i, off)
+                rover.setPixel(i, white)
         rover.show()
 
         idx = (idx + 1) % 4
