@@ -97,24 +97,24 @@ def control_rover():
             elif cmd == 'forward':
                 speed = data.get('speed', 100)
                 rover.forward(speed)
-                # Set front LEDs (0, 1) to blue
+                # Set front LEDs (0=left front, 2=right front) to blue
                 blue = rover.fromRGB(0, 0, 255)
                 white = rover.fromRGB(255, 255, 255)
-                rover.setPixel(0, blue)
-                rover.setPixel(1, blue)
-                rover.setPixel(2, white)
-                rover.setPixel(3, white)
+                rover.setPixel(0, blue)   # Left front
+                rover.setPixel(2, blue)   # Right front
+                rover.setPixel(1, white)  # Left rear
+                rover.setPixel(3, white)  # Right rear
                 rover.show()
             elif cmd == 'reverse':
                 speed = data.get('speed', 100)
                 rover.reverse(speed)
-                # Set rear LEDs (2, 3) to red
+                # Set rear LEDs (1=left rear, 3=right rear) to red
                 red = rover.fromRGB(255, 0, 0)
                 white = rover.fromRGB(255, 255, 255)
-                rover.setPixel(0, white)
-                rover.setPixel(1, white)
-                rover.setPixel(2, red)
-                rover.setPixel(3, red)
+                rover.setPixel(0, white)  # Left front
+                rover.setPixel(2, white)  # Right front
+                rover.setPixel(1, red)    # Left rear
+                rover.setPixel(3, red)    # Right rear
                 rover.show()
             elif cmd == 'spinLeft':
                 speed = data.get('speed', 100)
@@ -129,10 +129,10 @@ def control_rover():
                 # Set front LEDs to blue when turning forward
                 blue = rover.fromRGB(0, 0, 255)
                 white = rover.fromRGB(255, 255, 255)
-                rover.setPixel(0, blue)
-                rover.setPixel(1, blue)
-                rover.setPixel(2, white)
-                rover.setPixel(3, white)
+                rover.setPixel(0, blue)   # Left front
+                rover.setPixel(2, blue)   # Right front
+                rover.setPixel(1, white)  # Left rear
+                rover.setPixel(3, white)  # Right rear
                 rover.show()
             elif cmd == 'turnReverse':
                 left_speed = data.get('leftSpeed', 50)
@@ -141,10 +141,10 @@ def control_rover():
                 # Set rear LEDs to red when turning reverse
                 red = rover.fromRGB(255, 0, 0)
                 white = rover.fromRGB(255, 255, 255)
-                rover.setPixel(0, white)
-                rover.setPixel(1, white)
-                rover.setPixel(2, red)
-                rover.setPixel(3, red)
+                rover.setPixel(0, white)  # Left front
+                rover.setPixel(2, white)  # Right front
+                rover.setPixel(1, red)    # Left rear
+                rover.setPixel(3, red)    # Right rear
                 rover.show()
             else:
                 print(f"Unknown command: {cmd}")
