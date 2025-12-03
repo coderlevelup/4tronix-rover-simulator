@@ -166,6 +166,13 @@ def main():
     # Initialize rover with default brightness
     rover.init(40)
 
+    # Set all LEDs to white to indicate server is ready
+    white = rover.fromRGB(255, 255, 255)
+    for i in range(4):
+        rover.setPixel(i, white)
+    rover.show()
+    print("LEDs set to white")
+
     print("Rover initialized successfully")
     print("Starting HTTP server on port 8523...")
     print("Server ready to accept commands")
