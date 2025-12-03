@@ -13,6 +13,8 @@ It runs a Flask HTTP server on port 8523 and accepts JSON commands for:
 
 import sys
 import json
+import threading
+import time
 from flask import Flask, request, jsonify
 import rover
 
@@ -22,6 +24,56 @@ app = Flask("RoverServer")
 # Track current motor state to determine which rover function to call
 current_speed_left = 0
 current_speed_right = 0
+
+# LED animation control
+animation_thread = None
+animation_running = False
+
+def animate_spin_leds(direction):
+    """Animate LEDs in a rotating pattern for spin commands"""
+    global animation_running
+    green = rover.fromRGB(0, 255, 0)
+    off = rover.fromRGB(0, 0, 0)
+
+    # LED positions: 0 (rear left), 1 (front left), 2 (front right), 3 (rear right)
+    # Clockwise (spin right): 1 -> 2 -> 3 -> 0 (front left -> front right -> rear right -> rear left)
+    # Counterclockwise (spin left): 1 -> 0 -> 3 -> 2 (front left -> rear left -> rear right -> front right)
+
+    if direction == 'right':
+        sequence = [1, 2, 3, 0]  # Clockwise
+    else:
+        sequence = [1, 0, 3, 2]  # Counterclockwise
+
+    idx = 0
+    while animation_running:
+        # Set current LED to green, others to off
+        for i in range(4):
+            if i == sequence[idx]:
+                rover.setPixel(i, green)
+            else:
+                rover.setPixel(i, off)
+        rover.show()
+
+        idx = (idx + 1) % 4
+        time.sleep(0.15)  # Rotation speed
+
+def start_spin_animation(direction):
+    """Start the LED spin animation"""
+    global animation_thread, animation_running
+    stop_spin_animation()  # Stop any existing animation
+
+    animation_running = True
+    animation_thread = threading.Thread(target=animate_spin_leds, args=(direction,))
+    animation_thread.daemon = True
+    animation_thread.start()
+
+def stop_spin_animation():
+    """Stop the LED spin animation"""
+    global animation_running, animation_thread
+    animation_running = False
+    if animation_thread:
+        animation_thread.join(timeout=0.5)
+        animation_thread = None
 
 def calculate_motor_command(left_fwd, left_rev, right_fwd, right_rev):
     """
@@ -89,6 +141,7 @@ def control_rover():
 
             if cmd == 'stop':
                 rover.stop()
+                stop_spin_animation()
                 # Set all LEDs to white when stopped
                 white = rover.fromRGB(255, 255, 255)
                 for i in range(4):
@@ -97,6 +150,7 @@ def control_rover():
             elif cmd == 'forward':
                 speed = data.get('speed', 100)
                 rover.forward(speed)
+                stop_spin_animation()
                 # Set front LEDs (1, 2) to blue
                 blue = rover.fromRGB(0, 0, 255)
                 white = rover.fromRGB(255, 255, 255)
@@ -108,6 +162,7 @@ def control_rover():
             elif cmd == 'reverse':
                 speed = data.get('speed', 100)
                 rover.reverse(speed)
+                stop_spin_animation()
                 # Set rear LEDs (0, 3) to red
                 red = rover.fromRGB(255, 0, 0)
                 white = rover.fromRGB(255, 255, 255)
@@ -119,13 +174,16 @@ def control_rover():
             elif cmd == 'spinLeft':
                 speed = data.get('speed', 100)
                 rover.spinLeft(speed)
+                start_spin_animation('left')
             elif cmd == 'spinRight':
                 speed = data.get('speed', 100)
                 rover.spinRight(speed)
+                start_spin_animation('right')
             elif cmd == 'turnForward':
                 left_speed = data.get('leftSpeed', 50)
                 right_speed = data.get('rightSpeed', 50)
                 rover.turnForward(left_speed, right_speed)
+                stop_spin_animation()
                 # Set front LEDs (1, 2) to blue when turning forward
                 blue = rover.fromRGB(0, 0, 255)
                 white = rover.fromRGB(255, 255, 255)
@@ -138,6 +196,7 @@ def control_rover():
                 left_speed = data.get('leftSpeed', 50)
                 right_speed = data.get('rightSpeed', 50)
                 rover.turnReverse(left_speed, right_speed)
+                stop_spin_animation()
                 # Set rear LEDs (0, 3) to red when turning reverse
                 red = rover.fromRGB(255, 0, 0)
                 white = rover.fromRGB(255, 255, 255)

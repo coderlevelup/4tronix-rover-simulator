@@ -120,7 +120,7 @@ def handle_sequence():
 if __name__ == '__main__':
     # Use port 80 only if on Linux and running as root
     # Default to 5001 to avoid macOS AirPlay Receiver on 5000
-    port = 80 if os.name == 'posix' and os.geteuid() == 0 else 5001
+    port = 80 if os.name == 'posix' and os.geteuid() == 0 else 5050
     # Enable debug mode with auto-reload
     app.run(host='0.0.0.0', port=port, debug=True)
 
