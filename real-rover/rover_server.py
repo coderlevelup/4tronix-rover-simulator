@@ -205,6 +205,72 @@ def control_rover():
                 rover.setPixel(0, red)    # Rear left
                 rover.setPixel(3, red)    # Rear right
                 rover.show()
+            elif cmd == 'steerLeft':
+                degrees = data.get('degrees', 20)
+                seconds = data.get('seconds', 1.0)
+                speed = data.get('speed', 60)
+                # Set servos for left steering
+                rover.setServo(9, -degrees)   # Front left
+                rover.setServo(15, -degrees)  # Front right
+                rover.setServo(11, degrees)   # Rear left
+                rover.setServo(13, degrees)   # Rear right
+                # Move forward
+                rover.forward(speed)
+                stop_spin_animation()
+                # Set front LEDs blue for forward movement
+                blue = rover.fromRGB(0, 0, 255)
+                white = rover.fromRGB(255, 255, 255)
+                rover.setPixel(1, blue)   # Front left
+                rover.setPixel(2, blue)   # Front right
+                rover.setPixel(0, white)  # Rear left
+                rover.setPixel(3, white)  # Rear right
+                rover.show()
+                # Wait for duration
+                time.sleep(seconds)
+                # Stop and reset servos
+                rover.stop()
+                rover.setServo(9, 0)
+                rover.setServo(15, 0)
+                rover.setServo(11, 0)
+                rover.setServo(13, 0)
+                # Set all LEDs to white when stopped
+                white = rover.fromRGB(255, 255, 255)
+                for i in range(4):
+                    rover.setPixel(i, white)
+                rover.show()
+            elif cmd == 'steerRight':
+                degrees = data.get('degrees', 20)
+                seconds = data.get('seconds', 1.0)
+                speed = data.get('speed', 60)
+                # Set servos for right steering
+                rover.setServo(9, degrees)    # Front left
+                rover.setServo(15, degrees)   # Front right
+                rover.setServo(11, -degrees)  # Rear left
+                rover.setServo(13, -degrees)  # Rear right
+                # Move forward
+                rover.forward(speed)
+                stop_spin_animation()
+                # Set front LEDs blue for forward movement
+                blue = rover.fromRGB(0, 0, 255)
+                white = rover.fromRGB(255, 255, 255)
+                rover.setPixel(1, blue)   # Front left
+                rover.setPixel(2, blue)   # Front right
+                rover.setPixel(0, white)  # Rear left
+                rover.setPixel(3, white)  # Rear right
+                rover.show()
+                # Wait for duration
+                time.sleep(seconds)
+                # Stop and reset servos
+                rover.stop()
+                rover.setServo(9, 0)
+                rover.setServo(15, 0)
+                rover.setServo(11, 0)
+                rover.setServo(13, 0)
+                # Set all LEDs to white when stopped
+                white = rover.fromRGB(255, 255, 255)
+                for i in range(4):
+                    rover.setPixel(i, white)
+                rover.show()
             else:
                 print(f"Unknown command: {cmd}")
 

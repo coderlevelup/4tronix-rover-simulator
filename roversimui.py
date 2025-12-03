@@ -432,6 +432,28 @@ class MainWindow(QWidget):
                 right_speed = data.get('rightSpeed', 50)
                 self.rover.setWheelMotorLeft(0, left_speed)
                 self.rover.setWheelMotorRight(0, right_speed)
+            elif cmd == 'steerLeft':
+                degrees = data.get('degrees', 20)
+                speed = data.get('speed', 60)
+                # Set servos for left steering
+                self.rover.setServo(servo_FL, -degrees)
+                self.rover.setServo(servo_FR, -degrees)
+                self.rover.setServo(servo_RL, degrees)
+                self.rover.setServo(servo_RR, degrees)
+                # Move forward
+                self.rover.setWheelMotorLeft(speed, 0)
+                self.rover.setWheelMotorRight(speed, 0)
+            elif cmd == 'steerRight':
+                degrees = data.get('degrees', 20)
+                speed = data.get('speed', 60)
+                # Set servos for right steering
+                self.rover.setServo(servo_FL, degrees)
+                self.rover.setServo(servo_FR, degrees)
+                self.rover.setServo(servo_RL, -degrees)
+                self.rover.setServo(servo_RR, -degrees)
+                # Move forward
+                self.rover.setWheelMotorLeft(speed, 0)
+                self.rover.setWheelMotorRight(speed, 0)
             else:
                 print(f"Unknown command: {cmd}")
 

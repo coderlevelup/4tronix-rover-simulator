@@ -817,8 +817,8 @@
             <block type="rover_spin_left"></block>
             <block type="rover_spin_right"></block>
             <block type="rover_stop"></block>
-            <block type="rover_turn_forward"></block>
-            <block type="rover_turn_reverse"></block>
+            <block type="rover_steer_left"></block>
+            <block type="rover_steer_right"></block>
             <block type="rover_wait"></block>
             <block type="rover_repeat"></block>
             <block type="rover_if_obstacle"></block>
@@ -924,8 +924,8 @@
                     <block type="rover_spin_left"></block>
                     <block type="rover_spin_right"></block>
                     <block type="rover_stop"></block>
-                    <block type="rover_turn_forward"></block>
-                    <block type="rover_turn_reverse"></block>
+                    <block type="rover_steer_left"></block>
+                    <block type="rover_steer_right"></block>
                 </category>
                 <category name="Control" colour="#5BA55B">
                     <block type="rover_wait"></block>
@@ -1026,35 +1026,35 @@
                 }
             };
 
-            // Turn Forward block
-            Blockly.Blocks['rover_turn_forward'] = {
+            // Steer Left block
+            Blockly.Blocks['rover_steer_left'] = {
                 init: function() {
                     this.appendDummyInput()
-                        .appendField("Turn Forward")
-                        .appendField("Left Speed")
-                        .appendField(new Blockly.FieldNumber(50, 0, 100), "LEFT_SPEED")
-                        .appendField("Right Speed")
-                        .appendField(new Blockly.FieldNumber(50, 0, 100), "RIGHT_SPEED");
+                        .appendField("Steer Left")
+                        .appendField("Degrees")
+                        .appendField(new Blockly.FieldNumber(20, 0, 45), "DEGREES")
+                        .appendField("Seconds")
+                        .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "SECONDS");
                     this.setPreviousStatement(true, null);
                     this.setNextStatement(true, null);
                     this.setColour("#2196F3");
-                    this.setTooltip("Turn while moving forward with different left/right speeds");
+                    this.setTooltip("Steer left while moving forward at given angle for duration");
                 }
             };
 
-            // Turn Reverse block
-            Blockly.Blocks['rover_turn_reverse'] = {
+            // Steer Right block
+            Blockly.Blocks['rover_steer_right'] = {
                 init: function() {
                     this.appendDummyInput()
-                        .appendField("Turn Reverse")
-                        .appendField("Left Speed")
-                        .appendField(new Blockly.FieldNumber(50, 0, 100), "LEFT_SPEED")
-                        .appendField("Right Speed")
-                        .appendField(new Blockly.FieldNumber(50, 0, 100), "RIGHT_SPEED");
+                        .appendField("Steer Right")
+                        .appendField("Degrees")
+                        .appendField(new Blockly.FieldNumber(20, 0, 45), "DEGREES")
+                        .appendField("Seconds")
+                        .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "SECONDS");
                     this.setPreviousStatement(true, null);
                     this.setNextStatement(true, null);
                     this.setColour("#2196F3");
-                    this.setTooltip("Turn while moving backward with different left/right speeds");
+                    this.setTooltip("Steer right while moving forward at given angle for duration");
                 }
             };
 
@@ -1150,16 +1150,16 @@
                 return `rover.stop()\n`;
             };
 
-            Blockly.Python['rover_turn_forward'] = function(block) {
-                const leftSpeed = block.getFieldValue('LEFT_SPEED');
-                const rightSpeed = block.getFieldValue('RIGHT_SPEED');
-                return `rover.turnForward(${leftSpeed}, ${rightSpeed})\n`;
+            Blockly.Python['rover_steer_left'] = function(block) {
+                const degrees = block.getFieldValue('DEGREES');
+                const seconds = block.getFieldValue('SECONDS');
+                return `rover.steerLeft(${degrees}, ${seconds})\n`;
             };
 
-            Blockly.Python['rover_turn_reverse'] = function(block) {
-                const leftSpeed = block.getFieldValue('LEFT_SPEED');
-                const rightSpeed = block.getFieldValue('RIGHT_SPEED');
-                return `rover.turnReverse(${leftSpeed}, ${rightSpeed})\n`;
+            Blockly.Python['rover_steer_right'] = function(block) {
+                const degrees = block.getFieldValue('DEGREES');
+                const seconds = block.getFieldValue('SECONDS');
+                return `rover.steerRight(${degrees}, ${seconds})\n`;
             };
 
             Blockly.Python['rover_wait'] = function(block) {
@@ -1256,15 +1256,15 @@
                 case 'rover_stop':
                     code = `rover.stop()\n`;
                     break;
-                case 'rover_turn_forward':
-                    const leftTurnSpeed = block.getFieldValue('LEFT_SPEED') || 50;
-                    const rightTurnSpeed = block.getFieldValue('RIGHT_SPEED') || 50;
-                    code = `rover.turnForward(${leftTurnSpeed}, ${rightTurnSpeed})\n`;
+                case 'rover_steer_left':
+                    const steerLeftDegrees = block.getFieldValue('DEGREES') || 20;
+                    const steerLeftSeconds = block.getFieldValue('SECONDS') || 1;
+                    code = `rover.steerLeft(${steerLeftDegrees}, ${steerLeftSeconds})\n`;
                     break;
-                case 'rover_turn_reverse':
-                    const leftRevSpeed = block.getFieldValue('LEFT_SPEED') || 50;
-                    const rightRevSpeed = block.getFieldValue('RIGHT_SPEED') || 50;
-                    code = `rover.turnReverse(${leftRevSpeed}, ${rightRevSpeed})\n`;
+                case 'rover_steer_right':
+                    const steerRightDegrees = block.getFieldValue('DEGREES') || 20;
+                    const steerRightSeconds = block.getFieldValue('SECONDS') || 1;
+                    code = `rover.steerRight(${steerRightDegrees}, ${steerRightSeconds})\n`;
                     break;
                 case 'rover_wait':
                     const waitTime = block.getFieldValue('TIME') || 1;
@@ -1406,15 +1406,15 @@
                     commands.push({cmd: 'spin_right', speed: speedMatch ? parseInt(speedMatch[1]) : speed});
                 } else if (trimmedLine.includes('rover.stop()')) {
                     commands.push({cmd: 'stop', speed: 0});
-                } else if (trimmedLine.includes('rover.turnForward(')) {
-                    const match = trimmedLine.match(/rover\.turnForward\((\d+),\s*(\d+)\)/);
+                } else if (trimmedLine.includes('rover.steerLeft(')) {
+                    const match = trimmedLine.match(/rover\.steerLeft\(([\d.]+),\s*([\d.]+)\)/);
                     if (match) {
-                        commands.push({cmd: 'turn_forward', leftSpeed: parseInt(match[1]), rightSpeed: parseInt(match[2])});
+                        commands.push({cmd: 'steer_left', degrees: parseFloat(match[1]), seconds: parseFloat(match[2])});
                     }
-                } else if (trimmedLine.includes('rover.turnReverse(')) {
-                    const match = trimmedLine.match(/rover\.turnReverse\((\d+),\s*(\d+)\)/);
+                } else if (trimmedLine.includes('rover.steerRight(')) {
+                    const match = trimmedLine.match(/rover\.steerRight\(([\d.]+),\s*([\d.]+)\)/);
                     if (match) {
-                        commands.push({cmd: 'turn_reverse', leftSpeed: parseInt(match[1]), rightSpeed: parseInt(match[2])});
+                        commands.push({cmd: 'steer_right', degrees: parseFloat(match[1]), seconds: parseFloat(match[2])});
                     }
                 } else if (trimmedLine.includes('time.sleep(')) {
                     const timeMatch = trimmedLine.match(/time\.sleep\(([\d.]+)\)/);
@@ -1447,40 +1447,13 @@
                         index++;
                         executeNext();
                     }, command.time * 1000);
-                } else if (command.cmd === 'turn_forward') {
-                    fetch('/command/turn_forward', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            leftSpeed: command.leftSpeed,
-                            rightSpeed: command.rightSpeed
-                        })
-                    }).then(response => response.json())
-                      .then(data => console.log(data))
-                      .catch(error => console.error('Error:', error));
+                } else if (command.cmd === 'steer_left' || command.cmd === 'steer_right') {
+                    // Steer commands have timing built in, so we wait for the duration
+                    sendCommand(command.cmd, 60);  // Use default speed
                     setTimeout(() => {
                         index++;
                         executeNext();
-                    }, 1000);
-                } else if (command.cmd === 'turn_reverse') {
-                    fetch('/command/turn_reverse', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            leftSpeed: command.leftSpeed,
-                            rightSpeed: command.rightSpeed
-                        })
-                    }).then(response => response.json())
-                      .then(data => console.log(data))
-                      .catch(error => console.error('Error:', error));
-                    setTimeout(() => {
-                        index++;
-                        executeNext();
-                    }, 1000);
+                    }, (command.seconds || 1) * 1000);
                 } else {
                     sendCommand(command.cmd, command.speed);
                     setTimeout(() => {

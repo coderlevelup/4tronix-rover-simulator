@@ -27,8 +27,8 @@ commands = {
     'spin_left': lambda: rover.spinLeft(speed),
     'spin_right': lambda: rover.spinRight(speed),
     'stop': lambda: rover.stop(),
-    'turn_forward': lambda: rover.turnForward(speed, speed),
-    'turn_reverse': lambda: rover.turnReverse(speed, speed)
+    'steer_left': lambda: rover.steerLeft(20, 1),  # Default degrees and seconds
+    'steer_right': lambda: rover.steerRight(20, 1)  # Default degrees and seconds
 }
 
 @app.route('/')
@@ -72,27 +72,11 @@ def set_target(target_name):
 def handle_command(cmd):
     global speed
     speed = request.json.get('speed', 100) if request.json else 100
-    
+
     if cmd in commands:
         commands[cmd]()
         return jsonify({'status': 'success'})
     return jsonify({'status': 'error', 'message': 'Invalid command'}), 400
-
-@app.route('/command/turn_forward', methods=['POST'])
-def handle_turn_forward():
-    data = request.json or {}
-    left_speed = data.get('leftSpeed', 50)
-    right_speed = data.get('rightSpeed', 50)
-    rover.turnForward(left_speed, right_speed)
-    return jsonify({'status': 'success'})
-
-@app.route('/command/turn_reverse', methods=['POST'])
-def handle_turn_reverse():
-    data = request.json or {}
-    left_speed = data.get('leftSpeed', 50)
-    right_speed = data.get('rightSpeed', 50)
-    rover.turnReverse(left_speed, right_speed)
-    return jsonify({'status': 'success'})
 
 @app.route('/sequence', methods=['POST'])
 def handle_sequence():

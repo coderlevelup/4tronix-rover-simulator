@@ -188,6 +188,20 @@ class RoverWebDriver:
         message = {'command': 'turnReverse', 'leftSpeed': leftSpeed, 'rightSpeed': rightSpeed}
         self._send_command(message)
 
+    # steerLeft(degrees, seconds): Steers left while moving forward at given angle for duration
+    def steerLeft(self, degrees, seconds):
+        self.lDir = 1
+        self.rDir = 1
+        message = {'command': 'steerLeft', 'degrees': degrees, 'seconds': seconds}
+        self._send_command(message)
+
+    # steerRight(degrees, seconds): Steers right while moving forward at given angle for duration
+    def steerRight(self, degrees, seconds):
+        self.lDir = 1
+        self.rDir = 1
+        message = {'command': 'steerRight', 'degrees': degrees, 'seconds': seconds}
+        self._send_command(message)
+
     # End of Motor Functions
     #======================================================================
 
