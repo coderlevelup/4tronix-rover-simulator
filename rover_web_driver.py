@@ -136,94 +136,56 @@ class RoverWebDriver:
     def stop(self):
         self.lDir = 0
         self.rDir = 0
-        message = {'wheelMotors': {'l': [0, 0], 'r': [0, 0]}}
+        message = {'command': 'stop'}
         self._send_command(message)
 
     # brake(): Stops both motors - regenerative braking to stop quickly
     def brake(self):
         self.lDir = 0
         self.rDir = 0
-        message = {'wheelMotors': {'l': [0, 0], 'r': [0, 0]}}
+        message = {'command': 'stop'}
         self._send_command(message)
 
     # forward(speed): Sets both motors to move forward at speed. 0 <= speed <= 100
     def forward(self, speed):
-        if self.lDir == -1 or self.rDir == -1:
-            self.brake()
-            sleep(0.2)
-        # Reset servos to 0 degrees
-        self.setServo(9, 0)   # servo_FL
-        self.setServo(15, 0)  # servo_FR
-        self.setServo(11, 0)  # servo_RL
-        self.setServo(13, 0)  # servo_RR
         self.lDir = 1
         self.rDir = 1
-        message = {'wheelMotors': {'l': [speed, 0], 'r': [speed, 0]}}
+        message = {'command': 'forward', 'speed': speed}
         self._send_command(message)
 
     # reverse(speed): Sets both motors to reverse at speed. 0 <= speed <= 100
     def reverse(self, speed):
-        if self.lDir == 1 or self.rDir == 1:
-            self.brake()
-            sleep(0.2)
-        # Reset servos to 0 degrees
-        self.setServo(9, 0)   # servo_FL
-        self.setServo(15, 0)  # servo_FR
-        self.setServo(11, 0)  # servo_RL
-        self.setServo(13, 0)  # servo_RR
         self.lDir = -1
         self.rDir = -1
-        message = {'wheelMotors': {'l': [0, speed], 'r': [0, speed]}}
+        message = {'command': 'reverse', 'speed': speed}
         self._send_command(message)
 
     # spinLeft(speed): Sets motors to turn opposite directions at speed. 0 <= speed <= 100
     def spinLeft(self, speed):
-        if self.lDir == 1 or self.rDir == -1:
-            self.brake()
-            sleep(0.2)
-        # Set servos for pivot mode
-        self.setServo(9, 50)   # servo_FL
-        self.setServo(15, -50) # servo_FR
-        self.setServo(11, -50) # servo_RL
-        self.setServo(13, 50)  # servo_RR
         self.lDir = -1
         self.rDir = 1
-        message = {'wheelMotors': {'l': [0, speed], 'r': [speed, 0]}}
+        message = {'command': 'spinLeft', 'speed': speed}
         self._send_command(message)
 
     # spinRight(speed): Sets motors to turn opposite directions at speed. 0 <= speed <= 100
     def spinRight(self, speed):
-        if self.lDir == -1 or self.rDir == 1:
-            self.brake()
-            sleep(0.2)
-        # Set servos for pivot mode
-        self.setServo(9, 50)   # servo_FL
-        self.setServo(15, -50) # servo_FR
-        self.setServo(11, -50) # servo_RL
-        self.setServo(13, 50)  # servo_RR
         self.lDir = 1
         self.rDir = -1
-        message = {'wheelMotors': {'l': [speed, 0], 'r': [0, speed]}}
+        message = {'command': 'spinRight', 'speed': speed}
         self._send_command(message)
 
     # turnForward(leftSpeed, rightSpeed): Moves forwards in an arc by setting different speeds. 0 <= leftSpeed,rightSpeed <= 100
     def turnForward(self, leftSpeed, rightSpeed):
-        if self.lDir == -1 or self.rDir == -1:
-            self.brake()
-            sleep(0.2)
         self.lDir = 1
         self.rDir = 1
-        message = {'wheelMotors': {'l': [leftSpeed, 0], 'r': [rightSpeed, 0]}}
+        message = {'command': 'turnForward', 'leftSpeed': leftSpeed, 'rightSpeed': rightSpeed}
         self._send_command(message)
 
     # turnReverse(leftSpeed, rightSpeed): Moves backwards in an arc by setting different speeds. 0 <= leftSpeed,rightSpeed <= 100
     def turnReverse(self, leftSpeed, rightSpeed):
-        if self.lDir == 1 or self.rDir == 1:
-            self.brake()
-            sleep(0.2)
         self.lDir = -1
         self.rDir = -1
-        message = {'wheelMotors': {'l': [0, leftSpeed], 'r': [0, rightSpeed]}}
+        message = {'command': 'turnReverse', 'leftSpeed': leftSpeed, 'rightSpeed': rightSpeed}
         self._send_command(message)
 
     # End of Motor Functions

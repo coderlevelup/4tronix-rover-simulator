@@ -82,35 +82,67 @@ def control_rover():
         data = request.json
         print(f"Received: {json.dumps(data)}")
 
-        # Process wheel motors
-        if 'wheelMotors' in data:
-            wheel_motors = data['wheelMotors']
-            left_fwd, left_rev = wheel_motors.get('l', [0, 0])
-            right_fwd, right_rev = wheel_motors.get('r', [0, 0])
+        # Process high-level command format (new API)
+        if 'command' in data:
+            cmd = data['command']
+            print(f"High-level command: {cmd}")
 
-            command, params = calculate_motor_command(left_fwd, left_rev, right_fwd, right_rev)
+            if cmd == 'stop':
+                rover.stop()
+            elif cmd == 'forward':
+                speed = data.get('speed', 100)
+                rover.forward(speed)
+            elif cmd == 'reverse':
+                speed = data.get('speed', 100)
+                rover.reverse(speed)
+            elif cmd == 'spinLeft':
+                speed = data.get('speed', 100)
+                rover.spinLeft(speed)
+            elif cmd == 'spinRight':
+                speed = data.get('speed', 100)
+                rover.spinRight(speed)
+            elif cmd == 'turnForward':
+                left_speed = data.get('leftSpeed', 50)
+                right_speed = data.get('rightSpeed', 50)
+                rover.turnForward(left_speed, right_speed)
+            elif cmd == 'turnReverse':
+                left_speed = data.get('leftSpeed', 50)
+                right_speed = data.get('rightSpeed', 50)
+                rover.turnReverse(left_speed, right_speed)
+            else:
+                print(f"Unknown command: {cmd}")
 
-            # Call the appropriate rover function
-            rover_func = getattr(rover, command)
-            rover_func(*params)
-            print(f"Motor command: {command}({params})")
+        # Process low-level format (backward compatibility)
+        else:
+            # Process wheel motors
+            if 'wheelMotors' in data:
+                wheel_motors = data['wheelMotors']
+                left_fwd, left_rev = wheel_motors.get('l', [0, 0])
+                right_fwd, right_rev = wheel_motors.get('r', [0, 0])
 
-        # Process servos
-        if 'servos' in data:
-            servos = data['servos']
-            for servo_id, degrees in servos.items():
-                rover.setServo(int(servo_id), degrees)
-                print(f"Servo {servo_id}: {degrees} degrees")
+                command, params = calculate_motor_command(left_fwd, left_rev, right_fwd, right_rev)
 
-        # Process RGB LEDs
-        if 'rgbLeds' in data:
-            rgb_leds = data['rgbLeds']
-            for led_id, rgb in rgb_leds.items():
-                r, g, b = rgb
-                color = rover.fromRGB(r, g, b)
-                rover.setPixel(int(led_id), color)
-            rover.show()
-            print(f"Updated LEDs: {rgb_leds}")
+                # Call the appropriate rover function
+                rover_func = getattr(rover, command)
+                rover_func(*params)
+                print(f"Motor command: {command}({params})")
+
+            # Process servos
+            if 'servos' in data:
+                servos = data['servos']
+                for servo_id, degrees in servos.items():
+                    rover.setServo(int(servo_id), degrees)
+                    print(f"Servo {servo_id}: {degrees} degrees")
+
+            # Process RGB LEDs
+            if 'rgbLeds' in data:
+                rgb_leds = data['rgbLeds']
+                for led_id, rgb in rgb_leds.items():
+                    r, g, b = rgb
+                    color = rover.fromRGB(r, g, b)
+                    rover.setPixel(int(led_id), color)
+                rover.show()
+                print(f"Updated LEDs: {rgb_leds}")
 
         # Return sensor data (ultrasonic range if available)
         response = {}

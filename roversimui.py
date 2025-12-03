@@ -377,26 +377,86 @@ class MainWindow(QWidget):
     def on_change(self, s):
         print(s)
         data = json.loads(s)
-        if 'servos' in data:
-            servos = data['servos']
-            for servo in servos:
-                servoId = int(servo)
-                self.rover.setServo(servoId, servos[servo])
 
-        if 'wheelMotors' in data:
-            wheelMotors = data['wheelMotors']
-            if 'l' in wheelMotors:
-                [fwd, rev] = wheelMotors['l']
-                self.rover.setWheelMotorLeft(fwd, rev)
-            if 'r' in wheelMotors:
-                [fwd, rev] = wheelMotors['r']
-                self.rover.setWheelMotorRight(fwd, rev)
+        # Process high-level command format (new API)
+        if 'command' in data:
+            cmd = data['command']
+            print(f"High-level command: {cmd}")
 
-        if 'rgbLeds' in data:
-            rgbLeds = data['rgbLeds']
-            for led in rgbLeds:
-                ledId = int(led)
-                self.rover.setRgbLed(ledId, rgbLeds[led])
+            if cmd == 'stop':
+                self.rover.setWheelMotorLeft(0, 0)
+                self.rover.setWheelMotorRight(0, 0)
+            elif cmd == 'forward':
+                speed = data.get('speed', 100)
+                # Reset servos to 0 degrees for forward motion
+                self.rover.setServo(servo_FL, 0)
+                self.rover.setServo(servo_FR, 0)
+                self.rover.setServo(servo_RL, 0)
+                self.rover.setServo(servo_RR, 0)
+                self.rover.setWheelMotorLeft(speed, 0)
+                self.rover.setWheelMotorRight(speed, 0)
+            elif cmd == 'reverse':
+                speed = data.get('speed', 100)
+                # Reset servos to 0 degrees for reverse motion
+                self.rover.setServo(servo_FL, 0)
+                self.rover.setServo(servo_FR, 0)
+                self.rover.setServo(servo_RL, 0)
+                self.rover.setServo(servo_RR, 0)
+                self.rover.setWheelMotorLeft(0, speed)
+                self.rover.setWheelMotorRight(0, speed)
+            elif cmd == 'spinLeft':
+                speed = data.get('speed', 100)
+                # Set servos for pivot mode
+                self.rover.setServo(servo_FL, 50)
+                self.rover.setServo(servo_FR, -50)
+                self.rover.setServo(servo_RL, -50)
+                self.rover.setServo(servo_RR, 50)
+                self.rover.setWheelMotorLeft(0, speed)
+                self.rover.setWheelMotorRight(speed, 0)
+            elif cmd == 'spinRight':
+                speed = data.get('speed', 100)
+                # Set servos for pivot mode
+                self.rover.setServo(servo_FL, 50)
+                self.rover.setServo(servo_FR, -50)
+                self.rover.setServo(servo_RL, -50)
+                self.rover.setServo(servo_RR, 50)
+                self.rover.setWheelMotorLeft(speed, 0)
+                self.rover.setWheelMotorRight(0, speed)
+            elif cmd == 'turnForward':
+                left_speed = data.get('leftSpeed', 50)
+                right_speed = data.get('rightSpeed', 50)
+                self.rover.setWheelMotorLeft(left_speed, 0)
+                self.rover.setWheelMotorRight(right_speed, 0)
+            elif cmd == 'turnReverse':
+                left_speed = data.get('leftSpeed', 50)
+                right_speed = data.get('rightSpeed', 50)
+                self.rover.setWheelMotorLeft(0, left_speed)
+                self.rover.setWheelMotorRight(0, right_speed)
+            else:
+                print(f"Unknown command: {cmd}")
+
+        # Process low-level format (backward compatibility)
+        else:
+            if 'servos' in data:
+                servos = data['servos']
+                for servo in servos:
+                    servoId = int(servo)
+                    self.rover.setServo(servoId, servos[servo])
+
+            if 'wheelMotors' in data:
+                wheelMotors = data['wheelMotors']
+                if 'l' in wheelMotors:
+                    [fwd, rev] = wheelMotors['l']
+                    self.rover.setWheelMotorLeft(fwd, rev)
+                if 'r' in wheelMotors:
+                    [fwd, rev] = wheelMotors['r']
+                    self.rover.setWheelMotorRight(fwd, rev)
+
+            if 'rgbLeds' in data:
+                rgbLeds = data['rgbLeds']
+                for led in rgbLeds:
+                    ledId = int(led)
+                    self.rover.setRgbLed(ledId, rgbLeds[led])
 
 
         # self.helloMsg.setText(s)
