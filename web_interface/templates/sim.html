@@ -853,7 +853,7 @@
             if (workspace) {
                 try {
                     const xml = Blockly.Xml.workspaceToDom(workspace);
-                    const xmlText = Blockly.Xml.domToText(xml);
+                    const xmlText = Blockly.Xml.domToPrettyText(xml);
                     localStorage.setItem('rover_blockly_workspace', xmlText);
                     console.log('Workspace saved to localStorage');
                 } catch (error) {
@@ -867,7 +867,7 @@
                 try {
                     const xmlText = localStorage.getItem('rover_blockly_workspace');
                     if (xmlText) {
-                        const xml = Blockly.Xml.textToDom(xmlText);
+                        const xml = Blockly.utils.xml.textToDom(xmlText);
                         Blockly.Xml.clearWorkspaceAndLoadFromXml(xml, workspace);
                         console.log('Workspace loaded from localStorage');
                     }
