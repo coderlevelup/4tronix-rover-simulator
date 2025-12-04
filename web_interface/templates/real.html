@@ -683,6 +683,13 @@
             const mode = getUrlParameter('mode') || 'manual';
             showTab(mode);
 
+            // Set initial URL if not present
+            if (!getUrlParameter('mode')) {
+                updateURL(mode);
+            } else {
+                updateModeSwitcherLink();
+            }
+
             // Update URL and mode switcher link when tabs change
             document.querySelectorAll('.nav-link').forEach(link => {
                 link.addEventListener('click', () => {
@@ -834,9 +841,8 @@
                     return;
                 }
 
-                // Only update code for meaningful changes
-                if (event.type === Blockly.Events.FINISHED_LOADING ||
-                    event.type === Blockly.Events.BLOCK_CREATE ||
+                // Only update code for meaningful changes (but skip FINISHED_LOADING to avoid overwriting saved blocks)
+                if (event.type === Blockly.Events.BLOCK_CREATE ||
                     event.type === Blockly.Events.BLOCK_DELETE ||
                     event.type === Blockly.Events.BLOCK_CHANGE ||
                     event.type === Blockly.Events.BLOCK_MOVE) {
