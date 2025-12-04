@@ -876,8 +876,9 @@
                 try {
                     const xmlText = localStorage.getItem('rover_blockly_workspace');
                     if (xmlText) {
+                        workspace.clear();
                         const xml = Blockly.utils.xml.textToDom(xmlText);
-                        Blockly.Xml.clearWorkspaceAndLoadFromXml(xml, workspace);
+                        Blockly.Xml.domToWorkspace(xml, workspace);
                         console.log('Workspace loaded from localStorage');
                     }
                 } catch (error) {
