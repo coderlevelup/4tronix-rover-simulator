@@ -662,23 +662,34 @@
             return urlParams.get(name);
         }
 
+        // Update URL with current mode
+        function updateURL(mode) {
+            const url = new URL(window.location);
+            url.searchParams.set('mode', mode);
+            window.history.replaceState({}, '', url);
+            updateModeSwitcherLink();
+        }
+
         // Update mode switcher link to preserve current tab
         function updateModeSwitcherLink() {
-            const currentTab = document.querySelector('.nav-link.active').id.replace('-tab', '');
+            const currentMode = document.querySelector('.nav-link.active').id.replace('-tab', '');
             const simLink = document.getElementById('sim-link');
-            simLink.href = `/sim?tab=${currentTab}`;
+            simLink.href = `/sim?mode=${currentMode}`;
         }
 
         // Initialize page when DOM loads
         document.addEventListener('DOMContentLoaded', function() {
-            // Check URL parameter for tab
-            const tab = getUrlParameter('tab') || 'manual';
-            showTab(tab);
+            // Check URL parameter for mode
+            const mode = getUrlParameter('mode') || 'manual';
+            showTab(mode);
 
-            // Update mode switcher link when tabs change
+            // Update URL and mode switcher link when tabs change
             document.querySelectorAll('.nav-link').forEach(link => {
                 link.addEventListener('click', () => {
-                    setTimeout(updateModeSwitcherLink, 100);
+                    setTimeout(() => {
+                        const currentMode = document.querySelector('.nav-link.active').id.replace('-tab', '');
+                        updateURL(currentMode);
+                    }, 100);
                 });
             });
 
