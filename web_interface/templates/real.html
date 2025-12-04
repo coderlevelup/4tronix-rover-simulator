@@ -819,46 +819,34 @@
 
             // No test block - let users add their own blocks
 
-            // Generate code when workspace changes (but not while dragging)
-            let updateTimeout = null;
+            // Track workspace changes
             let isDragging = false;
-            
-            // Track when dragging starts and ends
-            workspace.addChangeListener(function(event) {
-                if (event.type === Blockly.Events.BLOCK_DRAG) {
-                    isDragging = true;
-                } else if (event.type === Blockly.Events.BLOCK_DRAG_END) {
-                    isDragging = false;
-                }
-            });
-            
-            // Listen for meaningful workspace changes
+
+            // Single change listener for all events
             workspace.addChangeListener(function(event) {
                 console.log('Blockly workspace changed:', event.type, event);
 
-                // Skip updates while dragging
-                if (isDragging) {
-                    console.log('Skipping save - dragging');
+                // Track dragging state using string comparison
+                if (event.type === 'drag') {
+                    isDragging = true;
+                    console.log('Drag started');
                     return;
                 }
 
-                // Only update code for meaningful changes (but skip FINISHED_LOADING to avoid overwriting saved blocks)
-                if (event.type === Blockly.Events.BLOCK_CREATE ||
-                    event.type === Blockly.Events.BLOCK_DELETE ||
-                    event.type === Blockly.Events.BLOCK_CHANGE ||
-                    event.type === Blockly.Events.BLOCK_MOVE) {
+                // Reset dragging on any non-drag event after dragging started
+                if (isDragging && event.type !== 'drag') {
+                    console.log('Drag ended, resetting isDragging');
+                    isDragging = false;
+                }
+
+                // Save on meaningful changes (not UI events)
+                if (event.type === 'create' ||
+                    event.type === 'delete' ||
+                    event.type === 'change' ||
+                    event.type === 'move') {
 
                     console.log('Saving workspace due to:', event.type);
-
-                    // Debounce updates to avoid rapid changes
-                    if (updateTimeout) {
-                        clearTimeout(updateTimeout);
-                    }
-
-                    // Save workspace to localStorage after a short delay
-                    updateTimeout = setTimeout(() => {
-                        saveWorkspaceToStorage();
-                    }, 500);
+                    saveWorkspaceToStorage();
                 }
             });
         }
@@ -881,13 +869,18 @@
                 try {
                     const xmlText = localStorage.getItem('rover_blockly_workspace');
                     if (xmlText) {
+                        console.log('Loading workspace from localStorage...');
+                        // Disable events while loading to prevent triggering saves
+                        Blockly.Events.disable();
                         workspace.clear();
                         const xml = Blockly.utils.xml.textToDom(xmlText);
                         Blockly.Xml.domToWorkspace(xml, workspace);
+                        Blockly.Events.enable();
                         console.log('Workspace loaded from localStorage');
                     }
                 } catch (error) {
                     console.error('Error loading workspace:', error);
+                    Blockly.Events.enable(); // Make sure to re-enable even on error
                 }
             }
         }
