@@ -9,69 +9,34 @@ from rover_web_driver import RoverWebDriver
 
 app = Flask(__name__)
 
-# Configure rover targets
-ROVER_TARGETS = {
-    'simulator': 'http://127.0.0.1:8523/',
-    'marspi': 'http://marspi.local:8523/'
-}
+# Create two separate rover instances
+real_rover = RoverWebDriver('http://marspi.local:8523/')
+real_rover.init(40)
 
-# Current target (default to marspi)
-current_target = 'marspi'
-rover = RoverWebDriver(ROVER_TARGETS[current_target])
-rover.init(40)  # Initialize with LED brightness of 40
+sim_rover = RoverWebDriver('http://127.0.0.1:8523/')
+sim_rover.init(40)
 
-# Define commands once at module level
-commands = {
-    'forward': lambda: rover.forward(speed),
-    'backward': lambda: rover.reverse(speed),
-    'spin_left': lambda: rover.spinLeft(speed),
-    'spin_right': lambda: rover.spinRight(speed),
-    'stop': lambda: rover.stop(),
-    'steer_left': lambda: rover.steerLeft(20, 1),  # Default degrees and seconds
-    'steer_right': lambda: rover.steerRight(20, 1)  # Default degrees and seconds
-}
-
+# Real rover routes
 @app.route('/')
 def index():
-    return render_template('index.html')
-
-@app.route('/target', methods=['GET'])
-def get_target():
-    """Get the current rover target"""
-    return jsonify({
-        'current': current_target,
-        'targets': list(ROVER_TARGETS.keys())
-    })
-
-@app.route('/target/<target_name>', methods=['POST'])
-def set_target(target_name):
-    """Switch between simulator and real rover"""
-    global current_target, rover
-
-    if target_name not in ROVER_TARGETS:
-        return jsonify({
-            'status': 'error',
-            'message': f'Invalid target. Valid targets: {list(ROVER_TARGETS.keys())}'
-        }), 400
-
-    # Clean up old rover connection
-    rover.cleanup()
-
-    # Create new rover connection
-    current_target = target_name
-    rover = RoverWebDriver(ROVER_TARGETS[current_target])
-    rover.init(40)
-
-    return jsonify({
-        'status': 'success',
-        'target': current_target,
-        'url': ROVER_TARGETS[current_target]
-    })
+    """Real rover page"""
+    return render_template('real.html')
 
 @app.route('/command/<cmd>', methods=['POST'])
-def handle_command(cmd):
+def handle_real_command(cmd):
+    """Handle commands for real rover"""
     global speed
     speed = request.json.get('speed', 100) if request.json else 100
+
+    commands = {
+        'forward': lambda: real_rover.forward(speed),
+        'backward': lambda: real_rover.reverse(speed),
+        'spin_left': lambda: real_rover.spinLeft(speed),
+        'spin_right': lambda: real_rover.spinRight(speed),
+        'stop': lambda: real_rover.stop(),
+        'steer_left': lambda: real_rover.steerLeft(20, 0),  # Continuous steering
+        'steer_right': lambda: real_rover.steerRight(20, 0)  # Continuous steering
+    }
 
     if cmd in commands:
         commands[cmd]()
@@ -79,26 +44,100 @@ def handle_command(cmd):
     return jsonify({'status': 'error', 'message': 'Invalid command'}), 400
 
 @app.route('/sequence', methods=['POST'])
-def handle_sequence():
-    global speed
-    speed = 100  # Use default speed for sequences
+def handle_real_sequence():
+    """Handle sequence execution for real rover"""
     sequence = request.json.get('sequence', [])
-    print(sequence)
-    
+
     for instruction in sequence:
         cmd = instruction['cmd']
-        print(cmd)
-        time_seconds = float(instruction['time'])
-        
+        time_seconds = float(instruction.get('time', 1))
+
         # Execute the command
-        if cmd in commands:
-            command = commands[cmd]
-            print(command) 
-            command()
-            time.sleep(time_seconds)
-            rover.stop()
-            time.sleep(0.1)  # Brief pause between instructions
-    
+        if cmd == 'forward':
+            real_rover.forward(100)
+        elif cmd == 'backward':
+            real_rover.reverse(100)
+        elif cmd == 'spin_left':
+            real_rover.spinLeft(100)
+        elif cmd == 'spin_right':
+            real_rover.spinRight(100)
+        elif cmd == 'stop':
+            real_rover.stop()
+        elif cmd == 'steer_left':
+            degrees = instruction.get('degrees', 20)
+            seconds = instruction.get('seconds', 1)
+            real_rover.steerLeft(degrees, seconds)
+        elif cmd == 'steer_right':
+            degrees = instruction.get('degrees', 20)
+            seconds = instruction.get('seconds', 1)
+            real_rover.steerRight(degrees, seconds)
+
+        time.sleep(time_seconds)
+        real_rover.stop()
+        time.sleep(0.1)  # Brief pause between instructions
+
+    return jsonify({'status': 'success'})
+
+# Simulator routes
+@app.route('/sim')
+def sim_index():
+    """Simulator page"""
+    return render_template('sim.html')
+
+@app.route('/sim/command/<cmd>', methods=['POST'])
+def handle_sim_command(cmd):
+    """Handle commands for simulator"""
+    global speed
+    speed = request.json.get('speed', 100) if request.json else 100
+
+    commands = {
+        'forward': lambda: sim_rover.forward(speed),
+        'backward': lambda: sim_rover.reverse(speed),
+        'spin_left': lambda: sim_rover.spinLeft(speed),
+        'spin_right': lambda: sim_rover.spinRight(speed),
+        'stop': lambda: sim_rover.stop(),
+        'steer_left': lambda: sim_rover.steerLeft(20, 0),  # Continuous steering
+        'steer_right': lambda: sim_rover.steerRight(20, 0)  # Continuous steering
+    }
+
+    if cmd in commands:
+        commands[cmd]()
+        return jsonify({'status': 'success'})
+    return jsonify({'status': 'error', 'message': 'Invalid command'}), 400
+
+@app.route('/sim/sequence', methods=['POST'])
+def handle_sim_sequence():
+    """Handle sequence execution for simulator"""
+    sequence = request.json.get('sequence', [])
+
+    for instruction in sequence:
+        cmd = instruction['cmd']
+        time_seconds = float(instruction.get('time', 1))
+
+        # Execute the command
+        if cmd == 'forward':
+            sim_rover.forward(100)
+        elif cmd == 'backward':
+            sim_rover.reverse(100)
+        elif cmd == 'spin_left':
+            sim_rover.spinLeft(100)
+        elif cmd == 'spin_right':
+            sim_rover.spinRight(100)
+        elif cmd == 'stop':
+            sim_rover.stop()
+        elif cmd == 'steer_left':
+            degrees = instruction.get('degrees', 20)
+            seconds = instruction.get('seconds', 1)
+            sim_rover.steerLeft(degrees, seconds)
+        elif cmd == 'steer_right':
+            degrees = instruction.get('degrees', 20)
+            seconds = instruction.get('seconds', 1)
+            sim_rover.steerRight(degrees, seconds)
+
+        time.sleep(time_seconds)
+        sim_rover.stop()
+        time.sleep(0.1)  # Brief pause between instructions
+
     return jsonify({'status': 'success'})
 
 if __name__ == '__main__':

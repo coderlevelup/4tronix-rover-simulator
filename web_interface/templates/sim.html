@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simulator Control</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .main-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        .simulator-panel {
+            flex: 0 0 50%;
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-right: 2px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+        }
+        .camera-feed {
+            flex: 1;
+            margin-bottom: 20px;
+        }
+        .camera-feed:last-child {
+            margin-bottom: 0;
+        }
+        .control-panel {
+            flex: 1;
+            padding: 20px;
+        }
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 300px;
+            margin: 20px auto;
+        }
+        .control-grid button {
+            height: 80px;
+        }
+        .sequence-grid {
+            display: grid;
+            grid-template-columns: auto auto 100px;
+            gap: 10px;
+            max-width: 500px;
+            margin: 20px auto;
+        }
+        .sequence-grid select {
+            height: 40px;
+        }
+        .nav-tabs .nav-link {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        .simulator-container {
+            text-align: center;
+            margin: 20px auto;
+            position: relative;
+        }
+        .connection-status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .connection-status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .connection-status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .connection-status.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        #blocklyDiv {
+            display: none;
+        }
+        
+        /* Micro:bit MakeCode Style for Blockly */
+        .blocklySvg {
+            background-color: #f8f9fa;
+        }
+        
+        .blocklyMainBackground {
+            fill: #f8f9fa;
+        }
+        
+        .blocklyToolboxDiv {
+            background-color: #ffffff;
+            border-right: 2px solid #e0e0e0;
+            box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+        }
+        
+        .blocklyTreeRow {
+            padding: 8px 12px;
+            margin: 2px 4px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+        
+        .blocklyTreeRow:hover {
+            background-color: #f0f0f0;
+            transform: translateX(2px);
+        }
+        
+        .blocklyTreeRow.blocklyTreeSelected {
+            background-color: #4CAF50;
+            color: white;
+            box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+        }
+        
+        .blocklyTreeRow.blocklyTreeSelected:hover {
+            background-color: #45a049;
+        }
+        
+        .blocklyTreeIcon {
+            margin-right: 8px;
+        }
+        
+        .blocklyTreeLabel {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        /* Block styling */
+        .blocklyPath {
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        
+        .blocklyBlockBackground {
+            fill: #ffffff;
+            stroke: #d0d0d0;
+            stroke-width: 2;
+            rx: 8;
+            ry: 8;
+        }
+        
+        .blocklyBlockBackground.blocklySelected {
+            stroke: #4CAF50;
+            stroke-width: 3;
+        }
+        
+        /* Movement blocks - Blue */
+        .blocklyPath[data-category="Movement"] {
+            fill: #2196F3;
+            stroke: #1976D2;
+        }
+        
+        /* Control blocks - Green */
+        .blocklyPath[data-category="Control"] {
+            fill: #4CAF50;
+            stroke: #388E3C;
+        }
+        
+        /* Sensor blocks - Orange */
+        .blocklyPath[data-category="Sensors"] {
+            fill: #FF9800;
+            stroke: #F57C00;
+        }
+        
+        /* LED blocks - Red */
+        .blocklyPath[data-category="LEDs"] {
+            fill: #F44336;
+            stroke: #D32F2F;
+        }
+        
+        /* Logic blocks - Purple */
+        .blocklyPath[data-category="Logic"] {
+            fill: #9C27B0;
+            stroke: #7B1FA2;
+        }
+        
+        /* Loop blocks - Teal */
+        .blocklyPath[data-category="Loops"] {
+            fill: #009688;
+            stroke: #00695C;
+        }
+        
+        /* Math blocks - Indigo */
+        .blocklyPath[data-category="Math"] {
+            fill: #3F51B5;
+            stroke: #303F9F;
+        }
+        
+        /* Field styling */
+        .blocklyText {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            fill: #333333;
+        }
+        
+        .blocklyDropdownText {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .blocklyNumberText {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            fill: #1976D2;
+        }
+        
+        /* Input shapes */
+        .blocklyInput {
+            fill: #ffffff;
+            stroke: #d0d0d0;
+            stroke-width: 2;
+        }
+        
+        .blocklyInput.blocklyInputStatement {
+            fill: #ffffff;
+            stroke: #4CAF50;
+            stroke-width: 2;
+        }
+        
+        /* Connection points */
+        .blocklyConnection {
+            fill: #ffffff;
+            stroke: #4CAF50;
+            stroke-width: 2;
+        }
+        
+        .blocklyConnection.blocklyConnectionStatement {
+            fill: #ffffff;
+            stroke: #4CAF50;
+            stroke-width: 2;
+        }
+        
+        /* Workspace grid */
+        .blocklyGridPattern line {
+            stroke: #e0e0e0;
+            stroke-width: 1;
+        }
+        
+        /* Scrollbars */
+        .blocklyScrollbarHandle {
+            fill: #bdbdbd;
+            stroke: #9e9e9e;
+            stroke-width: 1;
+        }
+        
+        .blocklyScrollbarHandle:hover {
+            fill: #9e9e9e;
+        }
+        
+        /* Trash can */
+        .blocklyTrash {
+            fill: #f44336;
+            stroke: #d32f2f;
+            stroke-width: 2;
+        }
+        
+        .blocklyTrash:hover {
+            fill: #d32f2f;
+        }
+        
+        /* Zoom controls */
+        .blocklyZoom {
+            fill: #ffffff;
+            stroke: #d0d0d0;
+            stroke-width: 1;
+        }
+        
+        .blocklyZoom:hover {
+            fill: #f0f0f0;
+        }
+        #simulator-feed {
+            width: 100%;
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            background-color: #000;
+        }
+        .simulator-title {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #495057;
+        }
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+            }
+            .simulator-panel {
+                flex: none;
+                border-right: none;
+                border-bottom: 2px solid #dee2e6;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Simulator Panel -->
+        <div class="simulator-panel">
+            <h2 class="simulator-title" id="simulator-title">Simulator View</h2>
+
+            <!-- Connection Status -->
+            <div id="connection-status" class="connection-status disconnected">
+                Disconnected
+            </div>
+
+            <!-- Simulator Feed -->
+            <div class="simulator-container">
+                <canvas id="simulator-feed" width="640" height="480"></canvas>
+                <div id="simulator-message" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; text-align: center; justify-content: center; font-size: 16px; font-weight: bold; color: white; pointer-events: none; padding: 20px; box-sizing: border-box; text-shadow: 0 0 5px black;">
+                    Connecting to simulator...
+                </div>
+            </div>
+
+            <!-- Connection Controls -->
+            <div class="mt-3">
+                <button id="connect-btn" class="btn btn-primary">Connect</button>
+                <button id="disconnect-btn" class="btn btn-secondary" disabled>Disconnect</button>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="mb-0">Simulator Control</h1>
+                <a href="/" class="btn btn-outline-secondary">Switch to Real Rover</a>
+            </div>
+
+        <!-- Navigation tabs -->
+            <ul class="nav nav-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual" type="button" role="tab">
+                    Manual Control
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="blockly-tab" data-bs-toggle="tab" data-bs-target="#blockly" type="button" role="tab">
+                    Blockly Programming
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab content -->
+        <div class="tab-content mt-4">
+            <!-- Manual Control Tab -->
+            <div class="tab-pane fade" id="manual" role="tabpanel">
+                <div class="control-grid">
+                    <button class="btn btn-info" onclick="sendCommand('steer_left')">Steer Left</button>
+                    <button class="btn btn-primary" onclick="sendCommand('forward')">Forward</button>
+                    <button class="btn btn-info" onclick="sendCommand('steer_right')">Steer Right</button>
+                    <button class="btn btn-primary" onclick="sendCommand('spin_left')">Spin Left</button>
+                    <button class="btn btn-danger" onclick="sendCommand('stop')">Stop</button>
+                    <button class="btn btn-primary" onclick="sendCommand('spin_right')">Spin Right</button>
+                    <div></div>
+                    <button class="btn btn-primary" onclick="sendCommand('backward')">Backward</button>
+                    <div></div>
+                </div>
+            </div>
+
+            <!-- Blockly Programming Tab -->
+            <div class="tab-pane fade" id="blockly" role="tabpanel">
+                <!-- Code Controls -->
+                <div class="mb-3 text-center">
+                    <button class="btn btn-primary btn-lg me-2" onclick="runBlocklyCode()">Run Code</button>
+                    <button class="btn btn-danger btn-lg" onclick="stopRover()">Stop Rover</button>
+                </div>
+
+                <!-- Blockly Editor -->
+                <div id="blocklyDiv" style="height: 500px; width: 100%; border: 1px solid #ccc;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pi Camera Connection Modal -->
+    <div class="modal fade" id="piCameraModal" tabindex="-1" aria-labelledby="piCameraModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="piCameraModalLabel">Connect to Pi AI Camera</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="mb-3">
+                            <label for="camera-hostname" class="form-label">Hostname</label>
+                            <input type="text" class="form-control" id="camera-hostname" value="mro.local" placeholder="mro.local">
+                            <div class="form-text">Enter the hostname or IP address of the Pi</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="camera-port" class="form-label">Port</label>
+                            <input type="number" class="form-control" id="camera-port" value="8890" placeholder="8890">
+                            <div class="form-text">WebSocket port for camera stream (default: 8890)</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="modal-connect-btn">Connect</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Blockly CDN -->
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="https://unpkg.com/blockly/python_compressed.js"></script>
+    <script>
+        // Ensure Python generator is available
+        if (typeof Blockly.Python === 'undefined') {
+            console.error('Blockly Python generator not loaded');
+        }
+    </script>
+    <script>
+        function sendCommand(cmd, speed = 100) {
+            fetch(`/command/${cmd}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({speed: speed})
+            }).then(response => response.json())
+              .then(data => console.log(data))
+              .catch(error => console.error('Error:', error));
+        }
+
+        // Target switching functions
+        function switchTarget(targetName) {
+            fetch(`/target/${targetName}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById('current-target').textContent = data.target;
+                    console.log(`Switched to ${data.target}: ${data.url}`);
+                } else {
+                    console.error('Failed to switch target:', data.message);
+                    alert('Failed to switch target: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error switching target:', error);
+                alert('Error switching target. Is the server running?');
+            });
+        }
+
+        function loadCurrentTarget() {
+            fetch('/target')
+            .then(response => response.json())
+            .then(data => {
+                const currentTarget = data.current;
+                document.getElementById('current-target').textContent = currentTarget;
+                document.getElementById(`target-${currentTarget}`).checked = true;
+            })
+            .catch(error => console.error('Error loading target:', error));
+        }
+
+
+        // Video streaming client for simulator
+        class VideoStreamClient {
+            constructor() {
+                this.currentTarget = 'simulator';
+                this.websocketUrl = 'ws://localhost:8889';  // Simulator stream
+                this.websocket = null;
+                this.connected = false;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 10;
+                this.reconnectInterval = 5000;
+                this.reconnectTimeout = null;
+
+                // Canvas setup
+                this.canvas = document.getElementById('simulator-feed');
+                this.ctx = this.canvas.getContext('2d');
+
+                // UI elements
+                this.connectionStatus = document.getElementById('connection-status');
+                this.simulatorMessage = document.getElementById('simulator-message');
+                this.connectBtn = document.getElementById('connect-btn');
+                this.disconnectBtn = document.getElementById('disconnect-btn');
+
+                // Modal elements
+                this.piCameraModal = new bootstrap.Modal(document.getElementById('piCameraModal'));
+                this.modalConnectBtn = document.getElementById('modal-connect-btn');
+                this.cameraHostnameInput = document.getElementById('camera-hostname');
+                this.cameraPortInput = document.getElementById('camera-port');
+
+                // Setup event listeners
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                this.connectBtn.addEventListener('click', () => {
+                    // Direct connect for simulator
+                    this.connect();
+                });
+                this.disconnectBtn.addEventListener('click', () => this.disconnect());
+            }
+
+            async connect() {
+                if (this.connected) return;
+
+                this.updateConnectionStatus('connecting', 'Connecting...');
+                this.connectBtn.disabled = true;
+
+                try {
+                    this.websocket = new WebSocket(this.websocketUrl);
+
+                    this.websocket.onopen = () => {
+                        this.connected = true;
+                        this.reconnectAttempts = 0;
+                        this.updateConnectionStatus('connected', 'Connected');
+                        this.connectBtn.disabled = true;
+                        this.disconnectBtn.disabled = false;
+                        this.hideSimulatorMessage();
+                        console.log('Connected to simulator stream');
+                    };
+
+                    this.websocket.onmessage = (event) => {
+                        this.handleMessage(event.data);
+                    };
+
+                    this.websocket.onclose = () => {
+                        this.connected = false;
+                        this.updateConnectionStatus('disconnected', 'Disconnected');
+                        this.connectBtn.disabled = false;
+                        this.disconnectBtn.disabled = true;
+                        this.showSimulatorMessage('Disconnected');
+                        console.log('Simulator stream closed');
+                        this.handleReconnect();
+                    };
+
+                    this.websocket.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        this.updateConnectionStatus('disconnected', 'Connection Error');
+                    };
+
+                } catch (error) {
+                    console.error('Failed to connect:', error);
+                    this.updateConnectionStatus('disconnected', 'Connection Failed');
+                    this.connectBtn.disabled = false;
+                    this.handleReconnect();
+                }
+            }
+
+            disconnect() {
+                if (this.websocket) {
+                    this.websocket.close();
+                    this.websocket = null;
+                }
+                this.connected = false;
+                this.updateConnectionStatus('disconnected', 'Disconnected');
+                this.connectBtn.disabled = false;
+                this.disconnectBtn.disabled = true;
+                this.showSimulatorMessage('Disconnected');
+
+                if (this.reconnectTimeout) {
+                    clearTimeout(this.reconnectTimeout);
+                    this.reconnectTimeout = null;
+                }
+            }
+
+            handleReconnect() {
+                if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                    console.log('Max reconnection attempts reached');
+                    this.showSimulatorMessage('Start simulator with --stream flag');
+                    return;
+                }
+
+                this.reconnectAttempts++;
+                console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+
+                this.reconnectTimeout = setTimeout(() => {
+                    if (!this.connected) {
+                        this.connect();
+                    }
+                }, this.reconnectInterval);
+            }
+
+            handleMessage(data) {
+                try {
+                    const message = JSON.parse(data);
+
+                    if (message.type === 'frame') {
+                        this.displayFrame(message.data);
+                    }
+                } catch (error) {
+                    console.error('Error parsing message:', error);
+                }
+            }
+
+            displayFrame(frameData) {
+                try {
+                    const img = new Image();
+                    img.onload = () => {
+                        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                        this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+                        this.hideSimulatorMessage();
+                    };
+                    img.onerror = (error) => {
+                        console.error('Error loading image:', error);
+                    };
+                    img.src = 'data:image/jpeg;base64,' + frameData;
+                } catch (error) {
+                    console.error('Error displaying frame:', error);
+                }
+            }
+
+            updateConnectionStatus(status, message) {
+                this.connectionStatus.className = `connection-status ${status}`;
+                this.connectionStatus.textContent = message;
+            }
+
+            showSimulatorMessage(message) {
+                this.simulatorMessage.textContent = message;
+                this.simulatorMessage.style.display = 'flex';
+            }
+
+            hideSimulatorMessage() {
+                this.simulatorMessage.style.display = 'none';
+            }
+        }
+
+        // Initialize video stream client
+        const streamClient = new VideoStreamClient();
+
+        // Rover control functions
+        function sendCommand(cmd, speed = 100) {
+            fetch(`/sim/command/${cmd}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({speed: speed})
+            }).then(response => response.json())
+              .then(data => console.log(data))
+              .catch(error => console.error('Error:', error));
+        }
+
+        // Initialize page when DOM loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set manual tab as active by default
+            showTab('manual');
+
+            // Auto-connect to simulator stream after a short delay
+            setTimeout(() => {
+                streamClient.connect();
+            }, 1000);
+        });
+
+        function showTab(tabName) {
+            // Hide all tab panes
+            document.querySelectorAll('.tab-pane').forEach(pane => {
+                pane.classList.remove('show', 'active');
+            });
+            
+            // Remove active class from all tab buttons
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            
+            // Show the selected tab
+            document.getElementById(tabName).classList.add('show', 'active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // Handle Blockly-specific logic
+            if (tabName === 'blockly') {
+                document.getElementById('blocklyDiv').style.display = 'block';
+                // Wait for the tab to be fully visible before initializing Blockly
+                setTimeout(() => {
+                    // Double-check that the tab is actually visible
+                    const blocklyTab = document.getElementById('blockly');
+                    if (blocklyTab.classList.contains('show') && blocklyTab.classList.contains('active')) {
+                        if (!workspace) {
+                            initializeBlockly();
+                        } else {
+                            // If workspace already exists, just resize it
+                            Blockly.svgResize(workspace);
+                        }
+                    }
+                }, 300);
+            } else {
+                if (workspace) {
+                    document.getElementById('blocklyDiv').style.display = 'none';
+                }
+            }
+        }
+
+        // Blockly Workspace
+        let workspace = null;
+
+        // Custom Block Definitions for Rover
+        const roverBlocks = `
+        <xml xmlns="https://developers.google.com/blockly/xml" id="rover-blocks">
+            <block type="rover_forward"></block>
+            <block type="rover_backward"></block>
+            <block type="rover_spin_left"></block>
+            <block type="rover_spin_right"></block>
+            <block type="rover_stop"></block>
+            <block type="rover_steer_left"></block>
+            <block type="rover_steer_right"></block>
+            <block type="rover_wait"></block>
+            <block type="rover_repeat"></block>
+            <block type="rover_if_obstacle"></block>
+            <block type="rover_get_distance"></block>
+            <block type="rover_set_led"></block>
+        </xml>
+        `;
+
+        // Tab click handlers
+        document.getElementById('manual-tab').addEventListener('click', function (event) {
+            event.preventDefault();
+            showTab('manual');
+        });
+
+        document.getElementById('blockly-tab').addEventListener('click', function (event) {
+            event.preventDefault();
+            showTab('blockly');
+        });
+
+        function initializeBlockly() {
+            console.log('Initializing Blockly...');
+            // Ensure the Blockly div is visible and has dimensions
+            const blocklyDiv = document.getElementById('blocklyDiv');
+            if (blocklyDiv.offsetWidth === 0 || blocklyDiv.offsetHeight === 0) {
+                console.log('Blockly div not ready, retrying...');
+                setTimeout(initializeBlockly, 100);
+                return;
+            }
+            
+            console.log('Blockly div ready, creating workspace...');
+            // Create the workspace
+            workspace = Blockly.inject('blocklyDiv', {
+                toolbox: createToolbox(),
+                grid: {
+                    spacing: 20,
+                    length: 3,
+                    colour: '#e0e0e0',
+                    snap: true
+                },
+                zoom: {
+                    controls: true,
+                    wheel: true,
+                    startScale: 1.0,
+                    maxScale: 3,
+                    minScale: 0.3,
+                    scaleSpeed: 1.2
+                },
+                trashcan: true,
+                theme: Blockly.Themes.Modern
+            });
+
+            // Add custom blocks
+            addCustomBlocks();
+
+            console.log('Workspace created successfully:', workspace);
+            console.log('Available blocks:', Object.keys(Blockly.Blocks).filter(key => key.startsWith('rover_')));
+
+            // No test block - let users add their own blocks
+
+            // Generate code when workspace changes (but not while dragging)
+            let updateTimeout = null;
+            let isDragging = false;
+            
+            // Track when dragging starts and ends
+            workspace.addChangeListener(function(event) {
+                if (event.type === Blockly.Events.BLOCK_DRAG) {
+                    isDragging = true;
+                } else if (event.type === Blockly.Events.BLOCK_DRAG_END) {
+                    isDragging = false;
+                }
+            });
+            
+            // Listen for meaningful workspace changes
+            workspace.addChangeListener(function(event) {
+                console.log('Blockly workspace changed:', event.type);
+                
+                // Skip updates while dragging
+                if (isDragging) {
+                    return;
+                }
+                
+                // Only update code for meaningful changes
+                if (event.type === Blockly.Events.FINISHED_LOADING ||
+                    event.type === Blockly.Events.BLOCK_CREATE ||
+                    event.type === Blockly.Events.BLOCK_DELETE ||
+                    event.type === Blockly.Events.BLOCK_CHANGE ||
+                    event.type === Blockly.Events.BLOCK_MOVE) {
+                    
+                    // Debounce updates to avoid rapid changes
+                    if (updateTimeout) {
+                        clearTimeout(updateTimeout);
+                    }
+                    }
+            });
+        }
+
+        function createToolbox() {
+            return `
+            <xml xmlns="https://developers.google.com/blockly/xml" id="toolbox">
+                <category name="Movement" colour="#5C81A6">
+                    <block type="rover_forward"></block>
+                    <block type="rover_backward"></block>
+                    <block type="rover_spin_left"></block>
+                    <block type="rover_spin_right"></block>
+                    <block type="rover_stop"></block>
+                    <block type="rover_steer_left"></block>
+                    <block type="rover_steer_right"></block>
+                </category>
+                <category name="Control" colour="#5BA55B">
+                    <block type="rover_wait"></block>
+                    <block type="rover_repeat"></block>
+                    <block type="rover_if_obstacle"></block>
+                </category>
+                <category name="Sensors" colour="#FF8C1A">
+                    <block type="rover_get_distance"></block>
+                </category>
+                <category name="LEDs" colour="#FF6B6B">
+                    <block type="rover_set_led"></block>
+                </category>
+                <category name="Variables" colour="#A55B80" custom="VARIABLE"></category>
+                <category name="Logic" colour="#5C81A6">
+                    <block type="controls_if"></block>
+                    <block type="logic_compare"></block>
+                    <block type="logic_operation"></block>
+                </category>
+                <category name="Loops" colour="#5BA55B">
+                    <block type="controls_repeat_ext"></block>
+                    <block type="controls_whileUntil"></block>
+                </category>
+                <category name="Math" colour="#5C81A6">
+                    <block type="math_number"></block>
+                    <block type="math_arithmetic"></block>
+                </category>
+            </xml>
+            `;
+        }
+
+        function addCustomBlocks() {
+            console.log('Adding custom blocks...');
+            // Forward block
+            Blockly.Blocks['rover_forward'] = {
+                init: function() {
+                    this.appendDummyInput()
+                        .appendField("Move Forward")
+                        .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "TIME")
+                        .appendField("seconds");
+                    this.setPreviousStatement(true, null);
+                    this.setNextStatement(true, null);
+                    this.setColour("#2196F3");
+                    this.setTooltip("Move the rover forward for specified time in seconds");
+                }
+            };
+
+            // Backward block
+            Blockly.Blocks['rover_backward'] = {
+                init: function() {
+                    this.appendDummyInput()
+                        .appendField("Move Backward")
+                        .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "TIME")
+                        .appendField("seconds");
+                    this.setPreviousStatement(true, null);
+                    this.setNextStatement(true, null);
+                    this.setColour("#2196F3");
+                    this.setTooltip("Move the rover backward for specified time in seconds");
+                }
+            };
+
+            // Spin Left block
+            Blockly.Blocks['rover_spin_left'] = {
+                init: function() {
+                    this.appendDummyInput()
+                        .appendField("Spin Left")
+                        .appendField(new Blockly.FieldNumber(0.5, 0.1, 10, 0.1), "TIME")
+                        .appendField("seconds");
+                    this.setPreviousStatement(true, null);
+                    this.setNextStatement(true, null);
+                    this.setColour("#2196F3");
+                    this.setTooltip("Spin the rover left for specified time in seconds");
+                }
+            };
+
+            // Spin Right block
+            Blockly.Blocks['rover_spin_right'] = {
+                init: function() {
+                    this.appendDummyInput()
+                        .appendField("Spin Right")
+                        .appendField(new Blockly.FieldNumber(0.5, 0.1, 10, 0.1), "TIME")
+                        .appendField("seconds");
+                    this.setPreviousStatement(true, null);
+                    this.setNextStatement(true, null);
+                    this.setColour("#2196F3");
+                    this.setTooltip("Spin the rover right for specified time in seconds");
+                }
+            };
+
+            // Stop block
+            Blockly.Blocks['rover_stop'] = {
+                init: function() {
+                    this.appendDummyInput()
+                        .appendField("Stop");
+                    this.setPreviousStatement(true, null);
+                    this.setNextStatement(true, null);
+                    this.setColour("#2196F3");
+                    this.setTooltip("Stop the rover");
+                }
+            };
+
+            // Steer Left block
+            Blockly.Blocks['rover_steer_left'] = {
+                init: function() {
+                    this.appendDummyInput()
+                        .appendField("Steer Left")
+                        .appendField("Degrees")
+                        .appendField(new Blockly.FieldNumber(20, 0, 45), "DEGREES")
+                        .appendField("Seconds")
+                        .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "SECONDS");
+                    this.setPreviousStatement(true, null);
+                    this.setNextStatement(true, null);
+                    this.setColour("#2196F3");
+                    this.setTooltip("Steer left while moving forward at given angle for duration");
+                }
+            };
+
+            // Steer Right block
+            Blockly.Blocks['rover_steer_right'] = {
+                init: function() {
+                    this.appendDummyInput()
+                        .appendField("Steer Right")
+                        .appendField("Degrees")
+                        .appendField(new Blockly.FieldNumber(20, 0, 45), "DEGREES")
+                        .appendField("Seconds")
+                        .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "SECONDS");
+                    this.setPreviousStatement(true, null);
+                    this.setNextStatement(true, null);
+                    this.setColour("#2196F3");
+                    this.setTooltip("Steer right while moving forward at given angle for duration");
+                }
+            };
+
+            // Wait block
+            Blockly.Blocks['rover_wait'] = {
+                init: function() {
+                    this.appendDummyInput()
+                        .appendField("Wait")
+                        .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "TIME")
+                        .appendField("seconds");
+                    this.setPreviousStatement(true, null);
+                    this.setNextStatement(true, null);
+                    this.setColour("#4CAF50");
+                    this.setTooltip("Wait for specified number of seconds");
+                }
+            };
+
+            // Repeat block
+            Blockly.Blocks['rover_repeat'] = {
+                init: function() {
+                    this.appendDummyInput()
+                        .appendField("Repeat")
+                        .appendField(new Blockly.FieldNumber(3, 1, 10), "TIMES");
+                    this.appendStatementInput("DO")
+                        .setCheck(null);
+                    this.setPreviousStatement(true, null);
+                    this.setNextStatement(true, null);
+                    this.setColour("#4CAF50");
+                    this.setTooltip("Repeat the blocks inside this number of times");
+                }
+            };
+
+            // If obstacle block
+            Blockly.Blocks['rover_if_obstacle'] = {
+                init: function() {
+                    this.appendDummyInput()
+                        .appendField("If obstacle detected");
+                    this.appendStatementInput("DO")
+                        .setCheck(null);
+                    this.setPreviousStatement(true, null);
+                    this.setNextStatement(true, null);
+                    this.setColour("#4CAF50");
+                    this.setTooltip("Execute blocks if an obstacle is detected");
+                }
+            };
+
+            // Get distance block
+            Blockly.Blocks['rover_get_distance'] = {
+                init: function() {
+                    this.appendDummyInput()
+                        .appendField("Distance to obstacle (cm)");
+                    this.setOutput(true, "Number");
+                    this.setColour("#FF9800");
+                    this.setTooltip("Get the distance to the nearest obstacle in centimeters");
+                }
+            };
+
+            // Set LED block
+            Blockly.Blocks['rover_set_led'] = {
+                init: function() {
+                    this.appendDummyInput()
+                        .appendField("Set LED")
+                        .appendField(new Blockly.FieldDropdown([["Red", "red"], ["Green", "green"], ["Blue", "blue"], ["Yellow", "yellow"], ["Purple", "purple"], ["Cyan", "cyan"], ["White", "white"], ["Off", "off"]]), "COLOR");
+                    this.setPreviousStatement(true, null);
+                    this.setNextStatement(true, null);
+                    this.setColour("#F44336");
+                    this.setTooltip("Set the rover's LED color");
+                }
+            };
+
+            // Generate Python code for custom blocks
+            Blockly.Python['rover_forward'] = function(block) {
+                const time = block.getFieldValue('TIME');
+                return `rover.forward(100)\ntime.sleep(${time})\nrover.stop()\n`;
+            };
+
+            Blockly.Python['rover_backward'] = function(block) {
+                const time = block.getFieldValue('TIME');
+                return `rover.reverse(100)\ntime.sleep(${time})\nrover.stop()\n`;
+            };
+
+            Blockly.Python['rover_spin_left'] = function(block) {
+                const time = block.getFieldValue('TIME');
+                return `rover.spinLeft(100)\ntime.sleep(${time})\nrover.stop()\n`;
+            };
+
+            Blockly.Python['rover_spin_right'] = function(block) {
+                const time = block.getFieldValue('TIME');
+                return `rover.spinRight(100)\ntime.sleep(${time})\nrover.stop()\n`;
+            };
+
+            Blockly.Python['rover_stop'] = function(block) {
+                return `rover.stop()\n`;
+            };
+
+            Blockly.Python['rover_steer_left'] = function(block) {
+                const degrees = block.getFieldValue('DEGREES');
+                const seconds = block.getFieldValue('SECONDS');
+                return `rover.steerLeft(${degrees}, ${seconds})\n`;
+            };
+
+            Blockly.Python['rover_steer_right'] = function(block) {
+                const degrees = block.getFieldValue('DEGREES');
+                const seconds = block.getFieldValue('SECONDS');
+                return `rover.steerRight(${degrees}, ${seconds})\n`;
+            };
+
+            Blockly.Python['rover_wait'] = function(block) {
+                const time = block.getFieldValue('TIME');
+                return `time.sleep(${time})\n`;
+            };
+
+            Blockly.Python['rover_repeat'] = function(block) {
+                const times = block.getFieldValue('TIMES');
+                const statements = Blockly.Python.statementToCode(block, 'DO');
+                return `for i in range(${times}):\n${statements}`;
+            };
+
+            Blockly.Python['rover_if_obstacle'] = function(block) {
+                const statements = Blockly.Python.statementToCode(block, 'DO');
+                return `if rover.irAll():\n${statements}`;
+            };
+
+            Blockly.Python['rover_get_distance'] = function(block) {
+                return ['rover.getDistance()', Blockly.Python.ORDER_ATOMIC];
+            };
+
+            Blockly.Python['rover_set_led'] = function(block) {
+                const color = block.getFieldValue('COLOR');
+                const colorMap = {
+                    'red': 'rover.fromRGB(255, 0, 0)',
+                    'green': 'rover.fromRGB(0, 255, 0)',
+                    'blue': 'rover.fromRGB(0, 0, 255)',
+                    'yellow': 'rover.fromRGB(255, 255, 0)',
+                    'purple': 'rover.fromRGB(255, 0, 255)',
+                    'cyan': 'rover.fromRGB(0, 255, 255)',
+                    'white': 'rover.fromRGB(255, 255, 255)',
+                    'off': '0'
+                };
+                const colorCode = colorMap[color] || '0';
+                return `rover.setColor(${colorCode})\nrover.show()\n`;
+            };
+        }
+
+
+        function generateCustomCode(workspace) {
+            const blocks = workspace.getTopBlocks(false);
+            let code = '';
+            const processedBlocks = new Set(); // Track processed blocks to avoid duplicates
+            
+            for (let block of blocks) {
+                code += generateBlockChain(block, processedBlocks);
+            }
+            
+            return code;
+        }
+
+        function generateBlockChain(block, processedBlocks) {
+            let code = '';
+            let currentBlock = block;
+
+            while (currentBlock) {
+                // Skip if we've already processed this block
+                if (processedBlocks.has(currentBlock.id)) {
+                    console.log('Skipping duplicate block:', currentBlock.type, currentBlock.id);
+                    break;
+                }
+
+                processedBlocks.add(currentBlock.id);
+                code += generateBlockCode(currentBlock, processedBlocks);
+                currentBlock = currentBlock.getNextBlock();
+            }
+
+            return code;
+        }
+
+        function generateBlockCode(block, processedBlocks) {
+            const type = block.type;
+            let code = '';
+            console.log('Generating code for block:', type, block.id);
+            
+            switch (type) {
+                case 'rover_forward':
+                    const fwdTime = block.getFieldValue('TIME') || 1;
+                    code = `rover.forward(100)\ntime.sleep(${fwdTime})\nrover.stop()\n`;
+                    break;
+                case 'rover_backward':
+                    const backTime = block.getFieldValue('TIME') || 1;
+                    code = `rover.reverse(100)\ntime.sleep(${backTime})\nrover.stop()\n`;
+                    break;
+                case 'rover_spin_left':
+                    const leftTime = block.getFieldValue('TIME') || 0.5;
+                    code = `rover.spinLeft(100)\ntime.sleep(${leftTime})\nrover.stop()\n`;
+                    break;
+                case 'rover_spin_right':
+                    const rightTime = block.getFieldValue('TIME') || 0.5;
+                    code = `rover.spinRight(100)\ntime.sleep(${rightTime})\nrover.stop()\n`;
+                    break;
+                case 'rover_stop':
+                    code = `rover.stop()\n`;
+                    break;
+                case 'rover_steer_left':
+                    const steerLeftDegrees = block.getFieldValue('DEGREES') || 20;
+                    const steerLeftSeconds = block.getFieldValue('SECONDS') || 1;
+                    code = `rover.steerLeft(${steerLeftDegrees}, ${steerLeftSeconds})\n`;
+                    break;
+                case 'rover_steer_right':
+                    const steerRightDegrees = block.getFieldValue('DEGREES') || 20;
+                    const steerRightSeconds = block.getFieldValue('SECONDS') || 1;
+                    code = `rover.steerRight(${steerRightDegrees}, ${steerRightSeconds})\n`;
+                    break;
+                case 'rover_wait':
+                    const waitTime = block.getFieldValue('TIME') || 1;
+                    code = `time.sleep(${waitTime})\n`;
+                    break;
+                case 'rover_repeat':
+                    const times = block.getFieldValue('TIMES') || 3;
+                    const doBlock = block.getInputTargetBlock('DO');
+                    if (doBlock) {
+                        let doCode = generateBlockChain(doBlock, processedBlocks);
+                        // Indent the code properly
+                        const indentedCode = doCode.split('\n').map(line => '    ' + line).join('\n');
+                        code = `for i in range(${times}):\n${indentedCode}`;
+                    }
+                    break;
+                case 'rover_if_obstacle':
+                    const ifBlock = block.getInputTargetBlock('DO');
+                    if (ifBlock) {
+                        let ifCode = generateBlockChain(ifBlock, processedBlocks);
+                        // Indent the code properly
+                        const indentedCode = ifCode.split('\n').map(line => '    ' + line).join('\n');
+                        code = `if rover.irAll():\n${indentedCode}`;
+                    }
+                    break;
+                case 'rover_set_led':
+                    const color = block.getFieldValue('COLOR') || 'off';
+                    const colorMap = {
+                        'red': 'rover.fromRGB(255, 0, 0)',
+                        'green': 'rover.fromRGB(0, 255, 0)',
+                        'blue': 'rover.fromRGB(0, 0, 255)',
+                        'yellow': 'rover.fromRGB(255, 255, 0)',
+                        'purple': 'rover.fromRGB(255, 0, 255)',
+                        'cyan': 'rover.fromRGB(0, 255, 255)',
+                        'white': 'rover.fromRGB(255, 255, 255)',
+                        'off': '0'
+                    };
+                    const colorCode = colorMap[color] || '0';
+                    code = `rover.setColor(${colorCode})\nrover.show()\n`;
+                    break;
+            }
+            
+            return code;
+        }
+
+        function runBlocklyCode() {
+            console.log('runBlocklyCode called');
+            if (!workspace) {
+                alert('Please initialize Blockly first by clicking on the Blockly Programming tab');
+                return;
+            }
+
+            let code;
+            try {
+                // Try Python generator first
+                if (typeof Blockly.Python !== 'undefined') {
+                    code = Blockly.Python.workspaceToCode(workspace);
+                } else {
+                    // Fallback to custom code generation
+                    code = generateCustomCode(workspace);
+                }
+            } catch (error) {
+                console.error('Code generation error:', error);
+                // Fallback to custom code generation
+                code = generateCustomCode(workspace);
+            }
+            
+            console.log('Generated code for execution:', code);
+            const defaultSpeed = 50; // Default speed for commands
+            
+            // Convert Python code to rover commands
+            const commands = parseBlocklyCode(code, defaultSpeed);
+            console.log('Parsed commands:', commands);
+            
+            if (commands.length === 0) {
+                alert('No valid commands found. Please add some blocks to the workspace.');
+                return;
+            }
+
+            // Send commands to rover
+            executeBlocklyCommands(commands);
+        }
+
+        function stopRover() {
+            sendCommand('stop', 0);
+        }
+
+        function parseBlocklyCode(code, speed) {
+            const commands = [];
+            const lines = code.split('\n');
+
+            let i = 0;
+            while (i < lines.length) {
+                const line = lines[i].trimEnd();
+                const trimmedLine = line.trim();
+
+                // Check for loop
+                const loopMatch = trimmedLine.match(/^for\s+\w+\s+in\s+range\((\d+)\):/);
+                if (loopMatch) {
+                    const iterations = parseInt(loopMatch[1]);
+                    const indent = line.match(/^(\s*)/)[0].length;
+
+                    // Collect loop body
+                    const loopBody = [];
+                    i++;
+                    while (i < lines.length) {
+                        const bodyLine = lines[i];
+                        const bodyIndent = bodyLine.match(/^(\s*)/)[0].length;
+
+                        // Check if still in loop body
+                        if (bodyLine.trim() && bodyIndent <= indent) {
+                            break;
+                        }
+                        if (bodyLine.trim()) {
+                            loopBody.push(bodyLine);
+                        }
+                        i++;
+                    }
+
+                    // Parse loop body and repeat
+                    for (let iter = 0; iter < iterations; iter++) {
+                        const loopCommands = parseBlocklyCode(loopBody.join('\n'), speed);
+                        commands.push(...loopCommands);
+                    }
+                    continue;
+                }
+
+                // Parse individual commands
+                if (trimmedLine.includes('rover.forward(')) {
+                    const speedMatch = trimmedLine.match(/rover\.forward\((\d+)\)/);
+                    commands.push({cmd: 'forward', speed: speedMatch ? parseInt(speedMatch[1]) : speed});
+                } else if (trimmedLine.includes('rover.reverse(')) {
+                    const speedMatch = trimmedLine.match(/rover\.reverse\((\d+)\)/);
+                    commands.push({cmd: 'backward', speed: speedMatch ? parseInt(speedMatch[1]) : speed});
+                } else if (trimmedLine.includes('rover.spinLeft(')) {
+                    const speedMatch = trimmedLine.match(/rover\.spinLeft\((\d+)\)/);
+                    commands.push({cmd: 'spin_left', speed: speedMatch ? parseInt(speedMatch[1]) : speed});
+                } else if (trimmedLine.includes('rover.spinRight(')) {
+                    const speedMatch = trimmedLine.match(/rover\.spinRight\((\d+)\)/);
+                    commands.push({cmd: 'spin_right', speed: speedMatch ? parseInt(speedMatch[1]) : speed});
+                } else if (trimmedLine.includes('rover.stop()')) {
+                    commands.push({cmd: 'stop', speed: 0});
+                } else if (trimmedLine.includes('rover.steerLeft(')) {
+                    const match = trimmedLine.match(/rover\.steerLeft\(([\d.]+),\s*([\d.]+)\)/);
+                    if (match) {
+                        commands.push({cmd: 'steer_left', degrees: parseFloat(match[1]), seconds: parseFloat(match[2])});
+                    }
+                } else if (trimmedLine.includes('rover.steerRight(')) {
+                    const match = trimmedLine.match(/rover\.steerRight\(([\d.]+),\s*([\d.]+)\)/);
+                    if (match) {
+                        commands.push({cmd: 'steer_right', degrees: parseFloat(match[1]), seconds: parseFloat(match[2])});
+                    }
+                } else if (trimmedLine.includes('time.sleep(')) {
+                    const timeMatch = trimmedLine.match(/time\.sleep\(([\d.]+)\)/);
+                    if (timeMatch) {
+                        commands.push({cmd: 'wait', time: parseFloat(timeMatch[1])});
+                    }
+                }
+
+                i++;
+            }
+
+            return commands;
+        }
+
+        function executeBlocklyCommands(commands) {
+            console.log('Starting execution of commands:', commands);
+            let index = 0;
+            
+            function executeNext() {
+                if (index >= commands.length) {
+                    console.log('All commands executed');
+                    return;
+                }
+                
+                const command = commands[index];
+                console.log('Executing command:', command);
+                
+                if (command.cmd === 'wait') {
+                    setTimeout(() => {
+                        index++;
+                        executeNext();
+                    }, command.time * 1000);
+                } else if (command.cmd === 'steer_left' || command.cmd === 'steer_right') {
+                    // Steer commands have timing built in, so we wait for the duration
+                    sendCommand(command.cmd, 60);  // Use default speed
+                    setTimeout(() => {
+                        index++;
+                        executeNext();
+                    }, (command.seconds || 1) * 1000);
+                } else {
+                    sendCommand(command.cmd, command.speed);
+                    setTimeout(() => {
+                        index++;
+                        executeNext();
+                    }, 1000);
+                }
+            }
+            
+            executeNext();
+        }
+
+        function clearBlocklyWorkspace() {
+            if (workspace) {
+                workspace.clear();
+            }
+        }
+
+        function saveBlocklyCode() {
+            if (workspace) {
+                const xml = Blockly.Xml.workspaceToDom(workspace);
+                const xmlText = Blockly.Xml.domToText(xml);
+                localStorage.setItem('rover_blockly_code', xmlText);
+                alert('Code saved to browser storage');
+            }
+        }
+
+        function loadBlocklyCode() {
+            if (workspace) {
+                const xmlText = localStorage.getItem('rover_blockly_code');
+                if (xmlText) {
+                    const xml = Blockly.Xml.textToDom(xmlText);
+                    workspace.clear();
+                    Blockly.Xml.domToWorkspace(xml, workspace);
+                    alert('Code loaded from browser storage');
+                } else {
+                    alert('No saved code found');
+                }
+            }
+        }
+    </script>
+</body>
+</html>

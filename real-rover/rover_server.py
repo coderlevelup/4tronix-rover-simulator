@@ -207,7 +207,7 @@ def control_rover():
                 rover.show()
             elif cmd == 'steerLeft':
                 degrees = data.get('degrees', 20)
-                seconds = data.get('seconds', 1.0)
+                seconds = data.get('seconds', 0)  # Default to 0 for continuous steering
                 speed = data.get('speed', 60)
                 # Move forward first
                 rover.forward(speed)
@@ -225,22 +225,22 @@ def control_rover():
                 rover.setPixel(0, white)  # Rear left
                 rover.setPixel(3, white)  # Rear right
                 rover.show()
-                # Wait for duration
-                time.sleep(seconds)
-                # Stop and reset servos
-                rover.stop()
-                rover.setServo(9, 0)
-                rover.setServo(15, 0)
-                rover.setServo(11, 0)
-                rover.setServo(13, 0)
-                # Set all LEDs to white when stopped
-                white = rover.fromRGB(255, 255, 255)
-                for i in range(4):
-                    rover.setPixel(i, white)
-                rover.show()
+                # Only do timed stop if seconds > 0 (for blockly blocks)
+                if seconds > 0:
+                    time.sleep(seconds)
+                    rover.stop()
+                    rover.setServo(9, 0)
+                    rover.setServo(15, 0)
+                    rover.setServo(11, 0)
+                    rover.setServo(13, 0)
+                    # Set all LEDs to white when stopped
+                    white = rover.fromRGB(255, 255, 255)
+                    for i in range(4):
+                        rover.setPixel(i, white)
+                    rover.show()
             elif cmd == 'steerRight':
                 degrees = data.get('degrees', 20)
-                seconds = data.get('seconds', 1.0)
+                seconds = data.get('seconds', 0)  # Default to 0 for continuous steering
                 speed = data.get('speed', 60)
                 # Move forward first
                 rover.forward(speed)
@@ -258,19 +258,19 @@ def control_rover():
                 rover.setPixel(0, white)  # Rear left
                 rover.setPixel(3, white)  # Rear right
                 rover.show()
-                # Wait for duration
-                time.sleep(seconds)
-                # Stop and reset servos
-                rover.stop()
-                rover.setServo(9, 0)
-                rover.setServo(15, 0)
-                rover.setServo(11, 0)
-                rover.setServo(13, 0)
-                # Set all LEDs to white when stopped
-                white = rover.fromRGB(255, 255, 255)
-                for i in range(4):
-                    rover.setPixel(i, white)
-                rover.show()
+                # Only do timed stop if seconds > 0 (for blockly blocks)
+                if seconds > 0:
+                    time.sleep(seconds)
+                    rover.stop()
+                    rover.setServo(9, 0)
+                    rover.setServo(15, 0)
+                    rover.setServo(11, 0)
+                    rover.setServo(13, 0)
+                    # Set all LEDs to white when stopped
+                    white = rover.fromRGB(255, 255, 255)
+                    for i in range(4):
+                        rover.setPixel(i, white)
+                    rover.show()
             else:
                 print(f"Unknown command: {cmd}")
 
