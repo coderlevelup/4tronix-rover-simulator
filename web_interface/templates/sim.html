@@ -825,10 +825,11 @@
             
             // Listen for meaningful workspace changes
             workspace.addChangeListener(function(event) {
-                console.log('Blockly workspace changed:', event.type);
+                console.log('Blockly workspace changed:', event.type, event);
 
                 // Skip updates while dragging
                 if (isDragging) {
+                    console.log('Skipping save - dragging');
                     return;
                 }
 
@@ -838,13 +839,17 @@
                     event.type === Blockly.Events.BLOCK_CHANGE ||
                     event.type === Blockly.Events.BLOCK_MOVE) {
 
+                    console.log('Saving workspace due to:', event.type);
+
                     // Debounce updates to avoid rapid changes
                     if (updateTimeout) {
                         clearTimeout(updateTimeout);
                     }
 
-                    // Save workspace to localStorage
-                    saveWorkspaceToStorage();
+                    // Save workspace to localStorage after a short delay
+                    updateTimeout = setTimeout(() => {
+                        saveWorkspaceToStorage();
+                    }, 500);
                 }
             });
         }
