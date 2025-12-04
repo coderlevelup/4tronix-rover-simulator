@@ -330,7 +330,7 @@
         <div class="control-panel">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1 class="mb-0">Real Rover Control</h1>
-                <a href="/sim" class="btn btn-outline-secondary">Switch to Simulator</a>
+                <a href="/sim" class="btn btn-outline-secondary" id="sim-link">Switch to Simulator</a>
             </div>
 
         <!-- Navigation tabs -->
@@ -656,10 +656,31 @@
               .catch(error => console.error('Error:', error));
         }
 
+        // Get URL parameters
+        function getUrlParameter(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+
+        // Update mode switcher link to preserve current tab
+        function updateModeSwitcherLink() {
+            const currentTab = document.querySelector('.nav-link.active').id.replace('-tab', '');
+            const simLink = document.getElementById('sim-link');
+            simLink.href = `/sim?tab=${currentTab}`;
+        }
+
         // Initialize page when DOM loads
         document.addEventListener('DOMContentLoaded', function() {
-            // Set manual tab as active by default
-            showTab('manual');
+            // Check URL parameter for tab
+            const tab = getUrlParameter('tab') || 'manual';
+            showTab(tab);
+
+            // Update mode switcher link when tabs change
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.addEventListener('click', () => {
+                    setTimeout(updateModeSwitcherLink, 100);
+                });
+            });
 
             // Auto-connect to Pi camera after a short delay
             setTimeout(() => {
@@ -775,6 +796,9 @@
             console.log('Workspace created successfully:', workspace);
             console.log('Available blocks:', Object.keys(Blockly.Blocks).filter(key => key.startsWith('rover_')));
 
+            // Load saved workspace from localStorage
+            loadWorkspaceFromStorage();
+
             // No test block - let users add their own blocks
 
             // Generate code when workspace changes (but not while dragging)
@@ -793,25 +817,56 @@
             // Listen for meaningful workspace changes
             workspace.addChangeListener(function(event) {
                 console.log('Blockly workspace changed:', event.type);
-                
+
                 // Skip updates while dragging
                 if (isDragging) {
                     return;
                 }
-                
+
                 // Only update code for meaningful changes
                 if (event.type === Blockly.Events.FINISHED_LOADING ||
                     event.type === Blockly.Events.BLOCK_CREATE ||
                     event.type === Blockly.Events.BLOCK_DELETE ||
                     event.type === Blockly.Events.BLOCK_CHANGE ||
                     event.type === Blockly.Events.BLOCK_MOVE) {
-                    
+
                     // Debounce updates to avoid rapid changes
                     if (updateTimeout) {
                         clearTimeout(updateTimeout);
                     }
-                    }
+
+                    // Save workspace to localStorage
+                    saveWorkspaceToStorage();
+                }
             });
+        }
+
+        function saveWorkspaceToStorage() {
+            if (workspace) {
+                try {
+                    const xml = Blockly.Xml.workspaceToDom(workspace);
+                    const xmlText = Blockly.Xml.domToText(xml);
+                    localStorage.setItem('rover_blockly_workspace', xmlText);
+                    console.log('Workspace saved to localStorage');
+                } catch (error) {
+                    console.error('Error saving workspace:', error);
+                }
+            }
+        }
+
+        function loadWorkspaceFromStorage() {
+            if (workspace) {
+                try {
+                    const xmlText = localStorage.getItem('rover_blockly_workspace');
+                    if (xmlText) {
+                        const xml = Blockly.Xml.textToDom(xmlText);
+                        Blockly.Xml.clearWorkspaceAndLoadFromXml(xml, workspace);
+                        console.log('Workspace loaded from localStorage');
+                    }
+                } catch (error) {
+                    console.error('Error loading workspace:', error);
+                }
+            }
         }
 
         function createToolbox() {
