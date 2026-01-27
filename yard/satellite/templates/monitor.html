@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rover Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+        }
+
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Left panel - Camera feed (2/3) */
+        .camera-panel {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            background: #111;
+            border-right: 2px solid #222;
+        }
+
+        .camera-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #333;
+        }
+
+        .camera-header h2 {
+            font-size: 18px;
+            font-weight: 500;
+            color: #aaa;
+        }
+
+        .connection-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+        }
+
+        .connection-dot.connected {
+            background: #4CAF50;
+        }
+
+        .connection-dot.connecting {
+            background: #ff9800;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .camera-view {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: #000;
+        }
+
+        #cameraCanvas {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .camera-message {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            color: #666;
+        }
+
+        .camera-message.hidden {
+            display: none;
+        }
+
+        .camera-icon {
+            font-size: 48px;
+        }
+
+        /* Right panel - Queue status (1/3) */
+        .queue-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 300px;
+            max-width: 400px;
+        }
+
+        .queue-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #333;
+        }
+
+        .queue-header h2 {
+            font-size: 18px;
+            font-weight: 500;
+            color: #aaa;
+        }
+
+        .rover-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .rover-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+        }
+
+        .rover-dot.connected {
+            background: #4CAF50;
+        }
+
+        .queue-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .queue-section {
+            margin-bottom: 24px;
+        }
+
+        .queue-section h3 {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #333;
+        }
+
+        .instruction {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            border-left: 3px solid #444;
+        }
+
+        .instruction.executing {
+            border-left-color: #4CAF50;
+            background: #1a2a1a;
+        }
+
+        .instruction.pending {
+            border-left-color: #ff9800;
+        }
+
+        .instruction.completed {
+            border-left-color: #2196F3;
+            opacity: 0.6;
+        }
+
+        .instruction-icon {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: #333;
+            font-size: 16px;
+        }
+
+        .instruction.executing .instruction-icon {
+            background: #4CAF50;
+            animation: pulse 0.5s infinite;
+        }
+
+        .instruction-details {
+            flex: 1;
+        }
+
+        .instruction-cmd {
+            font-weight: 600;
+            font-size: 14px;
+            text-transform: capitalize;
+        }
+
+        .instruction-params {
+            font-size: 12px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .empty-message {
+            text-align: center;
+            color: #555;
+            font-size: 14px;
+            padding: 20px;
+        }
+
+        /* Command icons */
+        .cmd-forward::before { content: '\2191'; }
+        .cmd-backward::before { content: '\2193'; }
+        .cmd-spin_left::before { content: '\21BA'; }
+        .cmd-spin_right::before { content: '\21BB'; }
+        .cmd-steer_left::before { content: '\2196'; }
+        .cmd-steer_right::before { content: '\2197'; }
+        .cmd-stop::before { content: '\23F9'; }
+        .cmd-wait::before { content: '\23F1'; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="camera-panel">
+            <div class="camera-header">
+                <h2>Camera Feed</h2>
+                <div class="connection-badge">
+                    <span class="connection-dot" id="cameraDot"></span>
+                    <span id="cameraStatus">Disconnected</span>
+                </div>
+            </div>
+            <div class="camera-view">
+                <canvas id="cameraCanvas" width="640" height="480"></canvas>
+                <div class="camera-message" id="cameraMessage">
+                    <span class="camera-icon">&#128247;</span>
+                    <span>Connecting to camera...</span>
+                </div>
+            </div>
+        </div>
+        <div class="queue-panel">
+            <div class="queue-header">
+                <h2>Instruction Queue</h2>
+                <div class="rover-badge">
+                    <span class="rover-dot" id="roverDot"></span>
+                    <span id="roverStatus">Disconnected</span>
+                </div>
+            </div>
+            <div class="queue-content">
+                <div class="queue-section">
+                    <h3>Current</h3>
+                    <div id="currentInstruction">
+                        <div class="empty-message">Idle</div>
+                    </div>
+                </div>
+                <div class="queue-section">
+                    <h3>Pending (<span id="pendingCount">0</span>)</h3>
+                    <div id="pendingInstructions">
+                        <div class="empty-message">No pending instructions</div>
+                    </div>
+                </div>
+                <div class="queue-section">
+                    <h3>History</h3>
+                    <div id="historyInstructions">
+                        <div class="empty-message">No history</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // Camera WebSocket Client
+        // ============================================================
+
+        class CameraClient {
+            constructor(canvasId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.ws = null;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 10;
+                this.reconnectInterval = 5000;
+
+                this.cameraDot = document.getElementById('cameraDot');
+                this.cameraStatus = document.getElementById('cameraStatus');
+                this.cameraMessage = document.getElementById('cameraMessage');
+            }
+
+            connect(url = 'ws://mro.local:8890') {
+                this.updateStatus('connecting', 'Connecting...');
+
+                try {
+                    this.ws = new WebSocket(url);
+
+                    this.ws.onopen = () => {
+                        this.reconnectAttempts = 0;
+                        this.updateStatus('connected', 'Connected');
+                        this.cameraMessage.classList.add('hidden');
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        this.handleMessage(event.data);
+                    };
+
+                    this.ws.onclose = () => {
+                        this.updateStatus('disconnected', 'Disconnected');
+                        this.cameraMessage.classList.remove('hidden');
+                        this.handleReconnect(url);
+                    };
+
+                    this.ws.onerror = (error) => {
+                        console.error('Camera WebSocket error:', error);
+                    };
+
+                } catch (error) {
+                    console.error('Failed to connect to camera:', error);
+                    this.handleReconnect(url);
+                }
+            }
+
+            handleMessage(data) {
+                try {
+                    const message = JSON.parse(data);
+                    if (message.type === 'frame') {
+                        this.displayFrame(message.data);
+                    }
+                } catch (e) {
+                    console.error('Error parsing camera message:', e);
+                }
+            }
+
+            displayFrame(frameData) {
+                const img = new Image();
+                img.onload = () => {
+                    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                    this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+                };
+                img.src = 'data:image/jpeg;base64,' + frameData;
+            }
+
+            handleReconnect(url) {
+                if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                    this.updateStatus('disconnected', 'Connection failed');
+                    return;
+                }
+
+                this.reconnectAttempts++;
+                setTimeout(() => this.connect(url), this.reconnectInterval);
+            }
+
+            updateStatus(state, text) {
+                this.cameraDot.className = 'connection-dot ' + state;
+                this.cameraStatus.textContent = text;
+            }
+        }
+
+        // ============================================================
+        // Queue Status Poller
+        // ============================================================
+
+        class QueuePoller {
+            constructor() {
+                this.roverDot = document.getElementById('roverDot');
+                this.roverStatus = document.getElementById('roverStatus');
+                this.currentEl = document.getElementById('currentInstruction');
+                this.pendingEl = document.getElementById('pendingInstructions');
+                this.pendingCountEl = document.getElementById('pendingCount');
+                this.historyEl = document.getElementById('historyInstructions');
+            }
+
+            start(interval = 500) {
+                this.poll();
+                setInterval(() => this.poll(), interval);
+            }
+
+            async poll() {
+                try {
+                    const resp = await fetch('/api/queue/status');
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+                    const data = await resp.json();
+                    this.updateUI(data);
+                    this.updateStatus('connected', 'Connected');
+
+                } catch (e) {
+                    this.updateStatus('disconnected', 'Disconnected');
+                }
+            }
+
+            updateUI(data) {
+                // Current instruction
+                if (data.current) {
+                    this.currentEl.innerHTML = this.renderInstruction(data.current, 'executing');
+                } else {
+                    this.currentEl.innerHTML = '<div class="empty-message">Idle</div>';
+                }
+
+                // Pending instructions
+                this.pendingCountEl.textContent = data.pending_count || 0;
+                if (data.pending && data.pending.length > 0) {
+                    this.pendingEl.innerHTML = data.pending
+                        .map(i => this.renderInstruction(i, 'pending'))
+                        .join('');
+                } else {
+                    this.pendingEl.innerHTML = '<div class="empty-message">No pending instructions</div>';
+                }
+
+                // History (reversed, most recent first)
+                if (data.history && data.history.length > 0) {
+                    this.historyEl.innerHTML = data.history
+                        .slice().reverse()
+                        .map(i => this.renderInstruction(i, 'completed'))
+                        .join('');
+                } else {
+                    this.historyEl.innerHTML = '<div class="empty-message">No history</div>';
+                }
+            }
+
+            renderInstruction(instr, status) {
+                const cmd = instr.cmd || 'unknown';
+                const params = instr.params || {};
+                const paramStr = Object.entries(params)
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join(', ');
+
+                return `
+                    <div class="instruction ${status}">
+                        <div class="instruction-icon cmd-${cmd}"></div>
+                        <div class="instruction-details">
+                            <div class="instruction-cmd">${cmd.replace('_', ' ')}</div>
+                            <div class="instruction-params">${paramStr || 'no params'}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            updateStatus(state, text) {
+                this.roverDot.className = 'rover-dot ' + state;
+                this.roverStatus.textContent = text;
+            }
+        }
+
+        // ============================================================
+        // Initialize
+        // ============================================================
+
+        // Start camera client
+        const camera = new CameraClient('cameraCanvas');
+        camera.connect();
+
+        // Start queue poller
+        const queue = new QueuePoller();
+        queue.start(500);
+    </script>
+</body>
+</html>

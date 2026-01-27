@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>Rover Code</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 16px;
+            background: #16213e;
+            border-bottom: 1px solid #0f3460;
+        }
+
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-run {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-run:hover {
+            background: #45a049;
+        }
+
+        .btn-stop {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-stop:hover {
+            background: #da190b;
+        }
+
+        .btn-clear {
+            background: #666;
+            color: white;
+        }
+
+        .btn-clear:hover {
+            background: #555;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            color: #aaa;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+        }
+
+        .status-dot.connected {
+            background: #4CAF50;
+        }
+
+        .status-dot.mock {
+            background: #ff9800;
+        }
+
+        .blockly-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #blocklyDiv {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        /* Mock output panel */
+        .mock-panel {
+            display: none;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            background: rgba(0,0,0,0.9);
+            border-top: 2px solid #ff9800;
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .mock-panel.visible {
+            display: block;
+        }
+
+        .mock-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #ff9800;
+            color: #000;
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .mock-close {
+            cursor: pointer;
+            padding: 2px 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+        }
+
+        .mock-content {
+            padding: 8px 12px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #fff;
+        }
+
+        .mock-content div {
+            padding: 2px 0;
+        }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: #333;
+            color: #fff;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .toast.visible {
+            opacity: 1;
+        }
+
+        .toast.success {
+            background: #4CAF50;
+        }
+
+        .toast.error {
+            background: #f44336;
+        }
+    </style>
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <button class="btn btn-run" id="runBtn">Run</button>
+                <button class="btn btn-stop" id="stopBtn">Stop</button>
+                <button class="btn btn-clear" id="clearBtn">Clear</button>
+            </div>
+            <div class="toolbar-right">
+                <div class="status-indicator">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">Connecting...</span>
+                </div>
+            </div>
+        </div>
+        <div class="blockly-container">
+            <div id="blocklyDiv"></div>
+            <div class="mock-panel" id="mockPanel">
+                <div class="mock-header">
+                    <span>Mock Mode - Commands Preview</span>
+                    <span class="mock-close" id="mockClose">Close</span>
+                </div>
+                <div class="mock-content" id="mockOutput"></div>
+            </div>
+        </div>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ============================================================
+        // Ports & Adapters Pattern for Testability
+        // ============================================================
+
+        class RoverService {
+            async addToQueue(instructions) { throw new Error("Not implemented"); }
+            async clearQueue() { throw new Error("Not implemented"); }
+            async getStatus() { throw new Error("Not implemented"); }
+        }
+
+        class RealRoverService extends RoverService {
+            constructor(baseUrl) {
+                super();
+                this.baseUrl = baseUrl;
+            }
+
+            async addToQueue(instructions) {
+                const resp = await fetch(`${this.baseUrl}/api/queue/add`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(instructions)
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                return resp.json();
+            }
+
+            async clearQueue() {
+                const resp = await fetch(`${this.baseUrl}/api/queue/clear`, {
+                    method: 'POST'
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                return resp.json();
+            }
+
+            async getStatus() {
+                const resp = await fetch(`${this.baseUrl}/api/queue/status`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                return resp.json();
+            }
+
+            async checkHealth() {
+                try {
+                    const resp = await fetch(`${this.baseUrl}/api/health`);
+                    return resp.ok;
+                } catch {
+                    return false;
+                }
+            }
+        }
+
+        class MockRoverService extends RoverService {
+            constructor(outputElement) {
+                super();
+                this.output = outputElement;
+            }
+
+            async addToQueue(instructions) {
+                this.log(`Would send ${instructions.length} instruction(s):`);
+                instructions.forEach(i => {
+                    const params = Object.entries(i.params || {})
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join(', ');
+                    this.log(`  - ${i.cmd} {${params}}`);
+                });
+                return {status: 'mock', added: instructions.length};
+            }
+
+            async clearQueue() {
+                this.log('Would clear queue and stop rover');
+                return {status: 'mock', cleared: 0};
+            }
+
+            async getStatus() {
+                return {current: null, pending: [], history: []};
+            }
+
+            async checkHealth() {
+                return true;
+            }
+
+            log(msg) {
+                console.log(`[MOCK] ${msg}`);
+                if (this.output) {
+                    this.output.innerHTML += `<div>${msg}</div>`;
+                    this.output.scrollTop = this.output.scrollHeight;
+                }
+            }
+
+            clear() {
+                if (this.output) {
+                    this.output.innerHTML = '';
+                }
+            }
+        }
+
+        // ============================================================
+        // Blockly Block Definitions
+        // ============================================================
+
+        Blockly.Blocks['rover_forward'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Move Forward")
+                    .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "TIME")
+                    .appendField("seconds");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#2196F3");
+                this.setTooltip("Move the rover forward");
+            }
+        };
+
+        Blockly.Blocks['rover_backward'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Move Backward")
+                    .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "TIME")
+                    .appendField("seconds");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#2196F3");
+                this.setTooltip("Move the rover backward");
+            }
+        };
+
+        Blockly.Blocks['rover_spin_left'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Spin Left")
+                    .appendField(new Blockly.FieldNumber(0.5, 0.1, 10, 0.1), "TIME")
+                    .appendField("seconds");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#9C27B0");
+                this.setTooltip("Spin the rover left in place");
+            }
+        };
+
+        Blockly.Blocks['rover_spin_right'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Spin Right")
+                    .appendField(new Blockly.FieldNumber(0.5, 0.1, 10, 0.1), "TIME")
+                    .appendField("seconds");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#9C27B0");
+                this.setTooltip("Spin the rover right in place");
+            }
+        };
+
+        Blockly.Blocks['rover_stop'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Stop");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#f44336");
+                this.setTooltip("Stop the rover immediately");
+            }
+        };
+
+        Blockly.Blocks['rover_steer_left'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Steer Left")
+                    .appendField(new Blockly.FieldNumber(20, 5, 45, 5), "DEGREES")
+                    .appendField("degrees for")
+                    .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "TIME")
+                    .appendField("seconds");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#00BCD4");
+                this.setTooltip("Steer left while moving forward");
+            }
+        };
+
+        Blockly.Blocks['rover_steer_right'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Steer Right")
+                    .appendField(new Blockly.FieldNumber(20, 5, 45, 5), "DEGREES")
+                    .appendField("degrees for")
+                    .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "TIME")
+                    .appendField("seconds");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#00BCD4");
+                this.setTooltip("Steer right while moving forward");
+            }
+        };
+
+        Blockly.Blocks['rover_wait'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Wait")
+                    .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "TIME")
+                    .appendField("seconds");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#4CAF50");
+                this.setTooltip("Wait for specified time");
+            }
+        };
+
+        Blockly.Blocks['rover_repeat'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Repeat")
+                    .appendField(new Blockly.FieldNumber(3, 1, 20, 1), "TIMES")
+                    .appendField("times");
+                this.appendStatementInput("DO")
+                    .setCheck(null);
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#FF9800");
+                this.setTooltip("Repeat the blocks inside");
+            }
+        };
+
+        // ============================================================
+        // Toolbox Configuration
+        // ============================================================
+
+        const toolbox = {
+            kind: 'categoryToolbox',
+            contents: [
+                {
+                    kind: 'category',
+                    name: 'Movement',
+                    colour: '#2196F3',
+                    contents: [
+                        {kind: 'block', type: 'rover_forward'},
+                        {kind: 'block', type: 'rover_backward'},
+                        {kind: 'block', type: 'rover_spin_left'},
+                        {kind: 'block', type: 'rover_spin_right'},
+                        {kind: 'block', type: 'rover_stop'}
+                    ]
+                },
+                {
+                    kind: 'category',
+                    name: 'Steering',
+                    colour: '#00BCD4',
+                    contents: [
+                        {kind: 'block', type: 'rover_steer_left'},
+                        {kind: 'block', type: 'rover_steer_right'}
+                    ]
+                },
+                {
+                    kind: 'category',
+                    name: 'Control',
+                    colour: '#FF9800',
+                    contents: [
+                        {kind: 'block', type: 'rover_wait'},
+                        {kind: 'block', type: 'rover_repeat'}
+                    ]
+                }
+            ]
+        };
+
+        // ============================================================
+        // Workspace Initialization
+        // ============================================================
+
+        const workspace = Blockly.inject('blocklyDiv', {
+            toolbox: toolbox,
+            zoom: {
+                controls: true,
+                wheel: true,
+                startScale: 1.0,
+                maxScale: 2,
+                minScale: 0.5,
+                scaleSpeed: 1.1
+            },
+            trashcan: true,
+            move: {
+                scrollbars: true,
+                drag: true,
+                wheel: true
+            },
+            grid: {
+                spacing: 20,
+                length: 3,
+                colour: '#333',
+                snap: true
+            },
+            theme: Blockly.Theme.defineTheme('dark', {
+                base: Blockly.Themes.Classic,
+                componentStyles: {
+                    workspaceBackgroundColour: '#1a1a2e',
+                    toolboxBackgroundColour: '#16213e',
+                    toolboxForegroundColour: '#fff',
+                    flyoutBackgroundColour: '#252525',
+                    flyoutForegroundColour: '#ccc',
+                    flyoutOpacity: 1,
+                    scrollbarColour: '#555',
+                    insertionMarkerColour: '#fff',
+                    insertionMarkerOpacity: 0.3,
+                    scrollbarOpacity: 0.5,
+                    cursorColour: '#fff'
+                }
+            })
+        });
+
+        // ============================================================
+        // Parse Blockly Workspace to Instructions
+        // ============================================================
+
+        function parseWorkspace(speed = 60) {
+            const instructions = [];
+            const topBlocks = workspace.getTopBlocks(true);
+
+            function parseBlock(block) {
+                if (!block) return;
+
+                const type = block.type;
+
+                switch (type) {
+                    case 'rover_forward':
+                        instructions.push({
+                            cmd: 'forward',
+                            params: {speed: speed, seconds: block.getFieldValue('TIME')}
+                        });
+                        break;
+
+                    case 'rover_backward':
+                        instructions.push({
+                            cmd: 'backward',
+                            params: {speed: speed, seconds: block.getFieldValue('TIME')}
+                        });
+                        break;
+
+                    case 'rover_spin_left':
+                        instructions.push({
+                            cmd: 'spin_left',
+                            params: {speed: speed, seconds: block.getFieldValue('TIME')}
+                        });
+                        break;
+
+                    case 'rover_spin_right':
+                        instructions.push({
+                            cmd: 'spin_right',
+                            params: {speed: speed, seconds: block.getFieldValue('TIME')}
+                        });
+                        break;
+
+                    case 'rover_stop':
+                        instructions.push({
+                            cmd: 'stop',
+                            params: {}
+                        });
+                        break;
+
+                    case 'rover_steer_left':
+                        instructions.push({
+                            cmd: 'steer_left',
+                            params: {
+                                degrees: block.getFieldValue('DEGREES'),
+                                speed: speed,
+                                seconds: block.getFieldValue('TIME')
+                            }
+                        });
+                        break;
+
+                    case 'rover_steer_right':
+                        instructions.push({
+                            cmd: 'steer_right',
+                            params: {
+                                degrees: block.getFieldValue('DEGREES'),
+                                speed: speed,
+                                seconds: block.getFieldValue('TIME')
+                            }
+                        });
+                        break;
+
+                    case 'rover_wait':
+                        instructions.push({
+                            cmd: 'wait',
+                            params: {seconds: block.getFieldValue('TIME')}
+                        });
+                        break;
+
+                    case 'rover_repeat':
+                        const times = block.getFieldValue('TIMES');
+                        const doBlock = block.getInputTargetBlock('DO');
+                        for (let i = 0; i < times; i++) {
+                            let innerBlock = doBlock;
+                            while (innerBlock) {
+                                parseBlock(innerBlock);
+                                innerBlock = innerBlock.getNextBlock();
+                            }
+                        }
+                        break;
+                }
+
+                // Continue to next block
+                parseBlock(block.getNextBlock());
+            }
+
+            topBlocks.forEach(block => parseBlock(block));
+            return instructions;
+        }
+
+        // ============================================================
+        // Service Initialization (DI based on URL param)
+        // ============================================================
+
+        const isMockMode = new URL(location).searchParams.get('mock') === 'true';
+        const mockOutput = document.getElementById('mockOutput');
+        const mockPanel = document.getElementById('mockPanel');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+
+        const roverService = isMockMode
+            ? new MockRoverService(mockOutput)
+            : new RealRoverService('');
+
+        // Update status indicator
+        if (isMockMode) {
+            statusDot.classList.add('mock');
+            statusText.textContent = 'Mock Mode';
+            mockPanel.classList.add('visible');
+        } else {
+            // Check connection status periodically
+            async function checkConnection() {
+                const connected = await roverService.checkHealth();
+                statusDot.classList.toggle('connected', connected);
+                statusText.textContent = connected ? 'Connected' : 'Disconnected';
+            }
+            checkConnection();
+            setInterval(checkConnection, 5000);
+        }
+
+        // ============================================================
+        // UI Event Handlers
+        // ============================================================
+
+        const toast = document.getElementById('toast');
+
+        function showToast(message, type = '') {
+            toast.textContent = message;
+            toast.className = 'toast visible ' + type;
+            setTimeout(() => toast.classList.remove('visible'), 3000);
+        }
+
+        document.getElementById('runBtn').addEventListener('click', async () => {
+            const instructions = parseWorkspace();
+            if (instructions.length === 0) {
+                showToast('No blocks to run', 'error');
+                return;
+            }
+
+            if (isMockMode) {
+                roverService.clear();
+            }
+
+            try {
+                const result = await roverService.addToQueue(instructions);
+                showToast(`Queued ${result.added} instructions`, 'success');
+            } catch (e) {
+                showToast('Failed to send: ' + e.message, 'error');
+            }
+        });
+
+        document.getElementById('stopBtn').addEventListener('click', async () => {
+            try {
+                await roverService.clearQueue();
+                showToast('Stopped!', 'success');
+            } catch (e) {
+                showToast('Failed to stop: ' + e.message, 'error');
+            }
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            workspace.clear();
+            if (isMockMode) {
+                roverService.clear();
+            }
+            localStorage.removeItem('roverWorkspace');
+            showToast('Workspace cleared');
+        });
+
+        document.getElementById('mockClose').addEventListener('click', () => {
+            mockPanel.classList.remove('visible');
+        });
+
+        // ============================================================
+        // Workspace Persistence
+        // ============================================================
+
+        const STORAGE_KEY = 'roverWorkspace';
+
+        function saveWorkspace() {
+            const state = Blockly.serialization.workspaces.save(workspace);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        }
+
+        function loadWorkspace() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    const state = JSON.parse(saved);
+                    Blockly.serialization.workspaces.load(state, workspace);
+                } catch (e) {
+                    console.warn('Failed to load workspace:', e);
+                }
+            }
+        }
+
+        // Save on change (debounced)
+        let saveTimeout;
+        workspace.addChangeListener(() => {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(saveWorkspace, 500);
+        });
+
+        // Load on startup
+        loadWorkspace();
+
+        // Handle resize
+        window.addEventListener('resize', () => Blockly.svgResize(workspace));
+
+        // ============================================================
+        // PWA Service Worker Registration
+        // ============================================================
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/service-worker.js')
+                .then(reg => console.log('Service worker registered'))
+                .catch(err => console.warn('Service worker registration failed:', err));
+        }
+    </script>
+</body>
+</html>
