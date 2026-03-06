@@ -1,42 +1,41 @@
 # Yard
 
-Queue-based control system for the 4tronix M.A.R.S. Rover.
+Yard is a queue-based control system designed for classroom use with the 4tronix M.A.R.S. Rover. It adds a tablet-friendly Blockly interface and a TV monitor display for group activities.
 
-## Using the Visual Simulator
+## What's in Yard?
 
-To see your rover programs in action, you'll want to run the visual simulator. This shows a simple representation of the rover so you can watch it move around.
-
-1. First, make sure you've done the [first time setup](../README.md#first-time-on-any-particular-computer-setup) from the main project.
-
-2. Open a terminal, navigate to the project root, and activate the environment:
-
-```bash
-cd 4tronix-rover-simulator
-source env/bin/activate
+```
+yard/
+├── rover/           # Queue-based instruction server (runs on the rover Pi)
+│   ├── rover_server.py
+│   ├── service.py
+│   ├── drivers.py
+│   └── test_*.py
+├── satellite/       # Web interfaces (runs on a separate Pi)
+│   ├── web_server.py
+│   ├── camera_server.py
+│   └── templates/
+└── docs/
 ```
 
-3. Start the simulator UI:
+**Rover** (marspi.local:8523) - Receives instructions via REST API and executes them in order. Automatically uses mock mode when not on a Pi.
 
-```bash
-python roversimui.py
-```
+**Satellite** (mro.local:5050) - Serves the tablet Blockly interface at `/code/` and the TV monitor at `/monitor/`. Also streams the Pi camera at port 8890.
 
-You should see a window appear with a simple representation of the rover and its wheels.
+## How It Works
 
-4. Now you can run programs that control the rover. In a separate terminal (with the environment activated), try running one of the examples:
-
-```bash
-python square.py
-```
-
-Watch the simulator window - you should see the rover start moving!
+1. Kids build programs using Blockly blocks on a tablet
+2. Pressing "Run" sends instructions to the rover's queue
+3. The rover executes instructions one at a time
+4. The TV monitor shows the camera feed and queue status
+5. "Stop" button triggers emergency stop and clears the queue
 
 ## Documentation
 
 | Doc | Description |
 |-----|-------------|
-| [Rover Server](docs/rover-server.md) | REST API server for queue-based control |
-| [Architecture](docs/architecture.md) | How the system components fit together |
-| [API Reference](docs/api.md) | Complete REST endpoint documentation |
-| [Testing](docs/testing.md) | Running and writing tests |
+| [Rover Server](docs/rover-server.md) | Setup and API for the queue server |
 | [Satellite](docs/satellite.md) | Web interface and camera server |
+| [Architecture](docs/architecture.md) | System design and data flow |
+| [API Reference](docs/api.md) | REST endpoints and instruction format |
+| [Testing](docs/testing.md) | Running and writing tests |

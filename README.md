@@ -231,3 +231,15 @@ For detailed setup and usage instructions, see the [web_interface/README.md](web
 - `python web_interface/run_simple.py` - Simple auto-reloading server
 - `python web_interface/run_server.py` - Advanced file-watching server
 
+## Yard (Classroom Setup)
+
+Yard is a queue-based control system designed for classroom activities. It provides:
+
+- A tablet-friendly Blockly interface for building programs
+- A TV monitor display showing live camera feed and queue status
+- Queue-based instruction processing with emergency stop
+
+This is useful when you want multiple kids to take turns programming the rover, with a big screen showing what's happening.
+
+For setup and usage, see [yard/README.md](yard/README.md).
+
