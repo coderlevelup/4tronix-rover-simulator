@@ -55,11 +55,15 @@ This simulator runs as a standalone application. Programs that want to control t
 
 You can run the simulator in the debugger, but you probably don't want to because you'll most likely want to debug the programs you're working on that are trying to control the Rover. You could actually run two copies of Visual Studio (or whatever you're using to debug your Python programs), one to run the simulator and one to debug your own program, but you don't have to. So here's how to run the Simulator UI on its own outside of a debugger.
 
-If you've just finished the 'first time' steps from the preceding section, and you've still got your Terminal (or Command Prompt) open, you can skip straight to step N. But if you've rebooted since then, or closed that window, follow all of these steps.
+If you've just finished the 'first time' steps from the preceding section, and you've still got your Terminal (or Command Prompt) open, you can skip straight to step 4. But if you've rebooted since then, or closed that window, follow all of these steps.
 
 1. Open a Windows Terminal window (or Command Prompt.)
 2. Find the path to the folder that this code is in. (If you're in VS Code, you can right click the README.md tab at the top of this page, and select **Reveal in File Explorer**. In the Windows File Explorer that opens, click in the address bar at the top to select the folder path then hit Ctrl-C.)
 3. You need to get the terminal (or command) window into this directory. So type `cd` then a space, and then the path you just determined in the previous step (you can use Ctrl-V to paste it in if you copied it to the clipboard). So something like this:
+
+```
+cd \dev\4tronix-rover-simulator
+```
 
 4. Activate the environment by running this command:
 
@@ -138,8 +142,8 @@ rover.setServo(servo_RR, 0)
 rover.forward(100)
 
 
-# Let it move for 3 seconds (3000 milliseconds)
-time.sleep(3000)
+# Let it move for 3 seconds
+time.sleep(3)
 
 
 # Now adjust the servo positions so that it's steering left
@@ -150,7 +154,7 @@ rover.setServo(servo_RR, 20)
 
 
 # Let it move for another 3 seconds
-time.sleep(3000)
+time.sleep(3)
 
 # Now steer right
 rover.setServo(servo_FL, 20)
@@ -160,7 +164,7 @@ rover.setServo(servo_RR, -20)
 
 
 # Let it move for another 3 seconds
-time.sleep(3000)
+time.sleep(3)
 
 # Straighten up.
 rover.setServo(servo_FL, 0)
@@ -170,7 +174,7 @@ rover.setServo(servo_RR, 0)
 
 
 # Let it move for another 3 seconds
-time.sleep(3000)
+time.sleep(3)
 
 
 # ...and rest.
