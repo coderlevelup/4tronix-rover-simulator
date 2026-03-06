@@ -15,8 +15,11 @@ A clean architecture for controlling the 4tronix rover with separated concerns a
 ```
 yard/
 ├── rover/
-│   ├── rover_server.py      # Queue-based server for marspi
+│   ├── rover_server.py      # Flask HTTP adapter (thin layer)
+│   ├── service.py           # RoverQueueService (business logic)
 │   ├── drivers.py           # RoverDriver interface + Real/Mock implementations
+│   ├── test_service.py      # Unit tests (26 tests)
+│   ├── test_integration.py  # Integration tests (26 tests)
 │   └── requirements.txt
 ├── satellite/
 │   ├── web_server.py        # Flask server for mro.local (port 5050)
@@ -30,6 +33,61 @@ yard/
 │   └── requirements.txt
 └── README.md
 ```
+
+## Rover Server Architecture (Ports & Adapters)
+
+The rover server follows the Ports & Adapters (Hexagonal) pattern for testability:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  rover_server.py - Primary Adapter (Flask HTTP layer)       │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  @app.route('/queue/add')                            │   │
+│  │       → service.add_instructions(data)               │   │
+│  │  @app.route('/queue/clear')                          │   │
+│  │       → service.clear_queue()                        │   │
+│  │  @app.route('/queue/status')                         │   │
+│  │       → service.get_status()                         │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  service.py - Application Service (business logic)          │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  RoverQueuePort (abstract interface)                 │   │
+│  │    - add_instructions()                              │   │
+│  │    - clear_queue()                                   │   │
+│  │    - get_status()                                    │   │
+│  │    - get_health()                                    │   │
+│  ├─────────────────────────────────────────────────────┤   │
+│  │  RoverQueueService (implementation)                  │   │
+│  │    - Thread-safe queue management                    │   │
+│  │    - Background processor thread                     │   │
+│  │    - Instruction execution                           │   │
+│  │    - Interruptible waits for emergency stop          │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  drivers.py - Secondary Adapter (hardware abstraction)      │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  RoverDriver (abstract interface)                    │   │
+│  │    - forward(), reverse(), spin_left(), spin_right() │   │
+│  │    - steer_left(), steer_right(), stop()             │   │
+│  ├─────────────────────────────────────────────────────┤   │
+│  │  RealRoverDriver    │  MockRoverDriver               │   │
+│  │  (Pi hardware)      │  (logging for dev/test)        │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Benefits:**
+- Unit tests call `RoverQueueService` directly (no HTTP overhead)
+- Integration tests use Flask test client (full stack)
+- Mock driver enables testing without hardware
+- Dependency injection for time/uuid providers in tests
 
 ## Quick Start
 
@@ -129,6 +187,27 @@ The satellite server proxies all API calls to the rover:
 
 ## Testing
 
+### Run Test Suites
+
+```bash
+cd yard/rover
+pip install -r requirements.txt
+
+# Run unit tests (fast, no HTTP)
+python -m pytest test_service.py -v
+
+# Run integration tests (Flask test client)
+python -m pytest test_integration.py -v
+
+# Run all tests
+python -m pytest -v
+```
+
+| Suite | Tests | What it tests |
+|-------|-------|---------------|
+| `test_service.py` | 26 | Queue logic, instruction execution, threading |
+| `test_integration.py` | 26 | Flask endpoints, HTTP layer, end-to-end flow |
+
 ### Test Rover Server (Mock Mode)
 
 On any machine (not Pi):
@@ -196,9 +275,38 @@ ROVER_URL=http://localhost:8523 python web_server.py
 
 ## Dependency Injection
 
+### Rover Queue Service
+
+The service supports injection for testing:
+
+```python
+from drivers import MockRoverDriver
+from service import RoverQueueService
+
+# Production: auto-detect driver
+from drivers import create_driver
+service = RoverQueueService(create_driver())
+
+# Testing: inject mock driver + fixed time/uuid
+from datetime import datetime
+service = RoverQueueService(
+    driver=MockRoverDriver(),
+    time_provider=lambda: datetime(2024, 1, 15, 12, 0, 0),
+    uuid_provider=lambda: 'test-uuid-123'
+)
+
+# Use service directly (unit tests)
+result = service.add_instructions([{'cmd': 'forward', 'params': {'speed': 60}}])
+
+# Or inject into Flask app (integration tests)
+from rover_server import create_app
+app = create_app(service)
+client = app.test_client()
+```
+
 ### Rover Driver
 
-The rover server uses the Driver pattern for testability:
+The driver layer abstracts hardware:
 
 ```python
 from drivers import create_driver, MockRoverDriver
