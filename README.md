@@ -177,69 +177,11 @@ time.sleep(3000)
 rover.forward(0)
 ```
 
-## Architecture
+## Other Setups
 
-The project uses a modular architecture that allows the same code to control either the simulator or real hardware:
-
-- **rover_web_driver.py**: Core HTTP-based rover driver with parameterized server address
-- **roversimulator.py**: Thin wrapper around rover_web_driver configured for localhost (simulator)
-- **roversimui.py**: Simulator UI that visualizes the rover
-- **real-rover/rover_server.py**: HTTP server that controls the real rover hardware
-
-This means you can:
-1. Develop and test with the simulator
-2. Deploy the exact same code to control the real rover
-3. Easily switch between simulator and hardware by changing just the server address
-
-### Using the Real Rover
-
-To control the real M.A.R.S. Rover hardware:
-
-1. On your Raspberry Pi (connected to the rover), run the rover server:
-   ```bash
-   cd real-rover
-   sudo python3 rover_server.py
-   ```
-
-2. In your control program, use `rover_web_driver` directly with your Pi's IP address:
-   ```python
-   from rover_web_driver import RoverWebDriver
-
-   rover = RoverWebDriver("http://192.168.1.100:8523/")  # Use your Pi's IP
-   rover.init(40)
-   rover.forward(50)
-   # ... your code ...
-   rover.cleanup()
-   ```
-
-See [connect_to_real_rover.py](connect_to_real_rover.py) for a complete example.
-
-For more details on the rover server, see [real-rover/README.md](real-rover/README.md).
-
-## Web Interface (Experimental)
-
-A web control interface is available for interactive activities with beginners. This is experimental and may not work reliably.
-
-For detailed setup and usage instructions, see the [web_interface/README.md](web_interface/README.md) file.
-
-**Quick Start:**
-1. Run the simulator: `python roversimui.py`
-2. Run the web interface: `python web_interface/web_interface.py`
-3. Open http://localhost:5000 in your browser
-
-**Convenience Scripts:**
-- `python web_interface/run_simple.py` - Simple auto-reloading server
-- `python web_interface/run_server.py` - Advanced file-watching server
-
-## Yard (Classroom Setup)
-
-Yard is a queue-based control system designed for classroom activities. It provides:
-
-- A tablet-friendly Blockly interface for building programs
-- A TV monitor display showing live camera feed and queue status
-- Queue-based instruction processing with emergency stop
-
-This is useful when you want multiple kids to take turns programming the rover, with a big screen showing what's happening.
-
-For setup and usage, see [yard/README.md](yard/README.md).
+| Folder | Description |
+|--------|-------------|
+| [real-rover/](real-rover/README.md) | Controlling the real M.A.R.S. Rover hardware |
+| [web_interface/](web_interface/README.md) | Browser-based control interface (experimental) |
+| [yard/](yard/README.md) | Classroom setup with tablets and TV monitor |
 
