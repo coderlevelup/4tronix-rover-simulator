@@ -1,97 +1,10 @@
-# Yard - Queue-Based Rover Control System
+# Yard - Rover Control System
 
-A clean architecture for controlling the 4tronix rover with separated concerns across devices.
-
-## Architecture Overview
-
-| Device | Hostname | Services |
-|--------|----------|----------|
-| **Rover** | marspi.local:8523 | Queue-based instruction processor |
-| **Satellite** | mro.local:5050 | Web interfaces (`/code/`, `/monitor/`) |
-| **Camera** | mro.local:8890 | Pi AI camera WebSocket stream |
-
-## Directory Structure
-
-```
-yard/
-├── rover/
-│   ├── rover_server.py      # Flask HTTP adapter (thin layer)
-│   ├── service.py           # RoverQueueService (business logic)
-│   ├── drivers.py           # RoverDriver interface + Real/Mock implementations
-│   ├── test_service.py      # Unit tests (26 tests)
-│   ├── test_integration.py  # Integration tests (26 tests)
-│   └── requirements.txt
-├── satellite/
-│   ├── web_server.py        # Flask server for mro.local (port 5050)
-│   ├── camera_server.py     # Pi AI camera WebSocket stream (port 8890)
-│   ├── templates/
-│   │   ├── code.html        # Tablet Blockly PWA
-│   │   └── monitor.html     # TV display (no interaction)
-│   ├── static/
-│   │   ├── manifest.json    # PWA manifest
-│   │   └── service-worker.js
-│   └── requirements.txt
-└── README.md
-```
-
-## Rover Server Architecture (Ports & Adapters)
-
-The rover server follows the Ports & Adapters (Hexagonal) pattern for testability:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  rover_server.py - Primary Adapter (Flask HTTP layer)       │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  @app.route('/queue/add')                            │   │
-│  │       → service.add_instructions(data)               │   │
-│  │  @app.route('/queue/clear')                          │   │
-│  │       → service.clear_queue()                        │   │
-│  │  @app.route('/queue/status')                         │   │
-│  │       → service.get_status()                         │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  service.py - Application Service (business logic)          │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  RoverQueuePort (abstract interface)                 │   │
-│  │    - add_instructions()                              │   │
-│  │    - clear_queue()                                   │   │
-│  │    - get_status()                                    │   │
-│  │    - get_health()                                    │   │
-│  ├─────────────────────────────────────────────────────┤   │
-│  │  RoverQueueService (implementation)                  │   │
-│  │    - Thread-safe queue management                    │   │
-│  │    - Background processor thread                     │   │
-│  │    - Instruction execution                           │   │
-│  │    - Interruptible waits for emergency stop          │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  drivers.py - Secondary Adapter (hardware abstraction)      │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  RoverDriver (abstract interface)                    │   │
-│  │    - forward(), reverse(), spin_left(), spin_right() │   │
-│  │    - steer_left(), steer_right(), stop()             │   │
-│  ├─────────────────────────────────────────────────────┤   │
-│  │  RealRoverDriver    │  MockRoverDriver               │   │
-│  │  (Pi hardware)      │  (logging for dev/test)        │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Benefits:**
-- Unit tests call `RoverQueueService` directly (no HTTP overhead)
-- Integration tests use Flask test client (full stack)
-- Mock driver enables testing without hardware
-- Dependency injection for time/uuid providers in tests
+A queue-based system for controlling the 4tronix Mars Rover from a tablet with live TV monitoring.
 
 ## Quick Start
 
-### On Rover (marspi.local)
+### 1. On Rover (marspi.local)
 
 ```bash
 cd yard/rover
@@ -99,265 +12,81 @@ pip install -r requirements.txt
 python rover_server.py
 ```
 
-The server auto-detects if running on a Pi (checks for `/dev/i2c-1`) and uses the appropriate driver:
-- **On Pi**: Uses `RealRoverDriver` - controls actual hardware
-- **Not on Pi**: Uses `MockRoverDriver` - logs commands to console
+### 2. On Satellite (mro.local)
 
-### On Satellite (mro.local)
-
-Terminal 1 - Camera Server:
 ```bash
+# Terminal 1: Camera
 cd yard/satellite
 pip install -r requirements.txt
 python camera_server.py
-```
 
-Terminal 2 - Web Server:
-```bash
+# Terminal 2: Web server
 cd yard/satellite
 python web_server.py
 ```
 
-### Access Web Interfaces
+### 3. Open Interfaces
 
-- **Tablet Blockly Interface**: http://mro.local:5050/code/
-- **TV Monitor Display**: http://mro.local:5050/monitor/
+- **Tablet**: http://mro.local:5050/code/
+- **TV Monitor**: http://mro.local:5050/monitor/
 
-## API Reference
+## Local Development (No Hardware)
 
-### Rover Server API (port 8523)
-
-#### POST /queue/add
-Add instruction(s) to the queue.
+The system auto-detects when not running on a Pi and uses mock drivers:
 
 ```bash
-curl -X POST http://marspi.local:8523/queue/add \
-  -H "Content-Type: application/json" \
-  -d '[{"cmd": "forward", "params": {"speed": 60, "seconds": 1}}]'
-```
+# Create venv
+cd yard
+python -m venv venv
+source venv/bin/activate
+pip install flask requests pytest
 
-**Instruction Format:**
-```json
-{
-  "cmd": "forward|backward|spin_left|spin_right|stop|steer_left|steer_right|wait",
-  "params": {"speed": 60, "degrees": 20, "seconds": 1.5}
-}
-```
-
-#### POST /queue/clear
-Clear queue and emergency stop.
-
-```bash
-curl -X POST http://marspi.local:8523/queue/clear
-```
-
-#### GET /queue/status
-Get current, pending, and history.
-
-```bash
-curl http://marspi.local:8523/queue/status
-```
-
-**Response:**
-```json
-{
-  "current": {...},
-  "pending": [...],
-  "pending_count": 5,
-  "history": [...],
-  "history_count": 10
-}
-```
-
-#### GET /health
-Health check endpoint.
-
-```bash
-curl http://marspi.local:8523/health
-```
-
-### Satellite API (port 5050)
-
-The satellite server proxies all API calls to the rover:
-
-- `POST /api/queue/add` → Proxies to rover
-- `POST /api/queue/clear` → Proxies to rover
-- `GET /api/queue/status` → Proxies to rover
-- `GET /api/health` → Health check with rover connectivity
-
-## Testing
-
-### Run Test Suites
-
-```bash
-cd yard/rover
-pip install -r requirements.txt
-
-# Run unit tests (fast, no HTTP)
-python -m pytest test_service.py -v
-
-# Run integration tests (Flask test client)
-python -m pytest test_integration.py -v
-
-# Run all tests
-python -m pytest -v
-```
-
-| Suite | Tests | What it tests |
-|-------|-------|---------------|
-| `test_service.py` | 26 | Queue logic, instruction execution, threading |
-| `test_integration.py` | 26 | Flask endpoints, HTTP layer, end-to-end flow |
-
-### Test Rover Server (Mock Mode)
-
-On any machine (not Pi):
-```bash
-cd yard/rover
+# Run rover server (mock mode)
+cd rover
 python rover_server.py
-# Logs: "Using MockRoverDriver (not on Pi)"
+# → "Using MockRoverDriver (not on Pi)"
 
-# Test endpoints:
-curl -X POST http://localhost:8523/queue/add \
-  -H "Content-Type: application/json" \
-  -d '[{"cmd": "forward", "params": {"speed": 60, "seconds": 1}}]'
-
-# Watch server output for mock commands:
-# [MOCK] Forward at speed 60
-# [MOCK] Stop
+# Run tests
+python -m pytest -v
+# → 52 tests pass
 ```
 
-### Test Tablet Client (Mock Mode)
-
-Open in browser with mock parameter:
+Test the tablet interface in mock mode:
 ```
 http://localhost:5050/code/?mock=true
 ```
 
-In mock mode:
-- Shows mock output panel below Blockly workspace
-- Displays exactly what instructions would be sent
-- No network calls - works completely offline
+## Documentation
 
-### End-to-End Test
+| Document | Description |
+|----------|-------------|
+| [Architecture](docs/architecture.md) | System design, Ports & Adapters pattern, data flow |
+| [API Reference](docs/api.md) | REST endpoints, WebSocket protocol, instruction format |
+| [Testing Guide](docs/testing.md) | Running tests, writing tests, mock drivers |
 
-1. Open `/code/` on tablet (no `?mock` parameter)
-2. Open `/monitor/` on TV
-3. Create simple program (Forward 1s, Spin Left 0.5s, Forward 1s)
-4. Click Run (green button)
-5. Verify: TV shows queue updating, rover executes sequence
-6. Click Stop (red button) mid-execution
-7. Verify: Rover stops immediately, queue clears
+## Project Structure
 
-## Command Reference
-
-| Blockly Block | Instruction cmd | Rover Action |
-|---------------|-----------------|--------------|
-| Move Forward | `forward` | `rover.forward(speed)` + sleep + stop |
-| Move Backward | `backward` | `rover.reverse(speed)` + sleep + stop |
-| Spin Left | `spin_left` | `rover.spinLeft(speed)` + LED animation + sleep + stop |
-| Spin Right | `spin_right` | `rover.spinRight(speed)` + LED animation + sleep + stop |
-| Stop | `stop` | `rover.stop()` |
-| Steer Left | `steer_left` | Set servos + `rover.forward(speed)` + sleep + stop |
-| Steer Right | `steer_right` | Set servos + `rover.forward(speed)` + sleep + stop |
-| Wait | `wait` | Sleep only |
+```
+yard/
+├── rover/           # Runs on marspi.local:8523
+│   ├── rover_server.py
+│   ├── service.py
+│   ├── drivers.py
+│   └── test_*.py
+├── satellite/       # Runs on mro.local:5050 + :8890
+│   ├── web_server.py
+│   ├── camera_server.py
+│   └── templates/
+├── docs/
+└── README.md
+```
 
 ## Configuration
 
-### Environment Variables
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ROVER_URL` | `http://marspi.local:8523` | Rover server URL (for satellite) |
 
-**Satellite Web Server:**
-- `ROVER_URL` - Rover server URL (default: `http://marspi.local:8523`)
-
-Example:
 ```bash
 ROVER_URL=http://localhost:8523 python web_server.py
 ```
-
-## Dependency Injection
-
-### Rover Queue Service
-
-The service supports injection for testing:
-
-```python
-from drivers import MockRoverDriver
-from service import RoverQueueService
-
-# Production: auto-detect driver
-from drivers import create_driver
-service = RoverQueueService(create_driver())
-
-# Testing: inject mock driver + fixed time/uuid
-from datetime import datetime
-service = RoverQueueService(
-    driver=MockRoverDriver(),
-    time_provider=lambda: datetime(2024, 1, 15, 12, 0, 0),
-    uuid_provider=lambda: 'test-uuid-123'
-)
-
-# Use service directly (unit tests)
-result = service.add_instructions([{'cmd': 'forward', 'params': {'speed': 60}}])
-
-# Or inject into Flask app (integration tests)
-from rover_server import create_app
-app = create_app(service)
-client = app.test_client()
-```
-
-### Rover Driver
-
-The driver layer abstracts hardware:
-
-```python
-from drivers import create_driver, MockRoverDriver
-
-# Auto-detect (production)
-driver = create_driver()
-
-# Force mock for testing
-driver = MockRoverDriver()
-```
-
-### Tablet Client RoverService
-
-The Blockly interface uses Ports & Adapters for testability:
-
-```javascript
-// Real mode (production)
-const service = new RealRoverService('/api');
-
-// Mock mode (testing)
-const service = new MockRoverService(outputElement);
-
-// Auto-detect via URL parameter
-const isMock = new URL(location).searchParams.get('mock') === 'true';
-```
-
-## PWA Support
-
-The tablet interface (`/code/`) is a Progressive Web App:
-
-- Installable on tablets
-- Works offline (workspace persistence in localStorage)
-- Service worker caches Blockly library
-
-To install on iPad:
-1. Open Safari to `http://mro.local:5050/code/`
-2. Tap Share → Add to Home Screen
-3. App launches in fullscreen mode
-
-## Dependencies
-
-### Rover (marspi.local)
-- flask>=2.0.0
-- RPi.GPIO (pre-installed on Pi)
-- rpi_ws281x (for LEDs)
-- rover module (4tronix hardware driver)
-
-### Satellite (mro.local)
-- flask>=2.0.0
-- requests>=2.28.0
-- websockets>=10.0
-- picamera2 (for camera access)
-- numpy
-- opencv-python
