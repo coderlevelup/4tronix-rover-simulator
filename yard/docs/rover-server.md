@@ -17,7 +17,35 @@ Follow the [4tronix Pi Setup Guide](https://4tronix.co.uk/blog/?p=2409) for full
 
 Use **Raspberry Pi OS (Legacy, 32-bit)** - the Bullseye version. Flash it using Raspberry Pi Imager.
 
-### 2. Enable Interfaces
+### 2. Headless Setup (Optional)
+
+If you don't have a monitor/keyboard, configure the SD card for headless boot before inserting it into the Pi.
+
+After imaging, the SD card will have a `boot` partition. Create these files in it:
+
+**Enable SSH** - Create an empty file named `ssh` (no extension):
+```bash
+touch /Volumes/boot/ssh
+```
+
+**Configure WiFi** - Create `wpa_supplicant.conf`:
+```
+country=AU
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+
+network={
+    ssid="marsyard"
+    psk="curiousinternet"
+    key_mgmt=WPA-PSK
+}
+```
+
+**Set hostname** - In Raspberry Pi Imager's advanced options (gear icon), set hostname to `marspi`.
+
+Once booted, connect via: `ssh pi@marspi.local`
+
+### 3. Enable Interfaces
 
 After first boot, run:
 ```bash
@@ -25,7 +53,7 @@ sudo raspi-config
 ```
 Navigate to **Interfaces** and enable both **SPI** and **I2C**. Reboot.
 
-### 3. Install Rover Software
+### 4. Install Rover Software
 
 ```bash
 sudo pip install rpi_ws281x
@@ -35,7 +63,7 @@ bash rover.sh
 
 This creates `/home/pi/marsrover` with the rover library and test programs.
 
-### 4. Calibrate Servos
+### 5. Calibrate Servos
 
 Before first use, calibrate the wheel servos:
 ```bash
