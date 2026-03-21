@@ -1,6 +1,13 @@
-# Bookworm/Trixie Upgrade Plan
+# Bookworm Upgrade Plan
 
-This document outlines the changes required to support Raspberry Pi OS Bookworm (and later Trixie) instead of Bullseye Legacy.
+This document outlines the changes required to support Raspberry Pi OS Bookworm instead of Bullseye Legacy.
+
+> **Why not Trixie?** Trixie (Debian 13, released Oct 2025) has breaking changes that affect rpi_ws281x:
+> - Sysfs GPIO (`/sys/class/gpio`) deprecated/removed in favor of `/dev/gpiochipN`
+> - PWM kernel changes in Linux 6.12 (`pwmchip2` missing)
+> - Would require rewriting LED code to use SPI or lgpio
+>
+> Bookworm is the safer upgrade path for Pi Zero.
 
 ## Target Hardware
 
@@ -198,3 +205,8 @@ sudo systemctl start rover-server
 - [rpi_ws281x GitHub](https://github.com/jgarff/rpi_ws281x)
 - [Pimoroni - Python Virtual Environments on Bookworm](https://pimoroni.github.io/venv-python/)
 - [PEP 668 - Externally Managed Environments](https://peps.python.org/pep-0668/)
+
+### Trixie Research (why we avoid it)
+- [Raspberry Pi OS Trixie Announcement](https://www.raspberrypi.com/news/trixie-the-new-version-of-raspberry-pi-os/)
+- [GPIO changes in Trixie](https://neilzone.co.uk/2025/12/using-gpioset-and-gpioget-to-control-the-gpio-pins-on-a-raspberry-pi-with-a-relay-board-under-debian-trixie/)
+- [PWM kernel issue #6818](https://github.com/raspberrypi/linux/issues/6818)
