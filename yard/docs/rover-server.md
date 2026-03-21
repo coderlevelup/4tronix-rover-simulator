@@ -11,25 +11,38 @@ If you're setting up a new M.A.R.S. Rover from scratch:
 
 ## Pi Setup (New SD Card)
 
-Follow the [4tronix Pi Setup Guide](https://4tronix.co.uk/blog/?p=2409) for full details. Key steps:
+Follow the [4tronix Pi Setup Guide](https://4tronix.co.uk/blog/?p=2409) for full details.
 
 ### 1. Image the SD Card
 
-Use **Raspberry Pi OS (Legacy, 32-bit)** - the Bullseye version. Flash it using Raspberry Pi Imager.
+Use **Raspberry Pi OS (Legacy, 32-bit)** - the Bullseye version.
 
-### 2. Headless Setup (Optional)
+In Raspberry Pi Imager:
+1. Click **Choose OS**
+2. Select **Raspberry Pi OS (other)**
+3. Select **Raspberry Pi OS (Legacy, 32-bit)**
+4. Choose your SD card and write
 
-If you don't have a monitor/keyboard, configure the SD card for headless boot before inserting it into the Pi.
+After imaging, macOS will show "disk not readable" - click **Ignore** (not Eject or Initialize). The boot partition will mount as `/Volumes/bootfs`.
 
-After imaging, the SD card will have a `boot` partition. Create these files in it:
+### 2. Headless Setup
 
-**Enable SSH** - Create an empty file named `ssh` (no extension):
+Configure the SD card for headless boot before inserting it into the Pi.
+
+> **macOS Note:** If you get "Operation not permitted" errors, add Terminal to **System Settings → Privacy & Security → Full Disk Access**, then restart Terminal.
+
+#### Required Files
+
+Create these files on the `bootfs` partition:
+
+**Enable SSH** - Create an empty file named `ssh`:
 ```bash
-touch /Volumes/boot/ssh
+touch /Volumes/bootfs/ssh
 ```
 
 **Configure WiFi** - Create `wpa_supplicant.conf`:
-```
+```bash
+cat > /Volumes/bootfs/wpa_supplicant.conf << 'EOF'
 country=AU
 ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
@@ -39,31 +52,149 @@ network={
     psk="curiousinternet"
     key_mgmt=WPA-PSK
 }
+EOF
 ```
 
-**Set hostname** - In Raspberry Pi Imager's advanced options (gear icon), set hostname to `marspi`.
+#### Automated First-Boot Setup (Optional)
 
-Once booted, connect via: `ssh pi@marspi.local`
+To automatically configure the Pi on first boot, create these additional files:
 
-### 3. Enable Interfaces
+**First-run script** - Create `firstrun.sh`:
+```bash
+cat > /Volumes/bootfs/firstrun.sh << 'FIRSTRUN'
+#!/bin/bash
+set +e
 
-After first boot, run:
+LOG=/boot/firstrun.log
+exec > >(tee -a $LOG) 2>&1
+
+echo "=== marspi firstrun starting at $(date) ==="
+
+# Set hostname
+raspi-config nonint do_hostname marspi
+
+# Enable SPI
+raspi-config nonint do_spi 0
+
+# Enable I2C
+raspi-config nonint do_i2c 0
+
+# Set timezone
+raspi-config nonint do_change_timezone Australia/Sydney
+
+# Copy setup service for post-network tasks
+cp /boot/marspi-setup.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable marspi-setup.service
+
+# Remove firstrun from cmdline.txt
+sed -i 's| systemd.run.*||g' /boot/cmdline.txt
+
+echo "=== firstrun complete, rebooting ==="
+
+rm -f /boot/firstrun.sh
+reboot
+FIRSTRUN
+```
+
+**Post-network setup service** - Create `marspi-setup.service`:
+```bash
+cat > /Volumes/bootfs/marspi-setup.service << 'EOF'
+[Unit]
+Description=Mars Rover Pi Setup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /boot/marspi-setup.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+**Post-network setup script** - Create `marspi-setup.sh`:
+```bash
+cat > /Volumes/bootfs/marspi-setup.sh << 'SETUP'
+#!/bin/bash
+# Runs after network is available
+
+LOG=/boot/marspi-setup.log
+exec > >(tee -a $LOG) 2>&1
+
+echo "=== marspi setup starting at $(date) ==="
+
+# Update and install dependencies
+echo "Updating packages..."
+apt-get update
+
+echo "Installing rpi_ws281x..."
+pip install rpi_ws281x
+
+# Install 4tronix rover software
+echo "Installing 4tronix rover software..."
+cd /home/pi
+wget -q https://4tronix.co.uk/rover.sh -O rover.sh
+bash rover.sh
+
+# Remove this script from running again
+echo "Removing setup service..."
+systemctl disable marspi-setup.service
+rm /etc/systemd/system/marspi-setup.service
+
+echo "=== marspi setup complete at $(date) ==="
+echo "Rebooting in 5 seconds..."
+sleep 5
+reboot
+SETUP
+```
+
+**Modify cmdline.txt** - Add the firstrun trigger:
+```bash
+# Read current cmdline.txt
+CMDLINE=$(cat /Volumes/bootfs/cmdline.txt)
+
+# Append firstrun parameters (must be single line)
+echo "${CMDLINE} systemd.run=/boot/firstrun.sh systemd.run_success_action=reboot systemd.unit=kernel-command-line.target" > /Volumes/bootfs/cmdline.txt
+```
+
+#### Eject and Boot
+
+```bash
+diskutil eject /dev/disk4  # Use correct disk number
+```
+
+Insert the SD card into the Pi and power on. The automated setup will:
+
+1. **First boot:** Set hostname, enable SPI/I2C, set timezone, reboot
+2. **Second boot:** Install rpi_ws281x, download 4tronix software, reboot
+3. **Ready:** Connect via `ssh pi@marspi.local` (password: `raspberry`)
+
+Check logs at `/boot/firstrun.log` and `/boot/marspi-setup.log` for any errors.
+
+### 3. Manual Setup (If Not Using Automation)
+
+If you didn't use the automated scripts, after first boot run:
+
 ```bash
 sudo raspi-config
 ```
-Navigate to **Interfaces** and enable both **SPI** and **I2C**. Reboot.
 
-### 4. Install Rover Software
+- **System Options → Hostname**: Set to `marspi`
+- **Interface Options → SPI**: Enable
+- **Interface Options → I2C**: Enable
+- Reboot when prompted
 
+Then install rover software:
 ```bash
 sudo pip install rpi_ws281x
 wget https://4tronix.co.uk/rover.sh -O rover.sh
 bash rover.sh
 ```
 
-This creates `/home/pi/marsrover` with the rover library and test programs.
-
-### 5. Calibrate Servos
+### 4. Calibrate Servos
 
 Before first use, calibrate the wheel servos:
 ```bash
