@@ -55,6 +55,18 @@ network={
 EOF
 ```
 
+**Create pi user** - Newer Bullseye images have no default user. Create `userconf.txt`:
+```bash
+# Creates user "pi" with password "raspberry"
+echo 'pi:$6$rBoByrWRKMY1EHFy$ho.LISnfm83CLBWBE/yqJ6Lq1TinRlxw/ImMTPcvvMuUfhQYcMmFnpFXUPowjy4SLJQK45iX9.' > /Volumes/bootfs/userconf.txt
+```
+
+> **Note:** The hash above is for password `raspberry`. To generate a different password:
+> ```bash
+> echo 'mypassword' | openssl passwd -6 -stdin
+> ```
+> Then format as `pi:<hash>` in userconf.txt.
+
 #### Automated First-Boot Setup (Optional)
 
 To automatically configure the Pi on first boot, create these additional files:
