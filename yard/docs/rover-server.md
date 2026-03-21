@@ -55,13 +55,20 @@ network={
 EOF
 ```
 
-**Create pi user** - Newer Bullseye images have no default user. Create `userconf.txt`:
-```bash
-# Creates user "pi" with password "raspberry"
-echo 'pi:$6$rBoByrWRKMY1EHFy$ho.LISnfm83CLBWBE/yqJ6Lq1TinRlxw/ImMTPcvvMuUfhQYcMmFnpFXUPowjy4SLJQK45iX9.' > /Volumes/bootfs/userconf.txt
+**Create pi user** - Newer Bullseye images have no default user. Create `userconf.txt` with a single line:
+```
+pi:$6$rBoByrWRKMY1EHFy$ho.LISnfm83CLBWBE/yqJ6Lq1TinRlxw/ImMTPcvvMuUfhQYcMmFnpFXUPowjy4SLJQK45iX9.
 ```
 
-> **Note:** The hash above is for password `raspberry`. To generate a different password:
+This sets user `pi` with password `raspberry`.
+
+> **macOS:** Neither `echo >` nor `sudo tee` work for this due to macOS security restrictions on FAT32 volumes. Use Python instead:
+> ```bash
+> python3 -c "open('/Volumes/bootfs/userconf.txt','w').write('pi:\$6\$rBoByrWRKMY1EHFy\$ho.LISnfm83CLBWBE/yqJ6Lq1TinRlxw/ImMTPcvvMuUfhQYcMmFnpFXUPowjy4SLJQK45iX9.\n')"
+> ```
+> Or open in Finder and create the file manually: `open /Volumes/bootfs`
+
+> **Custom password:** To generate a hash for a different password:
 > ```bash
 > echo 'mypassword' | openssl passwd -6 -stdin
 > ```
