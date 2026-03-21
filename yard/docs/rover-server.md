@@ -2,7 +2,52 @@
 
 The rover server is a queue-based REST API that processes instructions for the rover. It can run in mock mode (for development) or connect to real hardware on a Raspberry Pi.
 
-## First Time Setup
+## Hardware Assembly
+
+If you're setting up a new M.A.R.S. Rover from scratch:
+
+- [Assembly Instructions](https://4tronix.co.uk/blog/?p=2112) - Step-by-step build guide
+- [Assembly Video](https://www.youtube.com/watch?v=Np8ZQQd85oc) - Video walkthrough
+
+## Pi Setup (New SD Card)
+
+Follow the [4tronix Pi Setup Guide](https://4tronix.co.uk/blog/?p=2409) for full details. Key steps:
+
+### 1. Image the SD Card
+
+Use **Raspberry Pi OS (Legacy, 32-bit)** - the Bullseye version. Flash it using Raspberry Pi Imager.
+
+### 2. Enable Interfaces
+
+After first boot, run:
+```bash
+sudo raspi-config
+```
+Navigate to **Interfaces** and enable both **SPI** and **I2C**. Reboot.
+
+### 3. Install Rover Software
+
+```bash
+sudo pip install rpi_ws281x
+wget https://4tronix.co.uk/rover.sh -O rover.sh
+bash rover.sh
+```
+
+This creates `/home/pi/marsrover` with the rover library and test programs.
+
+### 4. Calibrate Servos
+
+Before first use, calibrate the wheel servos:
+```bash
+cd ~/marsrover
+sudo python calibrateServos.py
+```
+
+This ensures all wheels point straight when centered.
+
+> **Note:** Motor and servo test programs must run in a terminal (like LXTerminal), not in an IDE.
+
+## First Time Setup (Yard Server)
 
 Before you can run the server, you'll need to set up a Python environment and install some libraries. Don't worry - you only need to do this once on each computer.
 
