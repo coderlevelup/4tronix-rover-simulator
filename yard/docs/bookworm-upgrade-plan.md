@@ -29,6 +29,29 @@ The Pi Zero uses the same BCM2835 SoC as original Pi models. The PWM/DMA hardwar
 
 Bookworm enforces virtual environments for pip installs. System-wide `sudo pip install` no longer works without `--break-system-packages`.
 
+### sudo + venv Conflict
+
+**Problem:** rpi_ws281x requires root/sudo for PWM hardware access, but `sudo python` doesn't see the venv packages.
+
+**Solutions:**
+- Manual run: `sudo -E env PATH=$PATH python3 script.py`
+- Systemd: Runs as root by default, use absolute path to venv Python
+
+### Audio/PWM Hardware Conflict
+
+The PWM hardware used by rpi_ws281x conflicts with audio. Must disable audio:
+
+```bash
+# In /boot/config.txt, change:
+dtparam=audio=on
+# To:
+dtparam=audio=off
+```
+
+### 32-bit Requirement
+
+Pi Zero requires **32-bit** Bookworm (armhf). Do not use arm64 images.
+
 ## Upgrade Path (Pi Zero)
 
 Since Pi Zero uses BCM2835, rpi_ws281x should work without hardware changes.
@@ -83,7 +106,9 @@ pip install smbus-cffi  # Provides smbus module via smbus2
 
 ### Phase 3: Systemd Service Setup
 
-**Goal:** Run rover server on boot using venv
+**Goal:** Run rover server on boot using venv with root access for PWM
+
+Systemd services run as root by default, which provides the PWM hardware access that rpi_ws281x needs. No `sudo` required in the service file.
 
 Create `/etc/systemd/system/rover-server.service`:
 ```ini
@@ -93,10 +118,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=pi
 WorkingDirectory=/home/pi/yard/rover
-Environment=PATH=/home/pi/rover-env/bin
-ExecStart=/home/pi/rover-env/bin/python rover_server.py
+ExecStart=/home/pi/rover-env/bin/python /home/pi/yard/rover/rover_server.py
 Restart=always
 RestartSec=5
 
@@ -104,8 +127,11 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
+Note: Uses absolute paths to both venv Python and script. Runs as root (no User= specified).
+
 Enable with:
 ```bash
+sudo systemctl daemon-reload
 sudo systemctl enable rover-server
 sudo systemctl start rover-server
 ```
@@ -126,13 +152,15 @@ sudo systemctl start rover-server
 #### Test Procedure
 
 1. Flash fresh Bookworm 32-bit image (Pi Zero needs 32-bit)
-2. Enable SPI and I2C via raspi-config
-3. Run setup-bookworm.sh
-4. Patch rover.py for smbus2
-5. Reboot
-6. Run yard server: `source ~/rover-env/bin/activate && cd yard/rover && python rover_server.py`
-7. Test each function via curl commands
-8. Run test suite: `python -m pytest -v`
+2. Disable audio in `/boot/config.txt`: `dtparam=audio=off`
+3. Enable SPI and I2C via raspi-config
+4. Run setup-bookworm.sh
+5. Patch rover.py for smbus2
+6. Reboot
+7. Test manual run: `sudo -E env PATH=$PATH python3 /home/pi/yard/rover/rover_server.py`
+8. Test each function via curl commands
+9. If working, enable systemd service
+10. Run test suite: `python -m pytest -v`
 
 ## Fallback Options
 
@@ -165,7 +193,8 @@ sudo systemctl start rover-server
 ## References
 
 - [Adafruit NeoPixels on Raspberry Pi](https://learn.adafruit.com/neopixels-on-raspberry-pi/python-usage)
-- [Pi5Neo GitHub](https://github.com/vanshksingh/Pi5Neo)
-- [rpi_ws281x Pi 5 Issue](https://github.com/jgarff/rpi_ws281x/issues/528)
-- [Gordon Lesti - WS2811 via SPI](https://gordonlesti.com/light-up-ws2811-leds-with-a-raspberry-pi-5-via-spi/)
+- [Adafruit - Usage with sudo](https://learn.adafruit.com/python-virtual-environment-usage-on-raspberry-pi/usage-with-sudo)
+- [Adafruit - Running at Boot](https://learn.adafruit.com/python-virtual-environment-usage-on-raspberry-pi/automatically-running-at-boot)
+- [rpi_ws281x GitHub](https://github.com/jgarff/rpi_ws281x)
+- [Pimoroni - Python Virtual Environments on Bookworm](https://pimoroni.github.io/venv-python/)
 - [PEP 668 - Externally Managed Environments](https://peps.python.org/pep-0668/)
