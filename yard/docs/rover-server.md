@@ -302,12 +302,13 @@ wget https://4tronix.co.uk/rover.sh -O rover.sh
 bash rover.sh
 ```
 
-### 4. Copy Updated driveRover.py
+### 4. Symlink driveRover.py
 
-The 4tronix `rover.sh` installs an older `driveRover.py` without spin controls (`[` and `]`). Replace it with the repo version:
+The 4tronix `rover.sh` installs an older `driveRover.py`. Replace it with a symlink to the repo version so it stays up to date:
 
 ```bash
-cp ~/4tronix-rover-simulator/driveRover.py ~/marsrover/driveRover.py
+rm ~/marsrover/driveRover.py
+ln -s ~/4tronix-rover-simulator/driveRover.py ~/marsrover/driveRover.py
 ```
 
 ### 5. Calibrate Servos
