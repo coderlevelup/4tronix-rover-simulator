@@ -66,12 +66,16 @@ Follow the [4tronix Pi Setup Guide](https://4tronix.co.uk/blog/?p=2409) for full
 
 ### 1. Image the SD Card
 
-Use **Raspberry Pi OS (Legacy, 32-bit)** - the Bullseye version.
+Use **Raspberry Pi OS (Legacy, 32-bit) Bullseye, dated 22 October 2024** — this is the verified working image.
+
+> **Note:** Raspberry Pi Imager no longer lists Bullseye. Download the image directly and use **"Use custom"** in the imager:
+> ```
+> https://downloads.raspberrypi.com/raspios_oldstable_armhf/images/raspios_oldstable_armhf-2024-10-28/2024-10-22-raspios-bullseye-armhf.img.xz
+> ```
 
 In Raspberry Pi Imager:
 1. Click **Choose OS**
-2. Select **Raspberry Pi OS (other)**
-3. Select **Raspberry Pi OS (Legacy, 32-bit)**
+2. Select **Use custom** and pick the downloaded `.img.xz` file
 4. Choose your SD card and write
 
 After imaging, macOS will show "disk not readable" - click **Ignore** (not Eject or Initialize). The boot partition will mount as `/Volumes/bootfs`.
