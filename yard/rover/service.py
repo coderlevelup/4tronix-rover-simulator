@@ -219,7 +219,7 @@ class RoverQueueService(RoverQueuePort):
                 self._interruptible_wait(seconds)
                 self.driver.stop()
 
-            elif cmd == 'backward':
+            elif cmd == 'backward' or cmd == 'reverse':
                 self.driver.reverse(speed)
                 self._interruptible_wait(seconds)
                 self.driver.stop()
