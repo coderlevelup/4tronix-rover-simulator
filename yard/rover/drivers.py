@@ -132,7 +132,7 @@ class RealRoverDriver(RoverDriver):
         # Import rover module (only available on Pi)
         import rover
         self.rover = rover
-        self.rover.init()
+        self.rover.init(40)
 
         self.animation_running = False
         self.animation_thread = None
