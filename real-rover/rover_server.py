@@ -325,15 +325,18 @@ def main():
     """Initialize rover and start server"""
     print("Initializing M.A.R.S. Rover hardware...")
 
-    # Initialize rover with default brightness
-    rover.init(40)
-
-    # Set all LEDs to white to indicate server is ready
-    white = rover.fromRGB(255, 255, 255)
-    for i in range(4):
-        rover.setPixel(i, white)
-    rover.show()
-    print("LEDs set to white")
+    while True:
+        try:
+            rover.init(40)
+            white = rover.fromRGB(255, 255, 255)
+            for i in range(4):
+                rover.setPixel(i, white)
+            rover.show()
+            print("LEDs set to white")
+            break
+        except OSError as e:
+            print(f"Hardware not ready ({e}), retrying in 5 seconds...")
+            time.sleep(5)
 
     print("Rover initialized successfully")
     print("Starting HTTP server on port 8523...")
