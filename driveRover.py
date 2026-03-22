@@ -143,10 +143,10 @@ try:
             print ('Brake')
         elif keyp == '[':
             pivot()
-            rover.spinLeft(50)
+            rover.spinLeft(speed)
         elif keyp == ']':
             pivot()
-            rover.spinRight(50)
+            rover.spinRight(speed)
         elif ord(keyp) == 3:
             break
         else:
