@@ -328,6 +328,7 @@ def main():
     while True:
         try:
             rover.init(40)
+            rover.setServo(0, 60)  # Stage 2: mast thinking left while initialising
             white = rover.fromRGB(255, 255, 255)
             for i in range(4):
                 rover.setPixel(i, white)
@@ -338,6 +339,7 @@ def main():
             print(f"Hardware not ready ({e}), retrying in 5 seconds...")
             time.sleep(5)
 
+    rover.setServo(0, 0)  # Stage 3: mast centres — server ready
     print("Rover initialized successfully")
     print("Starting HTTP server on port 8523...")
     print("Server ready to accept commands")
