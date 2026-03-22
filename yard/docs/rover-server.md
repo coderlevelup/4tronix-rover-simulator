@@ -9,6 +9,57 @@ If you're setting up a new M.A.R.S. Rover from scratch:
 - [Assembly Instructions](https://4tronix.co.uk/blog/?p=2112) - Step-by-step build guide
 - [Assembly Video](https://www.youtube.com/watch?v=Np8ZQQd85oc) - Video walkthrough
 
+## Known-Working Pi Configuration (as of March 2026)
+
+This is the verified working setup inspected directly from the Pi on 22 March 2026.
+
+### OS
+- **Raspbian GNU/Linux 11 (Bullseye)**, image dated **22 October 2024**
+- Python **3.9.2**
+- Hostname: `marspi`
+- Timezone: `Africa/Johannesburg` (SAST)
+
+### Hardware Interfaces
+- **SPI:** enabled (`/dev/spidev0.0`, `/dev/spidev0.1`)
+- **I2C:** enabled (`/dev/i2c-1`)
+- **Camera:** enabled (`start_x=1` in config.txt)
+- **GPU memory:** 128MB
+
+### WiFi Networks Configured
+- `marsyard` (password: `curiousinternet`)
+- `mars-relay-network`
+- `David's Note 10` (personal hotspot, hashed PSK)
+
+### Key Python Packages
+- `Flask 1.1.2`
+- `RPi.GPIO 0.7.0`
+- `rpi-ws281x 5.0.0`
+- `picamera 1.13` / `picamera2 0.3.12`
+- `adafruit-circuitpython-pca9685 3.4.20`
+- `pigpio 1.78`
+- `numpy 1.19.5`
+
+### Auto-start Service
+`rover-server.service` is enabled and starts on boot:
+- Runs as `root`
+- Working dir: `/home/mars/4tronix-rover-simulator/real-rover`
+- Starts: `/usr/bin/python3 /home/mars/4tronix-rover-simulator/real-rover/rover_server.py`
+
+### Git Repos on Pi
+- `/home/mars/4tronix-rover-simulator` — main repo
+- `/home/mars/4tronix-rover-simulator-changed` — experimental branch with camera streaming
+
+### 4tronix Rover Files
+Located at `/home/mars/marsrover/`, installed via the official `rover.sh` script:
+`calibrateServos.py`, `rover.py`, `motorTest.py`, `servoTest.py`, `sonarTest.py`, etc.
+
+### SSH Access
+- User: `mars`, password: `R0v3r!`
+- Connect: `ssh mars@marspi.local`
+- VNC also enabled (`vncserver-x11-serviced.service`)
+
+---
+
 ## Pi Setup (New SD Card)
 
 Follow the [4tronix Pi Setup Guide](https://4tronix.co.uk/blog/?p=2409) for full details.
@@ -62,9 +113,13 @@ pi:$6$rBoByrWRKMY1EHFy$ho.LISnfm83CLBWBE/yqJ6Lq1TinRlxw/ImMTPcvvMuUfhQYcMmFnpFXU
 
 This sets user `pi` with password `raspberry`.
 
-> **macOS:** Neither `echo >` nor `sudo tee` work for this due to macOS security restrictions on FAT32 volumes. Use Python instead:
+> **macOS:** Neither `echo >` nor `sudo tee` work due to macOS security restrictions on FAT32 volumes. Generate a fresh hash and write the file:
 > ```bash
-> python3 -c "open('/Volumes/bootfs/userconf.txt','w').write('pi:\$6\$rBoByrWRKMY1EHFy\$ho.LISnfm83CLBWBE/yqJ6Lq1TinRlxw/ImMTPcvvMuUfhQYcMmFnpFXUPowjy4SLJQK45iX9.\n')"
+> # Generate hash (use the output in the next command)
+> openssl passwd -6 raspberry
+>
+> # Write userconf.txt with the generated hash
+> python3 -c "open('/Volumes/bootfs/userconf.txt','w').write('pi:<paste-hash>\n')"
 > ```
 > Or open in Finder and create the file manually: `open /Volumes/bootfs`
 
@@ -99,7 +154,7 @@ raspi-config nonint do_spi 0
 raspi-config nonint do_i2c 0
 
 # Set timezone
-raspi-config nonint do_change_timezone Australia/Sydney
+raspi-config nonint do_change_timezone Africa/Johannesburg
 
 # Copy setup service for post-network tasks
 cp /boot/marspi-setup.service /etc/systemd/system/
