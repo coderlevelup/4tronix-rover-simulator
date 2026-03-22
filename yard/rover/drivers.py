@@ -150,10 +150,14 @@ class RealRoverDriver(RoverDriver):
         self.rover.reverse(speed)
 
     def spin_left(self, speed: int) -> None:
+        self.rover.stop()
+        self._pivot()
         self._start_spin_animation('left')
         self.rover.spinLeft(speed)
 
     def spin_right(self, speed: int) -> None:
+        self.rover.stop()
+        self._pivot()
         self._start_spin_animation('right')
         self.rover.spinRight(speed)
 
@@ -197,6 +201,13 @@ class RealRoverDriver(RoverDriver):
         self.rover.stop()
         self._set_all_leds_white()
         self.rover.cleanup()
+
+    def _pivot(self) -> None:
+        """Set wheel servos to pivot position for spinning"""
+        self.rover.setServo(9, 50)   # Front left
+        self.rover.setServo(15, -50) # Front right
+        self.rover.setServo(11, -50) # Rear left
+        self.rover.setServo(13, 50)  # Rear right
 
     def _set_all_leds_white(self) -> None:
         """Set all LEDs to white"""
