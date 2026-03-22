@@ -81,11 +81,13 @@ def pivot():
 
 
 speed = 60
+mast_angle = 0
 
 print ("Drive M.A.R.S. Rover around")
-print ("Use arrow keys to steer")
-print ("Use , or < to slow down")
-print ("Use . or > to speed up")
+print ("Use arrow keys / wasd to steer")
+print ("Use - to slow down, = to speed up")
+print ("Use , to pan mast left, . to pan mast right")
+print ("Use [ ] to spin left/right")
 print ("Press space bar to coast to stop")
 print ("Press b to brake and stop quickly")
 print ("Press Ctrl-C to end")
@@ -109,12 +111,20 @@ try:
         elif keyp == 'a' or ord(keyp) == 19:
             goLeft()
             print ('Go Left', speed)
-        elif keyp == '.' or keyp == '>':
+        elif keyp == '=':
             speed = min(100, speed+10)
             print ('Speed+', speed)
-        elif keyp == ',' or keyp == '<':
-            speed = max (0, speed-10)
+        elif keyp == '-':
+            speed = max(0, speed-10)
             print ('Speed-', speed)
+        elif keyp == '.':
+            mast_angle = min(90, mast_angle+10)
+            rover.setServo(servo_MA, mast_angle)
+            print ('Mast', mast_angle)
+        elif keyp == ',':
+            mast_angle = max(-90, mast_angle-10)
+            rover.setServo(servo_MA, mast_angle)
+            print ('Mast', mast_angle)
         elif keyp == ' ':
             rover.stop()
             print ('Stop')
