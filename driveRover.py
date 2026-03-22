@@ -142,9 +142,11 @@ try:
             rover.setServo(servo_RR, 0)
             print ('Brake')
         elif keyp == '[':
+            rover.stop()
             pivot()
             rover.spinLeft(speed)
         elif keyp == ']':
+            rover.stop()
             pivot()
             rover.spinRight(speed)
         elif ord(keyp) == 3:
