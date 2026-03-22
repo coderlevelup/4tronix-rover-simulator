@@ -117,14 +117,14 @@ try:
         elif keyp == '-':
             speed = max(0, speed-10)
             print ('Speed-', speed)
-        elif keyp == '.':
+        elif keyp == ',':
             target = min(90, mast_angle+10)
             for a in range(mast_angle+1, target+1):
                 rover.setServo(servo_MA, a)
                 time.sleep(0.02)
             mast_angle = target
             print ('Mast', mast_angle)
-        elif keyp == ',':
+        elif keyp == '.':
             target = max(-90, mast_angle-10)
             for a in range(mast_angle-1, target-1, -1):
                 rover.setServo(servo_MA, a)
