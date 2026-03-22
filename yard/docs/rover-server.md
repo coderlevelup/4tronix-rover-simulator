@@ -83,7 +83,9 @@ https://downloads.raspberrypi.com/raspios_oldstable_armhf/images/raspios_oldstab
 In Raspberry Pi Imager:
 1. Click **Choose OS**
 2. Select **Use custom** and pick the downloaded `.img.xz` file
-4. Choose your SD card and write
+3. Choose your SD card and write
+
+> **Important:** The OS Customisation screen (gear icon) does **not** work with custom images. Skip it — configure headless setup manually after writing as described below.
 
 After imaging, macOS will show "disk not readable" - click **Ignore** (not Eject or Initialize). The boot partition will mount as `/Volumes/bootfs`.
 
@@ -92,6 +94,8 @@ After imaging, macOS will show "disk not readable" - click **Ignore** (not Eject
 Configure the SD card for headless boot before inserting it into the Pi.
 
 > **macOS Note:** If you get "Operation not permitted" errors, add Terminal to **System Settings → Privacy & Security → Full Disk Access**, then restart Terminal.
+
+> **Important:** `userconf.txt` is only processed once on first boot. If first boot fails to create the user, you must reflash — putting the file back after the fact does not work.
 
 #### Required Files
 
@@ -105,7 +109,7 @@ touch /Volumes/bootfs/ssh
 **Configure WiFi** - Create `wpa_supplicant.conf`:
 ```bash
 cat > /Volumes/bootfs/wpa_supplicant.conf << 'EOF'
-country=AU
+country=ZA
 ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
 
@@ -114,10 +118,29 @@ network={
     psk="curiousinternet"
     key_mgmt=WPA-PSK
 }
+
+network={
+    ssid="mars-relay-network"
+    psk="E.T.PhoneHome*"
+    key_mgmt=WPA-PSK
+}
 EOF
 ```
 
-**Create pi user** - Newer Bullseye images have no default user. Create `userconf.txt` with a single line:
+**Create mars user** - Generate a fresh hash and write `userconf.txt`. Always generate a fresh hash rather than copying one from docs, as stale hashes can fail silently:
+```bash
+HASH=$(openssl passwd -6 'R0v3r!')
+python3 -c "open('/Volumes/bootfs/userconf.txt','w').write('mars:' + '$HASH' + '\n')"
+```
+
+Verify it looks right:
+```bash
+cat /Volumes/bootfs/userconf.txt
+```
+
+It should show a single line: `mars:$6$...` with no backslashes.
+
+**Old (do not use):**
 ```
 pi:$6$rBoByrWRKMY1EHFy$ho.LISnfm83CLBWBE/yqJ6Lq1TinRlxw/ImMTPcvvMuUfhQYcMmFnpFXUPowjy4SLJQK45iX9.
 ```
@@ -279,7 +302,15 @@ wget https://4tronix.co.uk/rover.sh -O rover.sh
 bash rover.sh
 ```
 
-### 4. Calibrate Servos
+### 4. Copy Updated driveRover.py
+
+The 4tronix `rover.sh` installs an older `driveRover.py` without spin controls (`[` and `]`). Replace it with the repo version:
+
+```bash
+cp ~/4tronix-rover-simulator/driveRover.py ~/marsrover/driveRover.py
+```
+
+### 5. Calibrate Servos
 
 Before first use, calibrate the wheel servos:
 ```bash
