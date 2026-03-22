@@ -66,12 +66,19 @@ Follow the [4tronix Pi Setup Guide](https://4tronix.co.uk/blog/?p=2409) for full
 
 ### 1. Image the SD Card
 
-Use **Raspberry Pi OS (Legacy, 32-bit) Bullseye, dated 22 October 2024** — this is the verified working image.
+Use **Raspberry Pi OS (Legacy, 32-bit) Bullseye, dated 22 October 2024**.
 
-> **Note:** Raspberry Pi Imager no longer lists Bullseye. Download the image directly and use **"Use custom"** in the imager:
-> ```
-> https://downloads.raspberrypi.com/raspios_oldstable_armhf/images/raspios_oldstable_armhf-2024-10-28/2024-10-22-raspios-bullseye-armhf.img.xz
-> ```
+> **Note:** Raspberry Pi Imager no longer lists Bullseye. Download the image directly and use **"Use custom"** in the imager.
+
+**Recommended — Lite** (faster boot, better battery, headless only):
+```
+https://downloads.raspberrypi.com/raspios_oldstable_lite_armhf/images/raspios_oldstable_lite_armhf-2024-10-28/2024-10-22-raspios-bullseye-armhf-lite.img.xz
+```
+
+**Full desktop** (larger, slower, but all Pimoroni/hardware libraries pre-installed):
+```
+https://downloads.raspberrypi.com/raspios_oldstable_armhf/images/raspios_oldstable_armhf-2024-10-28/2024-10-22-raspios-bullseye-armhf.img.xz
+```
 
 In Raspberry Pi Imager:
 1. Click **Choose OS**
