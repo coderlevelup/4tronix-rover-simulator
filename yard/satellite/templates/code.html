@@ -181,27 +181,10 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            padding: 12px;
-            gap: 8px;
         }
 
         #pythonEditor {
             flex: 1;
-            background: #0d1117;
-            color: #e6edf3;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            padding: 12px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 14px;
-            line-height: 1.6;
-            resize: none;
-            outline: none;
-            tab-size: 4;
-        }
-
-        #pythonEditor:focus {
-            border-color: #4CAF50;
         }
 
         /* Mock output panel */
@@ -280,6 +263,7 @@
         }
     </style>
     <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="https://unpkg.com/monaco-editor@0.52.0/min/vs/loader.js"></script>
 </head>
 <body>
     <div class="container">
@@ -319,26 +303,7 @@
         <!-- Python editor pane -->
         <div class="pane" id="panePython">
             <div class="python-container">
-                <textarea id="pythonEditor" spellcheck="false"># Write Python directly — rover and time are available
-# Examples:
-#   rover.forward(60)
-#   time.sleep(1)
-#   rover.stop()
-#
-# Spin in place:
-#   rover.spinLeft(60)
-#   time.sleep(0.5)
-#   rover.stop()
-#
-# Loop:
-#   for i in range(4):
-#       rover.forward(60)
-#       time.sleep(1)
-#       rover.stop()
-#       rover.spinLeft(60)
-#       time.sleep(0.5)
-#       rover.stop()
-</textarea>
+                <div id="pythonEditor"></div>
             </div>
         </div>
     </div>
@@ -841,7 +806,7 @@
                     return;
                 }
             } else {
-                code = document.getElementById('pythonEditor').value;
+                code = pythonEditor.getValue();
                 if (code.trim() === '') {
                     showToast('No code to run', 'error');
                     return;
@@ -874,7 +839,7 @@
                 workspace.clear();
                 localStorage.removeItem('roverWorkspace');
             } else {
-                document.getElementById('pythonEditor').value = '';
+                pythonEditor.setValue('');
             }
             if (isMockMode) {
                 roverService.clear();
@@ -932,16 +897,40 @@
                 .catch(err => console.warn('Service worker registration failed:', err));
         }
 
-        // Tab key in Python editor inserts spaces instead of losing focus
-        document.getElementById('pythonEditor').addEventListener('keydown', (e) => {
-            if (e.key === 'Tab') {
-                e.preventDefault();
-                const el = e.target;
-                const start = el.selectionStart;
-                const end = el.selectionEnd;
-                el.value = el.value.substring(0, start) + '    ' + el.value.substring(end);
-                el.selectionStart = el.selectionEnd = start + 4;
-            }
+        // ============================================================
+        // Monaco Editor Initialization
+        // ============================================================
+
+        let pythonEditor;
+
+        require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.52.0/min/vs' } });
+        require(['vs/editor/editor.main'], function () {
+            pythonEditor = monaco.editor.create(document.getElementById('pythonEditor'), {
+                value: [
+                    '# Write Python directly — rover and time are available',
+                    '# Examples:',
+                    '#   rover.forward(60)',
+                    '#   time.sleep(1)',
+                    '#   rover.stop()',
+                    '',
+                    '# Loop:',
+                    'for i in range(4):',
+                    '    rover.forward(60)',
+                    '    time.sleep(1)',
+                    '    rover.stop()',
+                    '    rover.spinLeft(60)',
+                    '    time.sleep(0.5)',
+                    '    rover.stop()',
+                ].join('\n'),
+                language: 'python',
+                theme: 'vs-dark',
+                fontSize: 14,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                tabSize: 4,
+                insertSpaces: true,
+            });
         });
     </script>
 </body>
