@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rover Monitor</title>
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -120,6 +121,7 @@
             flex-direction: column;
             min-width: 300px;
             max-width: 400px;
+            position: relative;
         }
 
         .queue-header {
@@ -156,6 +158,58 @@
 
         .rover-dot.connected {
             background: #4CAF50;
+        }
+
+        .rover-badge {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .rover-badge:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .rover-popover {
+            display: none;
+            position: absolute;
+            right: 16px;
+            top: 48px;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 12px;
+            z-index: 100;
+            min-width: 240px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        .rover-popover.visible {
+            display: block;
+        }
+
+        .popover-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 4px 0;
+        }
+
+        .popover-row + .popover-row {
+            border-top: 1px solid #333;
+        }
+
+        .popover-label {
+            color: #666;
+            flex-shrink: 0;
+        }
+
+        .popover-value {
+            color: #ccc;
+            font-family: monospace;
+            text-align: right;
+            word-break: break-all;
         }
 
         .queue-content {
@@ -267,6 +321,14 @@
             max-height: 120px;
             overflow-y: auto;
         }
+
+        .blockly-preview {
+            height: 160px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 6px;
+            background: #1a1a2e;
+        }
     </style>
 </head>
 <body>
@@ -290,9 +352,19 @@
         <div class="queue-panel">
             <div class="queue-header">
                 <h2>Instruction Queue</h2>
-                <div class="rover-badge">
+                <div class="rover-badge" id="roverBadge">
                     <span class="rover-dot" id="roverDot"></span>
                     <span id="roverStatus">Disconnected</span>
+                </div>
+            </div>
+            <div class="rover-popover" id="roverPopover">
+                <div class="popover-row">
+                    <span class="popover-label">Rover URL</span>
+                    <span class="popover-value" id="popoverUrl">—</span>
+                </div>
+                <div class="popover-row">
+                    <span class="popover-label">Rover</span>
+                    <span class="popover-value" id="popoverRoverStatus">—</span>
                 </div>
             </div>
             <div class="queue-content">
@@ -319,6 +391,131 @@
     </div>
 
     <script>
+        // ============================================================
+        // Blockly Block Definitions (shape/colour only — no generators needed)
+        // ============================================================
+
+        Blockly.Blocks['rover_forward'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Move Forward")
+                    .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "TIME")
+                    .appendField("seconds");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#2196F3");
+            }
+        };
+
+        Blockly.Blocks['rover_backward'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Move Backward")
+                    .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "TIME")
+                    .appendField("seconds");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#2196F3");
+            }
+        };
+
+        Blockly.Blocks['rover_spin_left'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Spin Left")
+                    .appendField(new Blockly.FieldNumber(0.5, 0.1, 10, 0.1), "TIME")
+                    .appendField("seconds");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#9C27B0");
+            }
+        };
+
+        Blockly.Blocks['rover_spin_right'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Spin Right")
+                    .appendField(new Blockly.FieldNumber(0.5, 0.1, 10, 0.1), "TIME")
+                    .appendField("seconds");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#9C27B0");
+            }
+        };
+
+        Blockly.Blocks['rover_stop'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Stop");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#f44336");
+            }
+        };
+
+        Blockly.Blocks['rover_steer_left'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Steer Left")
+                    .appendField(new Blockly.FieldNumber(20, 5, 45, 5), "DEGREES")
+                    .appendField("degrees for")
+                    .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "TIME")
+                    .appendField("seconds");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#00BCD4");
+            }
+        };
+
+        Blockly.Blocks['rover_steer_right'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Steer Right")
+                    .appendField(new Blockly.FieldNumber(20, 5, 45, 5), "DEGREES")
+                    .appendField("degrees for")
+                    .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "TIME")
+                    .appendField("seconds");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#00BCD4");
+            }
+        };
+
+        Blockly.Blocks['rover_wait'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Wait")
+                    .appendField(new Blockly.FieldNumber(1, 0.1, 10, 0.1), "TIME")
+                    .appendField("seconds");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#4CAF50");
+            }
+        };
+
+        Blockly.Blocks['rover_repeat'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Repeat")
+                    .appendField(new Blockly.FieldNumber(3, 1, 20, 1), "TIMES")
+                    .appendField("times");
+                this.appendStatementInput("DO")
+                    .setCheck(null);
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#FF9800");
+            }
+        };
+
+        const monitorDarkTheme = Blockly.Theme.defineTheme('monitorDark', {
+            base: Blockly.Themes.Classic,
+            componentStyles: {
+                workspaceBackgroundColour: '#1a1a2e',
+                toolboxBackgroundColour: '#16213e',
+                scrollbarColour: '#444',
+            }
+        });
+
         // ============================================================
         // Camera WebSocket Client
         // ============================================================
@@ -417,6 +614,10 @@
                 this.pendingEl = document.getElementById('pendingInstructions');
                 this.pendingCountEl = document.getElementById('pendingCount');
                 this.historyEl = document.getElementById('historyInstructions');
+                this.activeWorkspaces = new Map();
+                this.pendingWorkspaces = new Map();
+                this.renderCounter = 0;
+                this.lastDataJson = null;
             }
 
             start(interval = 500) {
@@ -439,6 +640,17 @@
             }
 
             updateUI(data) {
+                // Skip re-render if data hasn't changed (prevents Blockly flicker)
+                const dataJson = JSON.stringify(data);
+                if (dataJson === this.lastDataJson) return;
+                this.lastDataJson = dataJson;
+
+                // Dispose existing Blockly workspaces before re-render
+                this.activeWorkspaces.forEach(ws => ws.dispose());
+                this.activeWorkspaces.clear();
+                this.pendingWorkspaces = new Map();
+                this.renderCounter = 0;
+
                 // Current instruction
                 if (data.current) {
                     this.currentEl.innerHTML = this.renderInstruction(data.current, 'executing');
@@ -465,6 +677,11 @@
                 } else {
                     this.historyEl.innerHTML = '<div class="empty-message">No history</div>';
                 }
+
+                // Inject Blockly workspaces after DOM is updated
+                if (this.pendingWorkspaces.size > 0) {
+                    setTimeout(() => this.injectBlocklyWorkspaces(), 0);
+                }
             }
 
             renderInstruction(instr, status) {
@@ -472,7 +689,11 @@
                 const params = instr.params || {};
 
                 let paramsHtml;
-                if (cmd === 'run_python') {
+                if (cmd === 'run_python' && params.blockly_state) {
+                    const wsId = `bws-${this.renderCounter++}`;
+                    this.pendingWorkspaces.set(wsId, params.blockly_state);
+                    paramsHtml = `<div class="blockly-preview" id="${wsId}"></div>`;
+                } else if (cmd === 'run_python') {
                     const code = (params.code || '').trimEnd();
                     paramsHtml = `<div class="instruction-code">${this.escapeHtml(code)}</div>`;
                 } else {
@@ -482,15 +703,41 @@
                     paramsHtml = `<div class="instruction-params">${paramStr || 'no params'}</div>`;
                 }
 
+                const label = (cmd === 'run_python' && params.blockly_state)
+                    ? 'Run Blockly'
+                    : cmd.replace(/_/g, ' ');
+
                 return `
                     <div class="instruction ${status}">
                         <div class="instruction-icon cmd-${cmd}"></div>
                         <div class="instruction-details">
-                            <div class="instruction-cmd">${cmd.replace(/_/g, ' ')}</div>
+                            <div class="instruction-cmd">${label}</div>
                             ${paramsHtml}
                         </div>
                     </div>
                 `;
+            }
+
+            injectBlocklyWorkspaces() {
+                this.pendingWorkspaces.forEach((blocklyState, wsId) => {
+                    const el = document.getElementById(wsId);
+                    if (!el) return;
+                    try {
+                        const state = JSON.parse(blocklyState);
+                        const ws = Blockly.inject(el, {
+                            readOnly: true,
+                            scrollbars: false,
+                            zoom: { controls: false, wheel: false },
+                            theme: monitorDarkTheme
+                        });
+                        Blockly.serialization.workspaces.load(state, ws);
+                        ws.zoomToFit();
+                        this.activeWorkspaces.set(wsId, ws);
+                    } catch (e) {
+                        console.warn('Failed to inject Blockly workspace:', e);
+                    }
+                });
+                this.pendingWorkspaces.clear();
             }
 
             escapeHtml(str) {
@@ -514,6 +761,34 @@
         // Start queue poller
         const queue = new QueuePoller();
         queue.start(500);
+
+        // Rover badge popover
+        const roverBadge = document.getElementById('roverBadge');
+        const roverPopover = document.getElementById('roverPopover');
+        const popoverUrl = document.getElementById('popoverUrl');
+        const popoverRoverStatus = document.getElementById('popoverRoverStatus');
+
+        async function refreshPopover() {
+            try {
+                const resp = await fetch('/api/health');
+                const data = await resp.json();
+                popoverUrl.textContent = data.rover_url || '—';
+                popoverRoverStatus.textContent = data.rover_status || '—';
+            } catch (e) {
+                popoverUrl.textContent = '—';
+                popoverRoverStatus.textContent = 'unreachable';
+            }
+        }
+
+        roverBadge.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const isVisible = roverPopover.classList.toggle('visible');
+            if (isVisible) await refreshPopover();
+        });
+
+        document.addEventListener('click', () => {
+            roverPopover.classList.remove('visible');
+        });
     </script>
 </body>
 </html>

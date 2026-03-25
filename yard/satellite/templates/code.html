@@ -798,6 +798,7 @@
 
         document.getElementById('runBtn').addEventListener('click', async () => {
             let code;
+            let blockly_state = null;
 
             if (activeTab === 'blockly') {
                 code = generatePythonCode();
@@ -805,6 +806,7 @@
                     showToast('No blocks to run', 'error');
                     return;
                 }
+                blockly_state = JSON.stringify(Blockly.serialization.workspaces.save(workspace));
             } else {
                 code = pythonEditor.getValue();
                 if (code.trim() === '') {
@@ -818,7 +820,8 @@
             }
 
             try {
-                const result = await roverService.addToQueue([{cmd: 'run_python', params: {code}}]);
+                const params = blockly_state ? {code, blockly_state} : {code};
+                const result = await roverService.addToQueue([{cmd: 'run_python', params}]);
                 showToast('Sent to rover', 'success');
             } catch (e) {
                 showToast('Failed to send: ' + e.message, 'error');
