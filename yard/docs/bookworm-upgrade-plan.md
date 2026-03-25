@@ -63,34 +63,20 @@ Pi Zero requires **32-bit** Bookworm (armhf). Do not use arm64 images.
 
 Since Pi Zero uses BCM2835, rpi_ws281x should work without hardware changes.
 
+> **Status: Completed and verified working on curiosity (Pi Zero W, Bookworm Lite, March 2026)**
+
 ### Phase 1: Virtual Environment Setup
 
 **Goal:** Package everything to work with Bookworm's PEP 668 requirements
 
-#### Setup Script
-
-Create `setup-bookworm.sh`:
 ```bash
-#!/bin/bash
-set -e
-
-cd /home/pi
-
-# Create virtual environment
+cd /home/mars
 python3 -m venv rover-env
 source rover-env/bin/activate
-
-# Install rover dependencies
-pip install rpi_ws281x smbus2
-
-# Install yard server dependencies
-pip install flask pytest
-
-# Add user to required groups
-sudo usermod -aG gpio,spi,i2c pi
-
-echo "Setup complete. Reboot for group changes to take effect."
+pip install rpi_ws281x smbus2 RPi.GPIO flask
 ```
+
+> Note: `RPi.GPIO` must be explicitly installed — it is not bundled with Bookworm Lite.
 
 ### Phase 2: Update 4tronix rover.py for smbus2
 
@@ -120,21 +106,23 @@ Systemd services run as root by default, which provides the PWM hardware access 
 Create `/etc/systemd/system/rover-server.service`:
 ```ini
 [Unit]
-Description=Rover Queue Server
+Description=4tronix M.A.R.S. Rover Queue Server
 After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/pi/yard/rover
-ExecStart=/home/pi/rover-env/bin/python /home/pi/yard/rover/rover_server.py
+User=root
+WorkingDirectory=/home/mars/4tronix-rover-simulator/yard/rover
+Environment=PYTHONPATH=/home/mars/marsrover
+ExecStart=/home/mars/rover-env/bin/python rover_server.py
 Restart=always
-RestartSec=5
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Note: Uses absolute paths to both venv Python and script. Runs as root (no User= specified).
+Note: `PYTHONPATH` must point to `/home/mars/marsrover` so rover.py and pca9685.py are found.
 
 Enable with:
 ```bash
@@ -149,23 +137,25 @@ sudo systemctl start rover-server
 
 | Component | Pi Zero Bullseye | Pi Zero Bookworm |
 |-----------|------------------|------------------|
-| Motor forward/reverse | ✓ (current) | To test |
-| Servo steering | ✓ (current) | To test |
-| LED patterns | ✓ (current) | To test |
-| Spin animations | ✓ (current) | To test |
-| Queue processing | ✓ (current) | To test |
-| Emergency stop | ✓ (current) | To test |
+| Motor forward/reverse | ✓ | ✓ |
+| Servo steering | ✓ | ✓ |
+| LED patterns | ✓ | ✓ |
+| Spin animations | ✓ | ✓ |
+| Queue processing | ✓ | ✓ |
+| Emergency stop | ✓ | ✓ |
 
 #### Test Procedure
 
-1. Flash fresh Bookworm 32-bit image (Pi Zero needs 32-bit)
-2. Disable audio in `/boot/config.txt`: `dtparam=audio=off`
-3. Enable SPI and I2C via raspi-config
-4. Run setup-bookworm.sh
-5. Patch rover.py for smbus2
-6. Reboot
-7. Test manual run: `sudo -E env PATH=$PATH python3 /home/pi/yard/rover/rover_server.py`
-8. Test each function via curl commands
+1. Flash Bookworm Lite 32-bit image using Raspberry Pi Imager with OS customisation
+2. Enable SPI and I2C: `sudo raspi-config nonint do_spi 0 && sudo raspi-config nonint do_i2c 0`
+3. Disable audio: edit `/boot/firmware/config.txt`, set `dtparam=audio=off`
+4. Reboot
+5. Install venv and dependencies (Phase 1)
+6. Install 4tronix rover software: `wget https://4tronix.co.uk/rover.sh -O rover.sh && bash rover.sh`
+7. Patch smbus imports in `marsrover/rover.py` and `marsrover/pca9685.py`
+8. Clone repo: `git clone https://github.com/coderlevelup/4tronix-rover-simulator.git`
+9. Create systemd service (Phase 3)
+10. Test via curl:
 9. If working, enable systemd service
 10. Run test suite: `python -m pytest -v`
 
