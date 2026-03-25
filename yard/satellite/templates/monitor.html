@@ -252,6 +252,21 @@
         .cmd-steer_right::before { content: '\2197'; }
         .cmd-stop::before { content: '\23F9'; }
         .cmd-wait::before { content: '\23F1'; }
+        .cmd-run_python::before { content: '\25B6'; }
+
+        .instruction-code {
+            margin-top: 6px;
+            padding: 6px 8px;
+            background: #0d1117;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 11px;
+            color: #adbac7;
+            white-space: pre;
+            overflow-x: auto;
+            max-height: 120px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
@@ -455,19 +470,31 @@
             renderInstruction(instr, status) {
                 const cmd = instr.cmd || 'unknown';
                 const params = instr.params || {};
-                const paramStr = Object.entries(params)
-                    .map(([k, v]) => `${k}: ${v}`)
-                    .join(', ');
+
+                let paramsHtml;
+                if (cmd === 'run_python') {
+                    const code = (params.code || '').trimEnd();
+                    paramsHtml = `<div class="instruction-code">${this.escapeHtml(code)}</div>`;
+                } else {
+                    const paramStr = Object.entries(params)
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join(', ');
+                    paramsHtml = `<div class="instruction-params">${paramStr || 'no params'}</div>`;
+                }
 
                 return `
                     <div class="instruction ${status}">
                         <div class="instruction-icon cmd-${cmd}"></div>
                         <div class="instruction-details">
-                            <div class="instruction-cmd">${cmd.replace('_', ' ')}</div>
-                            <div class="instruction-params">${paramStr || 'no params'}</div>
+                            <div class="instruction-cmd">${cmd.replace(/_/g, ' ')}</div>
+                            ${paramsHtml}
                         </div>
                     </div>
                 `;
+            }
+
+            escapeHtml(str) {
+                return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             }
 
             updateStatus(state, text) {
