@@ -88,7 +88,7 @@ class ServerWorker(QObject):
 
     def run(self):
         self.http_server.route('/', methods=['POST'])(self.result)
-        self.http_server.run(port=8523)
+        self.http_server.run(port=8524)
 
     def result(self): #, *args, **kwargs):
         bodyText = json.dumps(request.json)

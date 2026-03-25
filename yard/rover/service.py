@@ -68,7 +68,8 @@ class RoverQueueService(RoverQueuePort):
         driver: RoverDriver,
         history_size: int = 50,
         time_provider: Callable[[], datetime] = None,
-        uuid_provider: Callable[[], str] = None
+        uuid_provider: Callable[[], str] = None,
+        rover_module=None
     ):
         """Initialize the queue service.
 
@@ -79,6 +80,7 @@ class RoverQueueService(RoverQueuePort):
             uuid_provider: Optional callable returning UUID string (for testing)
         """
         self.driver = driver
+        self._rover_module = rover_module
         self._time_provider = time_provider or (lambda: datetime.now(timezone.utc))
         self._uuid_provider = uuid_provider or (lambda: str(uuid.uuid4()))
 
@@ -249,6 +251,35 @@ class RoverQueueService(RoverQueuePort):
 
             elif cmd == 'wait':
                 self._interruptible_wait(seconds)
+
+            elif cmd == 'run_python':
+                code = params.get('code', '')
+                import sys
+                import os
+                import time as time_module
+                if self._rover_module is not None:
+                    rover_module = self._rover_module
+                else:
+                    try:
+                        sys.path.insert(0, '/home/mars/marsrover')
+                        import rover as rover_module
+                        if not hasattr(rover_module, 'forward'):
+                            raise ImportError("rover module missing hardware API")
+                    except (ImportError, AttributeError):
+                        # Not on Pi — use roversimulator (same API, sends to visual sim or no-ops)
+                        repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                        if repo_root not in sys.path:
+                            sys.path.insert(0, repo_root)
+                        import roversimulator as rover_module
+                safe_builtins = {
+                    'range': range, 'len': len, 'print': print,
+                    'int': int, 'float': float, 'str': str,
+                    'list': list, 'dict': dict, 'tuple': tuple,
+                    'True': True, 'False': False, 'None': None,
+                    'enumerate': enumerate, 'zip': zip, 'abs': abs,
+                    'min': min, 'max': max, 'round': round,
+                }
+                exec(code, {'rover': rover_module, 'time': time_module, '__builtins__': safe_builtins})
 
             instruction['status'] = 'completed'
 

@@ -14,7 +14,7 @@
 from rover_web_driver import RoverWebDriver
 
 # Create a driver instance pointing to the local simulator
-_driver = RoverWebDriver("http://127.0.0.1:8523/")
+_driver = RoverWebDriver("http://127.0.0.1:8524/")
 
 # Export all driver methods as module-level functions
 init = _driver.init

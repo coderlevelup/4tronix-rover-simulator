@@ -120,6 +120,49 @@
             background: #ff9800;
         }
 
+        /* Tab bar */
+        .tab-bar {
+            display: flex;
+            background: #16213e;
+            border-bottom: 2px solid #0f3460;
+        }
+
+        .tab-btn {
+            padding: 8px 24px;
+            border: none;
+            background: transparent;
+            color: #888;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: color 0.2s;
+        }
+
+        .tab-btn.active {
+            color: #fff;
+            border-bottom-color: #4CAF50;
+        }
+
+        .tab-btn:hover:not(.active) {
+            color: #ccc;
+        }
+
+        /* Panes */
+        .pane {
+            display: none;
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .pane.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Blockly */
         .blockly-container {
             flex: 1;
             position: relative;
@@ -131,6 +174,34 @@
             left: 0;
             right: 0;
             bottom: 0;
+        }
+
+        /* Python editor */
+        .python-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 12px;
+            gap: 8px;
+        }
+
+        #pythonEditor {
+            flex: 1;
+            background: #0d1117;
+            color: #e6edf3;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+            tab-size: 4;
+        }
+
+        #pythonEditor:focus {
+            border-color: #4CAF50;
         }
 
         /* Mock output panel */
@@ -225,14 +296,49 @@
                 </div>
             </div>
         </div>
-        <div class="blockly-container">
-            <div id="blocklyDiv"></div>
-            <div class="mock-panel" id="mockPanel">
-                <div class="mock-header">
-                    <span>Mock Mode - Commands Preview</span>
-                    <span class="mock-close" id="mockClose">Close</span>
+
+        <div class="tab-bar">
+            <button class="tab-btn active" id="tabBlockly">Blockly</button>
+            <button class="tab-btn" id="tabPython">Python</button>
+        </div>
+
+        <!-- Blockly pane -->
+        <div class="pane active" id="paneBlockly">
+            <div class="blockly-container">
+                <div id="blocklyDiv"></div>
+                <div class="mock-panel" id="mockPanel">
+                    <div class="mock-header">
+                        <span>Mock Mode - Commands Preview</span>
+                        <span class="mock-close" id="mockClose">Close</span>
+                    </div>
+                    <div class="mock-content" id="mockOutput"></div>
                 </div>
-                <div class="mock-content" id="mockOutput"></div>
+            </div>
+        </div>
+
+        <!-- Python editor pane -->
+        <div class="pane" id="panePython">
+            <div class="python-container">
+                <textarea id="pythonEditor" spellcheck="false"># Write Python directly — rover and time are available
+# Examples:
+#   rover.forward(60)
+#   time.sleep(1)
+#   rover.stop()
+#
+# Spin in place:
+#   rover.spinLeft(60)
+#   time.sleep(0.5)
+#   rover.stop()
+#
+# Loop:
+#   for i in range(4):
+#       rover.forward(60)
+#       time.sleep(1)
+#       rover.stop()
+#       rover.spinLeft(60)
+#       time.sleep(0.5)
+#       rover.stop()
+</textarea>
             </div>
         </div>
     </div>
@@ -298,10 +404,17 @@
             async addToQueue(instructions) {
                 this.log(`Would send ${instructions.length} instruction(s):`);
                 instructions.forEach(i => {
-                    const params = Object.entries(i.params || {})
-                        .map(([k, v]) => `${k}: ${v}`)
-                        .join(', ');
-                    this.log(`  - ${i.cmd} {${params}}`);
+                    if (i.cmd === 'run_python') {
+                        this.log(`  - run_python:`);
+                        (i.params.code || '').split('\n').forEach(line => {
+                            this.log(`      ${line}`);
+                        });
+                    } else {
+                        const params = Object.entries(i.params || {})
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join(', ');
+                        this.log(`  - ${i.cmd} {${params}}`);
+                    }
                 });
                 return {status: 'mock', added: instructions.length};
             }
@@ -544,103 +657,137 @@
         });
 
         // ============================================================
-        // Parse Blockly Workspace to Instructions
+        // Python Code Generator (from Blockly workspace)
         // ============================================================
 
-        function parseWorkspace(speed = 60) {
-            const instructions = [];
-            const topBlocks = workspace.getTopBlocks(true);
+        function generatePythonCode() {
+            const lines = [];
 
-            function parseBlock(block) {
+            function blockToLines(block, indent) {
                 if (!block) return;
-
+                const pad = '    '.repeat(indent);
                 const type = block.type;
 
                 switch (type) {
-                    case 'rover_forward':
-                        instructions.push({
-                            cmd: 'forward',
-                            params: {speed: speed, seconds: block.getFieldValue('TIME')}
-                        });
+                    case 'rover_forward': {
+                        const t = block.getFieldValue('TIME');
+                        lines.push(`${pad}rover.forward(60)`);
+                        lines.push(`${pad}time.sleep(${t})`);
+                        lines.push(`${pad}rover.stop()`);
                         break;
-
-                    case 'rover_backward':
-                        instructions.push({
-                            cmd: 'backward',
-                            params: {speed: speed, seconds: block.getFieldValue('TIME')}
-                        });
+                    }
+                    case 'rover_backward': {
+                        const t = block.getFieldValue('TIME');
+                        lines.push(`${pad}rover.reverse(60)`);
+                        lines.push(`${pad}time.sleep(${t})`);
+                        lines.push(`${pad}rover.stop()`);
                         break;
-
-                    case 'rover_spin_left':
-                        instructions.push({
-                            cmd: 'spin_left',
-                            params: {speed: speed, seconds: block.getFieldValue('TIME')}
-                        });
+                    }
+                    case 'rover_spin_left': {
+                        const t = block.getFieldValue('TIME');
+                        lines.push(`${pad}rover.stop()`);
+                        lines.push(`${pad}rover.setServo(9, 50)`);
+                        lines.push(`${pad}rover.setServo(15, -50)`);
+                        lines.push(`${pad}rover.setServo(11, -50)`);
+                        lines.push(`${pad}rover.setServo(13, 50)`);
+                        lines.push(`${pad}rover.spinLeft(60)`);
+                        lines.push(`${pad}time.sleep(${t})`);
+                        lines.push(`${pad}rover.stop()`);
                         break;
-
-                    case 'rover_spin_right':
-                        instructions.push({
-                            cmd: 'spin_right',
-                            params: {speed: speed, seconds: block.getFieldValue('TIME')}
-                        });
+                    }
+                    case 'rover_spin_right': {
+                        const t = block.getFieldValue('TIME');
+                        lines.push(`${pad}rover.stop()`);
+                        lines.push(`${pad}rover.setServo(9, 50)`);
+                        lines.push(`${pad}rover.setServo(15, -50)`);
+                        lines.push(`${pad}rover.setServo(11, -50)`);
+                        lines.push(`${pad}rover.setServo(13, 50)`);
+                        lines.push(`${pad}rover.spinRight(60)`);
+                        lines.push(`${pad}time.sleep(${t})`);
+                        lines.push(`${pad}rover.stop()`);
                         break;
-
+                    }
                     case 'rover_stop':
-                        instructions.push({
-                            cmd: 'stop',
-                            params: {}
-                        });
+                        lines.push(`${pad}rover.stop()`);
                         break;
-
-                    case 'rover_steer_left':
-                        instructions.push({
-                            cmd: 'steer_left',
-                            params: {
-                                degrees: block.getFieldValue('DEGREES'),
-                                speed: speed,
-                                seconds: block.getFieldValue('TIME')
-                            }
-                        });
+                    case 'rover_steer_left': {
+                        const d = block.getFieldValue('DEGREES');
+                        const t = block.getFieldValue('TIME');
+                        lines.push(`${pad}rover.setServo(9, ${d})`);
+                        lines.push(`${pad}rover.setServo(15, ${d})`);
+                        lines.push(`${pad}rover.setServo(11, -${d})`);
+                        lines.push(`${pad}rover.setServo(13, -${d})`);
+                        lines.push(`${pad}rover.forward(60)`);
+                        lines.push(`${pad}time.sleep(${t})`);
+                        lines.push(`${pad}rover.stop()`);
+                        lines.push(`${pad}rover.setServo(9, 0)`);
+                        lines.push(`${pad}rover.setServo(11, 0)`);
+                        lines.push(`${pad}rover.setServo(13, 0)`);
+                        lines.push(`${pad}rover.setServo(15, 0)`);
                         break;
-
-                    case 'rover_steer_right':
-                        instructions.push({
-                            cmd: 'steer_right',
-                            params: {
-                                degrees: block.getFieldValue('DEGREES'),
-                                speed: speed,
-                                seconds: block.getFieldValue('TIME')
-                            }
-                        });
+                    }
+                    case 'rover_steer_right': {
+                        const d = block.getFieldValue('DEGREES');
+                        const t = block.getFieldValue('TIME');
+                        lines.push(`${pad}rover.setServo(9, -${d})`);
+                        lines.push(`${pad}rover.setServo(15, -${d})`);
+                        lines.push(`${pad}rover.setServo(11, ${d})`);
+                        lines.push(`${pad}rover.setServo(13, ${d})`);
+                        lines.push(`${pad}rover.forward(60)`);
+                        lines.push(`${pad}time.sleep(${t})`);
+                        lines.push(`${pad}rover.stop()`);
+                        lines.push(`${pad}rover.setServo(9, 0)`);
+                        lines.push(`${pad}rover.setServo(11, 0)`);
+                        lines.push(`${pad}rover.setServo(13, 0)`);
+                        lines.push(`${pad}rover.setServo(15, 0)`);
                         break;
-
-                    case 'rover_wait':
-                        instructions.push({
-                            cmd: 'wait',
-                            params: {seconds: block.getFieldValue('TIME')}
-                        });
+                    }
+                    case 'rover_wait': {
+                        const t = block.getFieldValue('TIME');
+                        lines.push(`${pad}time.sleep(${t})`);
                         break;
-
-                    case 'rover_repeat':
+                    }
+                    case 'rover_repeat': {
                         const times = block.getFieldValue('TIMES');
-                        const doBlock = block.getInputTargetBlock('DO');
-                        for (let i = 0; i < times; i++) {
-                            let innerBlock = doBlock;
-                            while (innerBlock) {
-                                parseBlock(innerBlock);
-                                innerBlock = innerBlock.getNextBlock();
-                            }
+                        lines.push(`${pad}for _ in range(${times}):`);
+                        let inner = block.getInputTargetBlock('DO');
+                        while (inner) {
+                            blockToLines(inner, indent + 1);
+                            inner = inner.getNextBlock();
                         }
                         break;
+                    }
                 }
 
-                // Continue to next block
-                parseBlock(block.getNextBlock());
+                blockToLines(block.getNextBlock(), indent);
             }
 
-            topBlocks.forEach(block => parseBlock(block));
-            return instructions;
+            workspace.getTopBlocks(true).forEach(b => blockToLines(b, 0));
+            return lines.join('\n') + '\n';
         }
+
+        // ============================================================
+        // Tab Switching
+        // ============================================================
+
+        let activeTab = 'blockly';
+
+        document.getElementById('tabBlockly').addEventListener('click', () => {
+            activeTab = 'blockly';
+            document.getElementById('tabBlockly').classList.add('active');
+            document.getElementById('tabPython').classList.remove('active');
+            document.getElementById('paneBlockly').classList.add('active');
+            document.getElementById('panePython').classList.remove('active');
+            Blockly.svgResize(workspace);
+        });
+
+        document.getElementById('tabPython').addEventListener('click', () => {
+            activeTab = 'python';
+            document.getElementById('tabPython').classList.add('active');
+            document.getElementById('tabBlockly').classList.remove('active');
+            document.getElementById('panePython').classList.add('active');
+            document.getElementById('paneBlockly').classList.remove('active');
+        });
 
         // ============================================================
         // Service Initialization (DI based on URL param)
@@ -685,10 +832,20 @@
         }
 
         document.getElementById('runBtn').addEventListener('click', async () => {
-            const instructions = parseWorkspace();
-            if (instructions.length === 0) {
-                showToast('No blocks to run', 'error');
-                return;
+            let code;
+
+            if (activeTab === 'blockly') {
+                code = generatePythonCode();
+                if (code.trim() === '') {
+                    showToast('No blocks to run', 'error');
+                    return;
+                }
+            } else {
+                code = document.getElementById('pythonEditor').value;
+                if (code.trim() === '') {
+                    showToast('No code to run', 'error');
+                    return;
+                }
             }
 
             if (isMockMode) {
@@ -696,8 +853,8 @@
             }
 
             try {
-                const result = await roverService.addToQueue(instructions);
-                showToast(`Queued ${result.added} instructions`, 'success');
+                const result = await roverService.addToQueue([{cmd: 'run_python', params: {code}}]);
+                showToast('Sent to rover', 'success');
             } catch (e) {
                 showToast('Failed to send: ' + e.message, 'error');
             }
@@ -713,12 +870,16 @@
         });
 
         document.getElementById('clearBtn').addEventListener('click', () => {
-            workspace.clear();
+            if (activeTab === 'blockly') {
+                workspace.clear();
+                localStorage.removeItem('roverWorkspace');
+            } else {
+                document.getElementById('pythonEditor').value = '';
+            }
             if (isMockMode) {
                 roverService.clear();
             }
-            localStorage.removeItem('roverWorkspace');
-            showToast('Workspace cleared');
+            showToast('Cleared');
         });
 
         document.getElementById('mockClose').addEventListener('click', () => {
@@ -770,6 +931,18 @@
                 .then(reg => console.log('Service worker registered'))
                 .catch(err => console.warn('Service worker registration failed:', err));
         }
+
+        // Tab key in Python editor inserts spaces instead of losing focus
+        document.getElementById('pythonEditor').addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const el = e.target;
+                const start = el.selectionStart;
+                const end = el.selectionEnd;
+                el.value = el.value.substring(0, start) + '    ' + el.value.substring(end);
+                el.selectionStart = el.selectionEnd = start + 4;
+            }
+        });
     </script>
 </body>
 </html>

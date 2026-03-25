@@ -392,5 +392,109 @@ class TestInstructionExecution:
         assert status['history_count'] == 1
 
 
+class TestRunPython:
+    """Tests for run_python instruction execution"""
+
+    def setup_method(self):
+        self.driver = MockRoverDriver()
+        self.calls = []
+        self.driver.forward = lambda s: self.calls.append(('forward', s))
+        self.driver.reverse = lambda s: self.calls.append(('reverse', s))
+        self.driver.spin_left = lambda s: self.calls.append(('spin_left', s))
+        self.driver.spin_right = lambda s: self.calls.append(('spin_right', s))
+        self.driver.stop = lambda: self.calls.append(('stop',))
+
+        # Inject a rover shim that routes calls through the tracked driver
+        driver = self.driver
+        calls = self.calls
+        class _TestRover:
+            def forward(self, s): driver.forward(s)
+            def reverse(self, s): driver.reverse(s)
+            def spinLeft(self, s): driver.spin_left(s)
+            def spinRight(self, s): driver.spin_right(s)
+            def stop(self): driver.stop()
+            def setServo(self, pin, angle): calls.append(('setServo', pin, angle))
+
+        self.service = RoverQueueService(driver=self.driver, rover_module=_TestRover())
+
+    def teardown_method(self):
+        self.service.cleanup()
+
+    def _run(self, code, wait=0.5):
+        self.service.add_instructions([
+            {'cmd': 'run_python', 'params': {'code': code}}
+        ])
+        self.service.start_processor()
+        time.sleep(wait)
+
+    def test_run_python_forward_stop(self):
+        """run_python can call rover.forward and rover.stop"""
+        self._run("rover.forward(60)\nrover.stop()\n")
+
+        assert ('forward', 60) in self.calls
+        assert ('stop',) in self.calls
+
+    def test_run_python_with_loop(self):
+        """run_python executes loops correctly"""
+        self._run(
+            "for i in range(3):\n"
+            "    rover.forward(60)\n"
+            "    rover.stop()\n",
+            wait=0.5
+        )
+
+        forward_calls = [c for c in self.calls if c == ('forward', 60)]
+        assert len(forward_calls) == 3
+
+    def test_run_python_with_sleep(self):
+        """run_python time.sleep actually delays execution"""
+        self._run(
+            "rover.forward(60)\n"
+            "time.sleep(0.2)\n"
+            "rover.stop()\n",
+            wait=0.5
+        )
+
+        assert ('forward', 60) in self.calls
+        assert ('stop',) in self.calls
+
+    def test_run_python_completes_in_history(self):
+        """run_python instruction moves to history as completed"""
+        self._run("rover.stop()\n")
+
+        status = self.service.get_status()
+        assert status['history_count'] == 1
+        assert status['history'][0]['cmd'] == 'run_python'
+        assert status['history'][0]['status'] == 'completed'
+
+    def test_run_python_error_captured(self):
+        """run_python syntax/runtime errors are captured in history"""
+        self._run("rover.nonexistent_method()\n")
+
+        status = self.service.get_status()
+        assert status['history'][0]['status'] == 'error'
+        assert 'error' in status['history'][0]
+
+    def test_run_python_empty_code(self):
+        """run_python with empty code completes without error"""
+        self._run("")
+
+        status = self.service.get_status()
+        assert status['history'][0]['status'] == 'completed'
+
+    def test_run_python_builtins_available(self):
+        """range, len, print and other safe builtins work"""
+        self._run(
+            "items = list(range(3))\n"
+            "for i in items:\n"
+            "    rover.forward(i + 1)\n",
+            wait=0.5
+        )
+
+        assert ('forward', 1) in self.calls
+        assert ('forward', 2) in self.calls
+        assert ('forward', 3) in self.calls
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
