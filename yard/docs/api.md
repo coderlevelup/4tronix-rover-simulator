@@ -169,6 +169,24 @@ const ws = new WebSocket('ws://mro.local:8890');
 | `steer_right` | `degrees`, `speed`, `seconds` | Steer right while moving |
 | `stop` | (none) | Stop immediately |
 | `wait` | `seconds` | Wait without moving |
+| `run_python` | `code`, `blockly_state` (optional) | Execute a Python script on the rover |
+
+### run_python
+
+Submits a Python script for the rover to execute. Sent by both the Blockly tab and the Python tab in `/code/`.
+
+```json
+{
+  "cmd": "run_python",
+  "params": {
+    "code": "rover.forward(60)\ntime.sleep(1)\nrover.stop()\n",
+    "blockly_state": "{\"blocks\":{...}}"
+  }
+}
+```
+
+- `code` — the generated or hand-written Python to run. The rover environment has `rover` and `time` pre-imported.
+- `blockly_state` — optional. Present when submitted from the Blockly tab. Contains the serialised Blockly workspace JSON. Used by the monitor to display the original blocks instead of the generated code.
 
 ### Parameter Defaults
 

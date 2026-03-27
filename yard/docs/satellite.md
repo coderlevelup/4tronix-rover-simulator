@@ -78,13 +78,40 @@ ws.onmessage = (event) => {
 
 ## Tablet Interface (/code/)
 
+### Tabs
+
+The code interface has two tabs:
+
+| Tab | Description |
+|-----|-------------|
+| **Blockly** | Visual block editor — drag and drop rover blocks |
+| **Python** | Monaco code editor — write Python directly |
+
+Both tabs submit a `run_python` instruction when Run is pressed. Blockly submissions also include the serialised workspace state (`blockly_state`) so the monitor can display the original blocks.
+
 ### Features
 
-- Full-screen Blockly workspace
-- Run button → POST instructions to queue
+- Blockly workspace with 9 rover block types (movement, steering, control)
+- Python tab with Monaco editor (syntax highlighting, dark theme)
+- Run button → POST `run_python` instruction to queue
 - Stop button → Emergency stop
+- Clear button → Clears workspace or editor
 - PWA support (installable, works offline)
-- Workspace persistence to localStorage
+- Workspace persistence to localStorage (Blockly tab only)
+
+### Block Types
+
+| Block | Colour | Parameters |
+|-------|--------|------------|
+| Move Forward | Blue | time (seconds) |
+| Move Backward | Blue | time (seconds) |
+| Spin Left | Purple | time (seconds) |
+| Spin Right | Purple | time (seconds) |
+| Stop | Red | — |
+| Steer Left | Cyan | degrees, time |
+| Steer Right | Cyan | degrees, time |
+| Wait | Green | time (seconds) |
+| Repeat | Orange | times, inner blocks |
 
 ### Mock Mode
 
@@ -131,8 +158,28 @@ const isMock = new URL(location).searchParams.get('mock') === 'true';
 
 - Auto-connects to camera WebSocket
 - Polls queue status every 500ms
+- Only re-renders when queue data changes (no flicker)
 - Dark theme for TV display
 - No interaction required
+
+### Instruction Display
+
+Instructions in the queue panel render differently depending on their source:
+
+| Source | Display |
+|--------|---------|
+| Blockly tab | Read-only Blockly workspace preview (160px tall) |
+| Python tab | Code block with syntax-coloured text |
+
+The label also differs: **Run Blockly** vs **run python**.
+
+### Rover Badge Popover
+
+Clicking the "Connected / Disconnected" badge in the queue panel opens a popover showing:
+- **Rover URL** — the URL the satellite is proxying to
+- **Rover** — live connection status (`connected`, `disconnected`, `timeout`, `error`)
+
+Click anywhere else to dismiss.
 
 ## Dependencies
 

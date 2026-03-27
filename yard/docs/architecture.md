@@ -120,13 +120,17 @@ yard/
 ### Instruction Lifecycle
 
 ```
-1. User creates Blockly program on tablet
+1. User creates program on tablet (Blockly or Python tab)
                     │
                     ▼
-2. Click "Run" → parseWorkspace() generates instructions
+2. Click "Run"
+   Blockly tab → generatePythonCode() + serialise workspace
+                  → params: { code, blockly_state }
+   Python tab  → read Monaco editor value
+                  → params: { code }
                     │
                     ▼
-3. POST /api/queue/add (to satellite)
+3. POST /api/queue/add [{cmd: 'run_python', params}] (to satellite)
                     │
                     ▼
 4. Satellite proxies to rover POST /queue/add
@@ -139,17 +143,16 @@ yard/
                     ▼
 6. Background processor thread picks up instruction
    - Sets status to 'executing'
-   - Calls driver methods (forward, spin, etc.)
-   - Waits for duration (interruptible)
-   - Calls driver.stop()
+   - Executes Python code (rover + time available)
    - Sets status to 'completed'
    - Moves to history
                     │
                     ▼
-7. TV monitor polls /api/queue/status
-   - Shows current instruction executing
-   - Shows pending queue
-   - Shows completion history
+7. TV monitor polls /api/queue/status every 500ms
+   - Only re-renders when data changes (no flicker)
+   - Blockly-sourced instructions → read-only Blockly workspace preview
+   - Python-sourced instructions → code block
+   - Shows current / pending / history
 ```
 
 ### Emergency Stop
