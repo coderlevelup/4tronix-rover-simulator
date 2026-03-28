@@ -419,7 +419,7 @@
         Blockly.Blocks['rover_on_receive'] = {
             init: function() {
                 this.appendDummyInput()
-                    .appendField("\uD83D\uDEF0\uFE0F On receive");
+                    .appendField("\uD83D\uDEF0\uFE0F On uplink");
                 this.appendStatementInput("DO")
                     .setCheck(null);
                 this.setColour("#FF6D00");
@@ -557,7 +557,7 @@
             contents: [
                 {
                     kind: 'category',
-                    name: '\uD83D\uDEF0\uFE0F Events',
+                    name: '\uD83D\uDEF0\uFE0F Uplink',
                     colour: '#FF6D00',
                     contents: [
                         {kind: 'block', type: 'rover_on_receive'}
@@ -867,6 +867,10 @@
             if (activeTab === 'blockly') {
                 workspace.clear();
                 localStorage.removeItem('roverWorkspace');
+                const block = workspace.newBlock('rover_on_receive');
+                block.initSvg();
+                block.render();
+                block.moveBy(40, 40);
             } else {
                 pythonEditor.setValue('');
             }
@@ -902,7 +906,7 @@
                     console.warn('Failed to load workspace:', e);
                 }
             }
-            // No saved state — start with an On receive block
+            // No saved state — start with an On uplink block
             const block = workspace.newBlock('rover_on_receive');
             block.initSvg();
             block.render();
