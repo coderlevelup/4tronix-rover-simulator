@@ -167,4 +167,4 @@ if __name__ == '__main__':
     print("Routes:")
     print("  /code/    - Tablet Blockly interface")
     print("  /monitor/ - TV display interface")
-    app.run(host='0.0.0.0', port=5050, debug=True)
+    app.run(host='0.0.0.0', port=5050, threaded=True, use_reloader=False)
