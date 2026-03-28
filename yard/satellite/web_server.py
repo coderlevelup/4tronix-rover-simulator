@@ -13,12 +13,20 @@ from flask import Flask, render_template, request, jsonify, Response, stream_wit
 
 
 def _local_ip():
+    # UDP connect never sends a packet — OS just picks the right source
+    # interface from the routing table. Try private ranges then fall back.
+    for dest in ('10.255.255.255', '192.168.255.255', '172.16.255.255'):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect((dest, 1))
+            ip = s.getsockname()[0]
+            s.close()
+            if not ip.startswith('127.'):
+                return ip
+        except Exception:
+            pass
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
+        return socket.gethostbyname(socket.gethostname())
     except Exception:
         return 'unknown'
 
