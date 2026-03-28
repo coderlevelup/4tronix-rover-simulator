@@ -164,19 +164,19 @@ class RealRoverDriver(RoverDriver):
     def steer_left(self, degrees: float, speed: int) -> None:
         self._set_leds_forward()
         # Set servo angles for left steering
-        self.rover.setServo(9, degrees)    # Front left
-        self.rover.setServo(15, degrees)   # Front right
-        self.rover.setServo(11, -degrees)  # Rear left
-        self.rover.setServo(13, -degrees)  # Rear right
+        self.rover.setServo(9, -degrees)   # Front left
+        self.rover.setServo(15, -degrees)  # Front right
+        self.rover.setServo(11, degrees)   # Rear left
+        self.rover.setServo(13, degrees)   # Rear right
         self.rover.forward(speed)
 
     def steer_right(self, degrees: float, speed: int) -> None:
         self._set_leds_forward()
         # Set servo angles for right steering
-        self.rover.setServo(9, -degrees)   # Front left
-        self.rover.setServo(15, -degrees)  # Front right
-        self.rover.setServo(11, degrees)   # Rear left
-        self.rover.setServo(13, degrees)   # Rear right
+        self.rover.setServo(9, degrees)    # Front left
+        self.rover.setServo(15, degrees)   # Front right
+        self.rover.setServo(11, -degrees)  # Rear left
+        self.rover.setServo(13, -degrees)  # Rear right
         self.rover.forward(speed)
 
     def stop(self) -> None:

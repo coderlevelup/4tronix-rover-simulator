@@ -307,7 +307,10 @@ class RoverQueueService(RoverQueuePort):
                     'enumerate': enumerate, 'zip': zip, 'abs': abs,
                     'min': min, 'max': max, 'round': round,
                 }
-                exec(code, {'rover': rover_module, 'time': time_module, '__builtins__': safe_builtins})
+                service_ref = self
+                class _interruptible_time:
+                    sleep = staticmethod(lambda s: service_ref._interruptible_wait(s))
+                exec(code, {'rover': rover_module, 'time': _interruptible_time, '__builtins__': safe_builtins})
 
             instruction['status'] = 'completed'
             self._notify_subscribers()

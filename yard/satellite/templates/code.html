@@ -416,6 +416,17 @@
         // Blockly Block Definitions
         // ============================================================
 
+        Blockly.Blocks['rover_on_receive'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("\uD83D\uDEF0\uFE0F On receive");
+                this.appendStatementInput("DO")
+                    .setCheck(null);
+                this.setColour("#FF6D00");
+                this.setTooltip("Blocks inside run when sent to the rover");
+            }
+        };
+
         Blockly.Blocks['rover_forward'] = {
             init: function() {
                 this.appendDummyInput()
@@ -546,23 +557,24 @@
             contents: [
                 {
                     kind: 'category',
+                    name: '\uD83D\uDEF0\uFE0F Events',
+                    colour: '#FF6D00',
+                    contents: [
+                        {kind: 'block', type: 'rover_on_receive'}
+                    ]
+                },
+                {
+                    kind: 'category',
                     name: 'Movement',
                     colour: '#2196F3',
                     contents: [
                         {kind: 'block', type: 'rover_forward'},
                         {kind: 'block', type: 'rover_backward'},
+                        {kind: 'block', type: 'rover_steer_left'},
+                        {kind: 'block', type: 'rover_steer_right'},
                         {kind: 'block', type: 'rover_spin_left'},
                         {kind: 'block', type: 'rover_spin_right'},
                         {kind: 'block', type: 'rover_stop'}
-                    ]
-                },
-                {
-                    kind: 'category',
-                    name: 'Steering',
-                    colour: '#00BCD4',
-                    contents: [
-                        {kind: 'block', type: 'rover_steer_left'},
-                        {kind: 'block', type: 'rover_steer_right'}
                     ]
                 },
                 {
@@ -634,8 +646,20 @@
                 const type = block.type;
 
                 switch (type) {
+                    case 'rover_on_receive': {
+                        let inner = block.getInputTargetBlock('DO');
+                        while (inner) {
+                            blockToLines(inner, indent);
+                            inner = inner.getNextBlock();
+                        }
+                        return;  // hat block — no next block to follow
+                    }
                     case 'rover_forward': {
                         const t = block.getFieldValue('TIME');
+                        lines.push(`${pad}rover.setServo(9, 0)`);
+                        lines.push(`${pad}rover.setServo(11, 0)`);
+                        lines.push(`${pad}rover.setServo(13, 0)`);
+                        lines.push(`${pad}rover.setServo(15, 0)`);
                         lines.push(`${pad}rover.forward(60)`);
                         lines.push(`${pad}time.sleep(${t})`);
                         lines.push(`${pad}rover.stop()`);
@@ -643,6 +667,10 @@
                     }
                     case 'rover_backward': {
                         const t = block.getFieldValue('TIME');
+                        lines.push(`${pad}rover.setServo(9, 0)`);
+                        lines.push(`${pad}rover.setServo(11, 0)`);
+                        lines.push(`${pad}rover.setServo(13, 0)`);
+                        lines.push(`${pad}rover.setServo(15, 0)`);
                         lines.push(`${pad}rover.reverse(60)`);
                         lines.push(`${pad}time.sleep(${t})`);
                         lines.push(`${pad}rover.stop()`);
@@ -678,10 +706,10 @@
                     case 'rover_steer_left': {
                         const d = block.getFieldValue('DEGREES');
                         const t = block.getFieldValue('TIME');
-                        lines.push(`${pad}rover.setServo(9, ${d})`);
-                        lines.push(`${pad}rover.setServo(15, ${d})`);
-                        lines.push(`${pad}rover.setServo(11, -${d})`);
-                        lines.push(`${pad}rover.setServo(13, -${d})`);
+                        lines.push(`${pad}rover.setServo(9, -${d})`);
+                        lines.push(`${pad}rover.setServo(15, -${d})`);
+                        lines.push(`${pad}rover.setServo(11, ${d})`);
+                        lines.push(`${pad}rover.setServo(13, ${d})`);
                         lines.push(`${pad}rover.forward(60)`);
                         lines.push(`${pad}time.sleep(${t})`);
                         lines.push(`${pad}rover.stop()`);
@@ -694,10 +722,10 @@
                     case 'rover_steer_right': {
                         const d = block.getFieldValue('DEGREES');
                         const t = block.getFieldValue('TIME');
-                        lines.push(`${pad}rover.setServo(9, -${d})`);
-                        lines.push(`${pad}rover.setServo(15, -${d})`);
-                        lines.push(`${pad}rover.setServo(11, ${d})`);
-                        lines.push(`${pad}rover.setServo(13, ${d})`);
+                        lines.push(`${pad}rover.setServo(9, ${d})`);
+                        lines.push(`${pad}rover.setServo(15, ${d})`);
+                        lines.push(`${pad}rover.setServo(11, -${d})`);
+                        lines.push(`${pad}rover.setServo(13, -${d})`);
                         lines.push(`${pad}rover.forward(60)`);
                         lines.push(`${pad}time.sleep(${t})`);
                         lines.push(`${pad}rover.stop()`);

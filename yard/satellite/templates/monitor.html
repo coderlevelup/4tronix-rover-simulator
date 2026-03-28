@@ -414,6 +414,16 @@
         // Blockly Block Definitions (shape/colour only — no generators needed)
         // ============================================================
 
+        Blockly.Blocks['rover_on_receive'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("\uD83D\uDEF0\uFE0F On receive");
+                this.appendStatementInput("DO")
+                    .setCheck(null);
+                this.setColour("#FF6D00");
+            }
+        };
+
         Blockly.Blocks['rover_forward'] = {
             init: function() {
                 this.appendDummyInput()

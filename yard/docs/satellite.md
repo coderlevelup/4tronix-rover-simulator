@@ -22,6 +22,80 @@ python camera_server.py
 python web_server.py
 ```
 
+## Updating the Satellite (Manual Steps)
+
+Use these steps if you can't SSH to the satellite and need to update the code by hand (e.g. the Pi is on a different network, or SSH is unavailable).
+
+### What you need
+- A laptop on the same WiFi network as the satellite (`marsyard` or `mars-relay-network`)
+- USB keyboard + HDMI monitor, **or** physical access to connect one
+
+### Option A — SSH from a laptop on the same network
+
+```bash
+ssh mars@mro.local
+cd /home/mars/4tronix-rover-simulator
+git pull
+# Then restart services (see below)
+```
+
+If `mro.local` doesn't resolve, find the IP first:
+```bash
+# From another Pi or Mac on the same network:
+ping mro.local
+# or
+arp -a | grep -i raspberry
+```
+
+Then SSH by IP: `ssh mars@<ip-address>`
+
+### Option B — USB keyboard + screen directly on the Pi
+
+1. Plug in keyboard and HDMI monitor
+2. Log in: user `mars`, password `R0v3r!`
+3. Open a terminal (right-click desktop → Terminal, or it may boot to terminal)
+
+```bash
+cd /home/mars/4tronix-rover-simulator
+git pull
+```
+
+### Restarting services after update
+
+**If running under systemd** (auto-start on boot):
+```bash
+sudo systemctl restart satellite-web
+sudo systemctl restart satellite-camera   # if camera service exists
+sudo systemctl status satellite-web       # check it started ok
+```
+
+**If running manually in a terminal** (started by hand):
+```bash
+# Kill the old processes
+pkill -f web_server.py
+pkill -f camera_server.py
+
+# Start again
+cd /home/mars/4tronix-rover-simulator/yard/satellite
+python web_server.py &
+python camera_server.py &
+```
+
+**If you're not sure how it's running:**
+```bash
+ps aux | grep -E 'web_server|camera_server' | grep -v grep
+```
+
+If you see the process listed with a systemd service path, use `systemctl restart`. If it shows a manual terminal session, kill and restart manually.
+
+### Verify it worked
+
+```bash
+curl http://localhost:5050/api/health
+```
+
+Should return JSON with `"status": "ok"`. If the rover is also running you'll see `"rover_status": "connected"`.
+
 ## Web Server (port 5050)
 
 ### Routes
