@@ -41,7 +41,10 @@ All `/api/*` requests are proxied to the rover server:
 | `POST /api/queue/add` | `POST /queue/add` |
 | `POST /api/queue/clear` | `POST /queue/clear` |
 | `GET /api/queue/status` | `GET /queue/status` |
+| `GET /api/queue/events` | `GET /queue/events` (SSE stream proxy) |
 | `GET /api/health` | Local + rover health |
+
+`/api/queue/events` is a persistent streaming response. The satellite opens one `requests.get(..., stream=True, timeout=None)` connection to the rover and forwards raw bytes to the browser. It does not parse or buffer SSE events.
 
 ### Configuration
 
@@ -157,8 +160,9 @@ const isMock = new URL(location).searchParams.get('mock') === 'true';
 ### Features
 
 - Auto-connects to camera WebSocket
-- Polls queue status every 500ms
+- Receives queue updates via SSE push (no polling)
 - Only re-renders when queue data changes (no flicker)
+- ↻ refresh button for a one-off manual fetch
 - Dark theme for TV display
 - No interaction required
 

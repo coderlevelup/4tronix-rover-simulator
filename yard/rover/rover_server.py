@@ -5,7 +5,8 @@ This is a thin adapter that translates HTTP requests to service calls.
 All business logic is in the RoverQueueService.
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response, stream_with_context
+import queue as queue_module
 
 from drivers import create_driver
 from service import RoverQueueService
@@ -59,6 +60,29 @@ def queue_status():
     """Get current queue status"""
     result = service.get_status()
     return jsonify(result)
+
+
+@app.route('/queue/events', methods=['GET'])
+def queue_events():
+    """SSE endpoint — streams queue state changes to subscribers"""
+    def generate():
+        import json
+        q = service.subscribe()
+        try:
+            yield f"data: {json.dumps(service.get_status())}\n\n"
+            while True:
+                try:
+                    yield f"data: {q.get(timeout=30)}\n\n"
+                except queue_module.Empty:
+                    yield ": heartbeat\n\n"
+        finally:
+            service.unsubscribe(q)
+
+    return Response(
+        stream_with_context(generate()),
+        content_type='text/event-stream',
+        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+    )
 
 
 @app.route('/health', methods=['GET'])

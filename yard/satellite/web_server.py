@@ -8,7 +8,7 @@ Proxies API calls to rover server.
 
 import os
 import requests
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 
 app = Flask(__name__)
 
@@ -88,6 +88,33 @@ def api_queue_status():
         return jsonify({'error': 'Rover server timeout'}), 504
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/queue/events', methods=['GET'])
+def api_queue_events():
+    """SSE proxy — forwards rover event stream to browser"""
+    try:
+        rover_resp = requests.get(
+            f'{ROVER_URL}/queue/events',
+            stream=True,
+            timeout=None
+        )
+    except requests.exceptions.ConnectionError:
+        return Response('Rover unreachable', status=503)
+
+    def generate():
+        try:
+            for chunk in rover_resp.iter_content(chunk_size=None):
+                if chunk:
+                    yield chunk
+        finally:
+            rover_resp.close()
+
+    return Response(
+        stream_with_context(generate()),
+        content_type='text/event-stream',
+        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+    )
 
 
 @app.route('/api/health', methods=['GET'])

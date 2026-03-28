@@ -9,6 +9,7 @@ This module implements the Ports & Adapters (Hexagonal) pattern:
 import time
 import uuid
 import threading
+import queue as queue_module
 from abc import ABC, abstractmethod
 from collections import deque
 from datetime import datetime, timezone
@@ -99,6 +100,10 @@ class RoverQueueService(RoverQueuePort):
         self._processor_running = False
         self._processor_thread: Optional[threading.Thread] = None
 
+        # SSE subscribers
+        self._subscribers = []
+        self._subscribers_lock = threading.Lock()
+
     def start_processor(self) -> None:
         """Start the background queue processor thread"""
         if self._processor_running:
@@ -116,6 +121,26 @@ class RoverQueueService(RoverQueuePort):
             self._processor_thread.join(timeout=1.0)
             self._processor_thread = None
         self._stop_requested.clear()
+
+    def subscribe(self):
+        q = queue_module.Queue()
+        with self._subscribers_lock:
+            self._subscribers.append(q)
+        return q
+
+    def unsubscribe(self, q):
+        with self._subscribers_lock:
+            try:
+                self._subscribers.remove(q)
+            except ValueError:
+                pass
+
+    def _notify_subscribers(self):
+        import json
+        payload = json.dumps(self.get_status())
+        with self._subscribers_lock:
+            for q in self._subscribers:
+                q.put_nowait(payload)
 
     def add_instructions(self, instructions: list) -> dict:
         """Add instruction(s) to the queue"""
@@ -139,6 +164,7 @@ class RoverQueueService(RoverQueuePort):
                 self._queue.append(instruction)
                 added.append(instruction)
 
+        self._notify_subscribers()
         return {
             'status': 'ok',
             'added': len(added),
@@ -162,6 +188,7 @@ class RoverQueueService(RoverQueuePort):
         time.sleep(0.1)
         self._stop_requested.clear()
 
+        self._notify_subscribers()
         return {
             'status': 'ok',
             'cleared': cleared_count,
@@ -214,6 +241,7 @@ class RoverQueueService(RoverQueuePort):
 
         instruction['status'] = 'executing'
         self._current = instruction
+        self._notify_subscribers()
 
         try:
             if cmd == 'forward':
@@ -282,11 +310,13 @@ class RoverQueueService(RoverQueuePort):
                 exec(code, {'rover': rover_module, 'time': time_module, '__builtins__': safe_builtins})
 
             instruction['status'] = 'completed'
+            self._notify_subscribers()
 
         except Exception as e:
             instruction['status'] = 'error'
             instruction['error'] = str(e)
             self.driver.stop()
+            self._notify_subscribers()
 
         # Add to history
         with self._queue_lock:

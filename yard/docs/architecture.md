@@ -45,6 +45,8 @@ The rover server follows the Ports & Adapters (Hexagonal) pattern for testabilit
 │  │       → service.clear_queue()                        │   │
 │  │  @app.route('/queue/status')                         │   │
 │  │       → service.get_status()                         │   │
+│  │  @app.route('/queue/events')  ← SSE stream           │   │
+│  │       → service.subscribe() / get_status()           │   │
 │  └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -63,6 +65,7 @@ The rover server follows the Ports & Adapters (Hexagonal) pattern for testabilit
 │  │    - Background processor thread                     │   │
 │  │    - Instruction execution                           │   │
 │  │    - Interruptible waits for emergency stop          │   │
+│  │    - SSE subscriber fan-out (_subscribers list)      │   │
 │  └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -148,12 +151,50 @@ yard/
    - Moves to history
                     │
                     ▼
-7. TV monitor polls /api/queue/status every 500ms
+7. TV monitor receives queue updates via SSE push
+   - EventSource('/api/queue/events') holds one persistent connection
+   - Rover pushes a state snapshot whenever something changes
    - Only re-renders when data changes (no flicker)
    - Blockly-sourced instructions → read-only Blockly workspace preview
    - Python-sourced instructions → code block
    - Shows current / pending / history
+   - ↻ refresh button triggers a one-off GET /api/queue/status fetch
 ```
+
+### SSE Push Architecture
+
+The monitor receives queue state via Server-Sent Events rather than polling. Each layer holds one persistent HTTP connection to the layer below it — nothing polls.
+
+```
+Browser                  Satellite (Flask :5050)       Rover (Flask :8523)
+   │                              │                              │
+   │  GET /api/queue/events       │                              │
+   │─────────────────────────────▶│                              │
+   │                              │  GET /queue/events           │
+   │                              │─────────────────────────────▶│
+   │                              │                              │ subscribe()
+   │                              │                              │ → Queue() added
+   │◀ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│◀ ─  200 streaming  ─ ─ ─ ─ ─│
+   │   (both responses stay open) │                              │
+```
+
+**Rover subscriber fan-out** — `service.subscribe()` creates a `queue.Queue` and adds it to `_subscribers`. The SSE generator blocks on `q.get(timeout=30)`. When state changes, `_notify_subscribers()` serialises `get_status()` and calls `q.put_nowait()` on every subscriber, unblocking each waiting generator.
+
+`_notify_subscribers()` is called at four points in the service:
+- `add_instructions()` — after appending to the queue
+- `clear_queue()` — after clearing
+- `_execute_instruction()` — after setting status to `'executing'`
+- `_execute_instruction()` — after setting status to `'completed'` or `'error'`
+
+**Satellite proxy** — uses `requests.get(..., stream=True, timeout=None)` and `iter_content(chunk_size=None)`. It is a byte pipe: it does not parse or buffer SSE events, just forwards raw bytes as they arrive.
+
+**Heartbeat** — the rover generator catches `queue.Empty` after 30s and yields `: heartbeat\n\n`. This keeps proxies and load balancers from closing an idle connection. Browsers ignore SSE comment lines.
+
+**Reconnection** — `EventSource` handles reconnection automatically. `onerror` fires on disconnect (badge goes grey); `onopen` fires when the connection is re-established (badge goes green). No manual reconnect logic is needed in the browser.
+
+**On rover offline** — the satellite's `requests.get` raises `ConnectionError`, which returns HTTP 503. The browser's `EventSource` retries every 3s until the rover comes back.
+
+**Cleanup** — when a browser tab closes, the satellite generator receives `GeneratorExit` in its `finally:` block and calls `rover_resp.close()`. The rover detects the broken pipe and `service.unsubscribe(q)` removes the queue from `_subscribers`.
 
 ### Emergency Stop
 

@@ -329,6 +329,22 @@
             margin-top: 6px;
             background: #1a1a2e;
         }
+
+        .refresh-btn {
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 6px;
+            line-height: 1;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: #aaa;
+        }
     </style>
 </head>
 <body>
@@ -352,9 +368,12 @@
         <div class="queue-panel">
             <div class="queue-header">
                 <h2>Instruction Queue</h2>
-                <div class="rover-badge" id="roverBadge">
-                    <span class="rover-dot" id="roverDot"></span>
-                    <span id="roverStatus">Disconnected</span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <button class="refresh-btn" id="refreshBtn" title="Refresh queue">&#8635;</button>
+                    <div class="rover-badge" id="roverBadge">
+                        <span class="rover-dot" id="roverDot"></span>
+                        <span id="roverStatus">Disconnected</span>
+                    </div>
                 </div>
             </div>
             <div class="rover-popover" id="roverPopover">
@@ -620,20 +639,12 @@
                 this.lastDataJson = null;
             }
 
-            start(interval = 500) {
-                this.poll();
-                setInterval(() => this.poll(), interval);
-            }
-
-            async poll() {
+            async refresh() {
                 try {
                     const resp = await fetch('/api/queue/status');
                     if (!resp.ok) throw new Error('HTTP ' + resp.status);
-
                     const data = await resp.json();
                     this.updateUI(data);
-                    this.updateStatus('connected', 'Connected');
-
                 } catch (e) {
                     this.updateStatus('disconnected', 'Disconnected');
                 }
@@ -758,9 +769,26 @@
         const camera = new CameraClient('cameraCanvas');
         camera.connect();
 
-        // Start queue poller
+        // Queue — SSE push with manual refresh fallback
         const queue = new QueuePoller();
-        queue.start(500);
+
+        queue.refresh();  // full fetch on load
+
+        const eventSource = new EventSource('/api/queue/events');
+
+        eventSource.onopen = () => queue.updateStatus('connected', 'Connected');
+
+        eventSource.onmessage = (event) => {
+            try {
+                queue.updateUI(JSON.parse(event.data));
+            } catch (e) {
+                console.error('SSE parse error:', e);
+            }
+        };
+
+        eventSource.onerror = () => queue.updateStatus('disconnected', 'Disconnected');
+
+        document.getElementById('refreshBtn').addEventListener('click', () => queue.refresh());
 
         // Rover badge popover
         const roverBadge = document.getElementById('roverBadge');
