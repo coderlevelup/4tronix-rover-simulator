@@ -33,7 +33,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 8px 16px;
+            padding: 16px 24px;
             background: #16213e;
             border-bottom: 1px solid #0f3460;
         }
@@ -41,23 +41,23 @@
         .toolbar-left {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 20px;
         }
 
         .toolbar-right {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 16px;
         }
 
         .btn {
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 12px 20px;
+            padding: 24px 44px;
             border: none;
-            border-radius: 8px;
-            font-size: 16px;
+            border-radius: 14px;
+            font-size: 32px;
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.1s, opacity 0.2s;
@@ -97,17 +97,17 @@
         .status-indicator {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            border-radius: 16px;
-            font-size: 12px;
+            gap: 12px;
+            padding: 12px 22px;
+            border-radius: 28px;
+            font-size: 22px;
             color: #aaa;
             background: rgba(255,255,255,0.1);
         }
 
         .status-dot {
-            width: 8px;
-            height: 8px;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
             background: #666;
         }
@@ -128,14 +128,14 @@
         }
 
         .tab-btn {
-            padding: 8px 24px;
+            padding: 18px 48px;
             border: none;
             background: transparent;
             color: #888;
-            font-size: 14px;
+            font-size: 26px;
             font-weight: 600;
             cursor: pointer;
-            border-bottom: 2px solid transparent;
+            border-bottom: 4px solid transparent;
             margin-bottom: -2px;
             transition: color 0.2s;
         }
@@ -237,14 +237,14 @@
         /* Toast notifications */
         .toast {
             position: fixed;
-            bottom: 20px;
+            bottom: 32px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 12px 24px;
+            padding: 20px 44px;
             background: #333;
             color: #fff;
-            border-radius: 8px;
-            font-size: 14px;
+            border-radius: 14px;
+            font-size: 26px;
             z-index: 1000;
             opacity: 0;
             transition: opacity 0.3s;
@@ -598,10 +598,10 @@
             zoom: {
                 controls: true,
                 wheel: true,
-                startScale: 1.0,
-                maxScale: 2,
+                startScale: 1.5,
+                maxScale: 3,
                 minScale: 0.5,
-                scaleSpeed: 1.1
+                scaleSpeed: 1.2
             },
             trashcan: true,
             move: {
