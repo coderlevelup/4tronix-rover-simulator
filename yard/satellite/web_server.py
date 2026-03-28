@@ -7,8 +7,20 @@ Proxies API calls to rover server.
 """
 
 import os
+import socket
 import requests
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context
+
+
+def _local_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return 'unknown'
 
 app = Flask(__name__)
 
@@ -34,7 +46,9 @@ def code():
 @app.route('/monitor/')
 def monitor():
     """TV display interface"""
-    return render_template('monitor.html')
+    return render_template('monitor.html',
+                           server_hostname=socket.gethostname(),
+                           server_ip=_local_ip())
 
 
 @app.route('/api/queue/add', methods=['POST'])
