@@ -647,11 +647,7 @@
 
                 switch (type) {
                     case 'rover_on_receive': {
-                        let inner = block.getInputTargetBlock('DO');
-                        while (inner) {
-                            blockToLines(inner, indent);
-                            inner = inner.getNextBlock();
-                        }
+                        blockToLines(block.getInputTargetBlock('DO'), indent);
                         return;  // hat block — no next block to follow
                     }
                     case 'rover_forward': {
@@ -755,7 +751,9 @@
                 blockToLines(block.getNextBlock(), indent);
             }
 
-            workspace.getTopBlocks(true).forEach(b => blockToLines(b, 0));
+            workspace.getTopBlocks(true)
+                .filter(b => b.type === 'rover_on_receive')
+                .forEach(b => blockToLines(b, 0));
             return lines.join('\n') + '\n';
         }
 
@@ -899,10 +897,16 @@
                 try {
                     const state = JSON.parse(saved);
                     Blockly.serialization.workspaces.load(state, workspace);
+                    return;
                 } catch (e) {
                     console.warn('Failed to load workspace:', e);
                 }
             }
+            // No saved state — start with an On receive block
+            const block = workspace.newBlock('rover_on_receive');
+            block.initSvg();
+            block.render();
+            block.moveBy(40, 40);
         }
 
         // Save on change (debounced)
