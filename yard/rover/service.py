@@ -313,19 +313,19 @@ class RoverQueueService(RoverQueuePort):
                 exec(code, {'rover': rover_module, 'time': _interruptible_time, '__builtins__': safe_builtins})
 
             instruction['status'] = 'completed'
-            self._notify_subscribers()
 
         except Exception as e:
             instruction['status'] = 'error'
             instruction['error'] = str(e)
             self.driver.stop()
-            self._notify_subscribers()
 
-        # Add to history
+        # Add to history and clear current before notifying so subscribers
+        # see consistent state (current=None, instruction already in history)
         with self._queue_lock:
             self._history.append(instruction)
 
         self._current = None
+        self._notify_subscribers()
 
     def _interruptible_wait(self, seconds: float) -> bool:
         """Wait for specified time, but return early if stop requested.

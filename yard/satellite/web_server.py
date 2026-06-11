@@ -11,6 +11,8 @@ import socket
 import requests
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 
+CAMERA_PORT = int(os.environ.get('CAMERA_PORT', 8890))
+
 
 def _local_ip():
     # UDP connect never sends a packet — OS just picks the right source
@@ -39,10 +41,55 @@ ROVER_URL = os.environ.get('ROVER_URL', 'http://marspi.local:8523')
 ROVER_TIMEOUT = 5.0
 
 
+def _check_camera():
+    """Try TCP connect to localhost:CAMERA_PORT. Returns True if up."""
+    try:
+        s = socket.create_connection(('127.0.0.1', CAMERA_PORT), timeout=1.0)
+        s.close()
+        return True
+    except Exception:
+        return False
+
+
 @app.route('/')
 def index():
     """Redirect to code interface"""
-    return '<a href="/code/">Go to Code Interface</a> | <a href="/monitor/">Go to Monitor</a>'
+    return '<a href="/code/">Go to Code Interface</a> | <a href="/monitor/">Go to Monitor</a> | <a href="/status">System Status</a>'
+
+
+@app.route('/status')
+def status():
+    return render_template('status.html', rover_url=ROVER_URL)
+
+
+@app.route('/api/status', methods=['GET'])
+def api_status():
+    satellite = {
+        'hostname': socket.gethostname(),
+        'ip': _local_ip(),
+    }
+
+    rover = {'reachable': False, 'driver': None, 'queue_size': None, 'url': ROVER_URL}
+    try:
+        resp = requests.get(f'{ROVER_URL}/health', timeout=2.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            rover['reachable'] = True
+            rover['driver'] = data.get('driver')
+            rover['queue_size'] = data.get('queue_size')
+    except Exception:
+        pass
+
+    camera = {
+        'reachable': _check_camera(),
+        'port': CAMERA_PORT,
+    }
+
+    return jsonify({
+        'satellite': satellite,
+        'rover': rover,
+        'camera': camera,
+    })
 
 
 @app.route('/code/')
