@@ -111,10 +111,15 @@ yard/
 │   │   ├── manifest.json    # PWA manifest
 │   │   └── service-worker.js
 │   └── requirements.txt
+├── deploy/
+│   ├── rover-server.service       # systemd unit for the rover Pi
+│   ├── satellite-web.service      # systemd units for the satellite Pi
+│   └── satellite-camera.service
 ├── docs/
 │   ├── architecture.md      # This file
 │   ├── api.md               # API reference
 │   └── testing.md           # Testing guide
+├── MANUAL.md                # Operations, quick fixes, install, debugging
 └── README.md
 ```
 
@@ -186,7 +191,7 @@ Browser                  Satellite (Flask :5050)       Rover (Flask :8523)
 - `_execute_instruction()` — after setting status to `'executing'`
 - `_execute_instruction()` — after setting status to `'completed'` or `'error'`
 
-**Satellite proxy** — uses `requests.get(..., stream=True, timeout=None)` and `iter_content(chunk_size=None)`. It is a byte pipe: it does not parse or buffer SSE events, just forwards raw bytes as they arrive.
+**Satellite proxy** — uses `requests.get(..., stream=True, timeout=(3.05, 45))` and `iter_content(chunk_size=None)`. It is a byte pipe: it does not parse or buffer SSE events, just forwards raw bytes as they arrive. The 45s read timeout is the zombie-detector: the rover heartbeats every 30s, so silence past 45s means the rover died without closing the socket — the proxy ends the response and the browser reconnects.
 
 **Heartbeat** — the rover generator catches `queue.Empty` after 30s and yields `: heartbeat\n\n`. This keeps proxies and load balancers from closing an idle connection. Browsers ignore SSE comment lines.
 

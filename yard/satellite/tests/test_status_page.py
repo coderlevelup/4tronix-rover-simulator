@@ -50,7 +50,8 @@ def test_satellite_always_green(page: Page, live_server):
 
 def test_rover_green(page: Page, live_server):
     mock_status(page, rover={
-        'reachable': True, 'driver': 'RealRoverDriver', 'queue_size': 0, 'url': 'http://x'
+        'reachable': True, 'driver': 'RealRoverDriver', 'queue_size': 0, 'url': 'http://x',
+        'status': 'ok', 'processor_alive': True
     })
     page.goto(f'{live_server}/status')
     wait_for_badge(page, 'rover')
@@ -60,12 +61,24 @@ def test_rover_green(page: Page, live_server):
 
 def test_rover_amber_mock_driver(page: Page, live_server):
     mock_status(page, rover={
-        'reachable': True, 'driver': 'MockRoverDriver', 'queue_size': 0, 'url': 'http://x'
+        'reachable': True, 'driver': 'MockRoverDriver', 'queue_size': 0, 'url': 'http://x',
+        'status': 'ok', 'processor_alive': True
     })
     page.goto(f'{live_server}/status')
     wait_for_badge(page, 'rover')
     assert 'amber' in page.locator('#badge-rover').get_attribute('class')
     assert 'Mock' in page.locator('#label-rover').text_content()
+
+
+def test_rover_red_processor_stalled(page: Page, live_server):
+    mock_status(page, rover={
+        'reachable': True, 'driver': 'RealRoverDriver', 'queue_size': 3, 'url': 'http://x',
+        'status': 'degraded', 'processor_alive': False
+    })
+    page.goto(f'{live_server}/status')
+    wait_for_badge(page, 'rover')
+    assert 'red' in page.locator('#badge-rover').get_attribute('class')
+    assert page.locator('#label-rover').text_content() == 'Processor stalled'
 
 
 def test_rover_red_unreachable(page: Page, live_server):

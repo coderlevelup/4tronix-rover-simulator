@@ -185,6 +185,14 @@
                     if (!r.reachable) {
                         setBadge('rover', { colour: 'red', icon: '✗', text: 'Unreachable' });
                         setDetail('rover', row('URL', r.url));
+                    } else if (r.status && r.status !== 'ok') {
+                        // Reachable but the queue processor thread is dead:
+                        // commands would be accepted yet never executed
+                        setBadge('rover', { colour: 'red', icon: '✗', text: 'Processor stalled' });
+                        setDetail('rover',
+                            row('Driver', r.driver) +
+                            row('Queue', r.queue_size)
+                        );
                     } else {
                         const isMock = r.driver && r.driver.toLowerCase().includes('mock');
                         if (isMock) {

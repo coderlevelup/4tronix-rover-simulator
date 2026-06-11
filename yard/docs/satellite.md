@@ -11,6 +11,52 @@ The satellite (mro.local) hosts the web interfaces and camera stream, acting as 
 
 ## Setup
 
+### Install as systemd services (recommended)
+
+Both services should run under systemd so they start on boot and restart
+automatically after a crash (the camera unit retries every 10s forever, so an
+unplugged camera recovers as soon as it's reconnected).
+
+First check what's already on the Pi — an existing venv or manually started
+processes:
+
+```bash
+ps aux | grep -E 'web_server|camera_server' | grep -v grep
+ls -d /home/mars/*env* 2>/dev/null
+```
+
+Create the venv if it doesn't exist (`--system-site-packages` is required —
+`picamera2` comes from apt, not pip):
+
+```bash
+sudo apt install -y python3-picamera2
+python3 -m venv --system-site-packages /home/mars/satellite-env
+/home/mars/satellite-env/bin/pip install -r /home/mars/4tronix-rover-simulator/yard/satellite/requirements.txt
+```
+
+Install and enable the units (from the repo's `yard/deploy/` directory):
+
+```bash
+cd /home/mars/4tronix-rover-simulator
+sudo cp yard/deploy/satellite-web.service yard/deploy/satellite-camera.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now satellite-web satellite-camera
+```
+
+Check the rover hostname in `satellite-web.service` (`Environment=ROVER_URL=...`)
+matches the rover actually deployed — `marspi.local` (old card) or
+`curiosity.local` (Bookworm). Edit `/etc/systemd/system/satellite-web.service`
+and `sudo systemctl daemon-reload && sudo systemctl restart satellite-web` if not.
+
+Watch logs:
+
+```bash
+journalctl -u satellite-web -f
+journalctl -u satellite-camera -f
+```
+
+### Running manually (development)
+
 ```bash
 cd yard/satellite
 pip install -r requirements.txt
@@ -64,8 +110,7 @@ git pull
 
 **If running under systemd** (auto-start on boot):
 ```bash
-sudo systemctl restart satellite-web
-sudo systemctl restart satellite-camera   # if camera service exists
+sudo systemctl restart satellite-web satellite-camera
 sudo systemctl status satellite-web       # check it started ok
 ```
 
@@ -118,7 +163,7 @@ All `/api/*` requests are proxied to the rover server:
 | `GET /api/queue/events` | `GET /queue/events` (SSE stream proxy) |
 | `GET /api/health` | Local + rover health |
 
-`/api/queue/events` is a persistent streaming response. The satellite opens one `requests.get(..., stream=True, timeout=None)` connection to the rover and forwards raw bytes to the browser. It does not parse or buffer SSE events.
+`/api/queue/events` is a persistent streaming response. The satellite opens one `requests.get(..., stream=True, timeout=(3.05, 45))` connection to the rover and forwards raw bytes to the browser. It does not parse or buffer SSE events. The rover emits a heartbeat comment every 30s of idle, so the 45s read timeout only fires when the rover has died without closing the socket — the proxy then ends the response and the browser's `EventSource` reconnects automatically.
 
 ### Configuration
 
@@ -174,7 +219,7 @@ Both tabs submit a `run_python` instruction when Run is pressed. Blockly submiss
 - Stop button → Emergency stop
 - Clear button → Clears workspace or editor
 - PWA support (installable, works offline)
-- Workspace persistence to localStorage (Blockly tab only)
+- Workspace persistence to localStorage (both Blockly and Python tabs)
 
 ### Block Types
 

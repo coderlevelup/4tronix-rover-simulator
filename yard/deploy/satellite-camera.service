@@ -1,0 +1,16 @@
+[Unit]
+Description=Mars Yard Camera Server (port 8890)
+After=network-online.target
+Wants=network-online.target
+# Never give up restarting — the camera may be unplugged for hours
+StartLimitIntervalSec=0
+
+[Service]
+User=mars
+WorkingDirectory=/home/mars/4tronix-rover-simulator/yard/satellite
+ExecStart=/home/mars/satellite-env/bin/python camera_server.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

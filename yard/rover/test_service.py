@@ -168,8 +168,23 @@ class TestRoverQueueService:
         """Health check returns driver class name"""
         result = self.service.get_health()
 
-        assert result['status'] == 'ok'
         assert result['driver'] == 'MockRoverDriver'
+
+    def test_health_degraded_without_processor(self):
+        """Health reports degraded when the processor thread isn't running"""
+        result = self.service.get_health()
+
+        assert result['status'] == 'degraded'
+        assert result['processor_alive'] is False
+
+    def test_health_ok_when_processor_running(self):
+        """Health reports ok while the processor thread is alive"""
+        self.service.start_processor()
+
+        result = self.service.get_health()
+
+        assert result['status'] == 'ok'
+        assert result['processor_alive'] is True
 
     def test_health_returns_queue_size(self):
         """Health check returns current queue size"""
@@ -494,6 +509,141 @@ class TestRunPython:
         assert ('forward', 1) in self.calls
         assert ('forward', 2) in self.calls
         assert ('forward', 3) in self.calls
+
+
+class TestRunPythonInterrupt:
+    """Tests for trace-based interruption of runaway run_python code"""
+
+    def setup_method(self):
+        self.driver = MockRoverDriver()
+        self.calls = []
+        self.driver.stop = lambda: self.calls.append(('stop',))
+
+        class _TestRover:
+            def stop(self): pass
+
+        self.rover_module = _TestRover()
+
+    def teardown_method(self):
+        self.service.cleanup()
+
+    def _make_service(self, timeout=120.0):
+        self.service = RoverQueueService(
+            driver=self.driver,
+            rover_module=self.rover_module,
+            run_python_timeout=timeout
+        )
+        return self.service
+
+    def _wait_for_history(self, count=1, timeout=3.0):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            status = self.service.get_status()
+            if status['history_count'] >= count:
+                return status
+            time.sleep(0.05)
+        return self.service.get_status()
+
+    def test_infinite_loop_interrupted_by_stop(self):
+        """Stop button (clear_queue) breaks out of `while True: pass`"""
+        self._make_service()
+        self.service.add_instructions([
+            {'cmd': 'run_python', 'params': {'code': 'while True:\n    pass\n'}}
+        ])
+        self.service.start_processor()
+        time.sleep(0.2)  # Let the loop start spinning
+
+        self.service.clear_queue()
+        status = self._wait_for_history()
+
+        assert status['history_count'] == 1
+        assert status['history'][0]['status'] == 'error'
+        assert 'Stopped' in status['history'][0]['error']
+
+    def test_infinite_loop_killed_by_deadline(self):
+        """Wall-clock timeout terminates an infinite loop on its own"""
+        self._make_service(timeout=0.3)
+        self.service.add_instructions([
+            {'cmd': 'run_python', 'params': {'code': 'while True:\n    pass\n'}}
+        ])
+        self.service.start_processor()
+
+        status = self._wait_for_history()
+
+        assert status['history_count'] == 1
+        assert status['history'][0]['status'] == 'error'
+        assert 'longer than' in status['history'][0]['error']
+
+    def test_processor_survives_interrupt(self):
+        """Queue keeps processing after an interrupted instruction"""
+        self._make_service(timeout=0.3)
+        self.service.add_instructions([
+            {'cmd': 'run_python', 'params': {'code': 'while True:\n    pass\n'}}
+        ])
+        self.service.start_processor()
+        self._wait_for_history(count=1)
+
+        self.service.add_instructions([{'cmd': 'stop', 'params': {}}])
+        status = self._wait_for_history(count=2)
+
+        assert status['history_count'] == 2
+        assert status['history'][1]['cmd'] == 'stop'
+        assert status['history'][1]['status'] == 'completed'
+
+    def test_normal_code_unaffected_by_trace(self):
+        """Well-behaved code still completes under the trace"""
+        self._make_service()
+        self.service.add_instructions([
+            {'cmd': 'run_python', 'params': {'code': 'total = 0\nfor i in range(100):\n    total = total + i\n'}}
+        ])
+        self.service.start_processor()
+
+        status = self._wait_for_history()
+
+        assert status['history'][0]['status'] == 'completed'
+
+
+class TestProcessorResilience:
+    """Tests that the processor thread survives unexpected exceptions"""
+
+    def setup_method(self):
+        self.driver = MockRoverDriver()
+        self.service = RoverQueueService(driver=self.driver)
+
+    def teardown_method(self):
+        self.service.cleanup()
+
+    def test_processor_survives_unexpected_exception(self):
+        """An exception escaping instruction handling doesn't kill the thread"""
+        original = self.service._execute_instruction
+        state = {'raised': False}
+
+        def flaky(instruction):
+            if not state['raised']:
+                state['raised'] = True
+                raise RuntimeError('unexpected internal failure')
+            original(instruction)
+
+        self.service._execute_instruction = flaky
+
+        self.service.add_instructions([
+            {'cmd': 'stop', 'params': {}},
+            {'cmd': 'stop', 'params': {}}
+        ])
+        self.service.start_processor()
+
+        deadline = time.time() + 3.0
+        while time.time() < deadline:
+            if self.service.get_status()['history_count'] >= 1:
+                break
+            time.sleep(0.05)
+
+        # First instruction was eaten by the injected failure; second executed
+        status = self.service.get_status()
+        assert state['raised'] is True
+        assert status['history_count'] == 1
+        assert status['history'][0]['status'] == 'completed'
+        assert self.service.get_health()['status'] == 'ok'
 
 
 if __name__ == '__main__':

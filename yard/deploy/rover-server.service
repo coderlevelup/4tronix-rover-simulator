@@ -1,0 +1,17 @@
+[Unit]
+Description=4tronix M.A.R.S. Rover Queue Server
+After=network.target
+
+[Service]
+Type=simple
+# Root is required for rpi_ws281x PWM access
+User=root
+WorkingDirectory=/home/mars/4tronix-rover-simulator/yard/rover
+# rover.py and pca9685.py live in the 4tronix install dir
+Environment=PYTHONPATH=/home/mars/marsrover
+ExecStart=/home/mars/rover-env/bin/python rover_server.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -77,6 +77,8 @@ def api_status():
             rover['reachable'] = True
             rover['driver'] = data.get('driver')
             rover['queue_size'] = data.get('queue_size')
+            rover['status'] = data.get('status')
+            rover['processor_alive'] = data.get('processor_alive')
     except Exception:
         pass
 
@@ -166,9 +168,11 @@ def api_queue_events():
         rover_resp = requests.get(
             f'{ROVER_URL}/queue/events',
             stream=True,
-            timeout=None
+            # Rover heartbeats every 30s of idle, so a 45s read timeout only
+            # fires when the rover died without closing the socket
+            timeout=(3.05, 45)
         )
-    except requests.exceptions.ConnectionError:
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         return Response('Rover unreachable', status=503)
 
     def generate():
@@ -176,6 +180,11 @@ def api_queue_events():
             for chunk in rover_resp.iter_content(chunk_size=None):
                 if chunk:
                     yield chunk
+        except (requests.exceptions.ConnectionError,
+                requests.exceptions.ChunkedEncodingError,
+                requests.exceptions.ReadTimeout):
+            # End the stream; the browser's EventSource reconnects (~3s)
+            pass
         finally:
             rover_resp.close()
 

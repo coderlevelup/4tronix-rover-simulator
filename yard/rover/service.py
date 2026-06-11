@@ -6,8 +6,10 @@ This module implements the Ports & Adapters (Hexagonal) pattern:
 - RoverQueueService: Application service implementing the core logic
 """
 
+import sys
 import time
 import uuid
+import logging
 import threading
 import queue as queue_module
 from abc import ABC, abstractmethod
@@ -16,6 +18,16 @@ from datetime import datetime, timezone
 from typing import Optional, Callable
 
 from drivers import RoverDriver
+
+logger = logging.getLogger(__name__)
+
+# Filename given to compiled student code so the trace function can
+# distinguish student frames from rover module / service internals
+STUDENT_CODE_FILENAME = '<student-code>'
+
+
+class StudentCodeInterrupted(Exception):
+    """Raised inside student run_python code to stop it (stop button or timeout)."""
 
 
 class RoverQueuePort(ABC):
@@ -70,7 +82,8 @@ class RoverQueueService(RoverQueuePort):
         history_size: int = 50,
         time_provider: Callable[[], datetime] = None,
         uuid_provider: Callable[[], str] = None,
-        rover_module=None
+        rover_module=None,
+        run_python_timeout: float = 120.0
     ):
         """Initialize the queue service.
 
@@ -79,8 +92,10 @@ class RoverQueueService(RoverQueuePort):
             history_size: Max number of completed instructions to keep
             time_provider: Optional callable returning current datetime (for testing)
             uuid_provider: Optional callable returning UUID string (for testing)
+            run_python_timeout: Wall-clock limit in seconds for run_python code
         """
         self.driver = driver
+        self._run_python_timeout = run_python_timeout
         self._rover_module = rover_module
         self._time_provider = time_provider or (lambda: datetime.now(timezone.utc))
         self._uuid_provider = uuid_provider or (lambda: str(uuid.uuid4()))
@@ -211,8 +226,10 @@ class RoverQueueService(RoverQueuePort):
 
     def get_health(self) -> dict:
         """Get service health status"""
+        alive = bool(self._processor_thread and self._processor_thread.is_alive())
         return {
-            'status': 'ok',
+            'status': 'ok' if alive else 'degraded',
+            'processor_alive': alive,
             'driver': self.driver.__class__.__name__,
             'queue_size': len(self._queue)
         }
@@ -220,15 +237,25 @@ class RoverQueueService(RoverQueuePort):
     def _process_queue(self) -> None:
         """Background thread that processes instructions from the queue"""
         while self._processor_running:
-            instruction = None
+            try:
+                instruction = None
 
-            with self._queue_lock:
-                if self._queue and not self._stop_requested.is_set():
-                    instruction = self._queue.popleft()
+                with self._queue_lock:
+                    if self._queue and not self._stop_requested.is_set():
+                        instruction = self._queue.popleft()
 
-            if instruction:
-                self._execute_instruction(instruction)
-            else:
+                if instruction:
+                    self._execute_instruction(instruction)
+                else:
+                    time.sleep(0.1)
+            except Exception:
+                # An unexpected exception (e.g. a bug in subscriber fan-out)
+                # must not kill the processor thread
+                logger.exception('Queue processor error (continuing)')
+                try:
+                    self.driver.stop()
+                except Exception:
+                    pass
                 time.sleep(0.1)
 
     def _execute_instruction(self, instruction: dict) -> None:
@@ -310,7 +337,29 @@ class RoverQueueService(RoverQueuePort):
                 service_ref = self
                 class _interruptible_time:
                     sleep = staticmethod(lambda s: service_ref._interruptible_wait(s))
-                exec(code, {'rover': rover_module, 'time': _interruptible_time, '__builtins__': safe_builtins})
+
+                # Trace each line of student code (only — other frames return
+                # None) so the stop button and a wall-clock deadline can break
+                # out of loops like `while True: pass`. Blocking C calls are
+                # not interruptible mid-call.
+                compiled = compile(code, STUDENT_CODE_FILENAME, 'exec')
+                deadline = time.monotonic() + self._run_python_timeout
+
+                def _trace(frame, event, arg):
+                    if frame.f_code.co_filename != STUDENT_CODE_FILENAME:
+                        return None
+                    if self._stop_requested.is_set():
+                        raise StudentCodeInterrupted('Stopped')
+                    if time.monotonic() > deadline:
+                        raise StudentCodeInterrupted(
+                            f'Code ran longer than {self._run_python_timeout:.0f}s and was stopped')
+                    return _trace
+
+                sys.settrace(_trace)
+                try:
+                    exec(compiled, {'rover': rover_module, 'time': _interruptible_time, '__builtins__': safe_builtins})
+                finally:
+                    sys.settrace(None)
 
             instruction['status'] = 'completed'
 

@@ -255,7 +255,7 @@ async def main():
 
     # Setup camera
     if not setup_camera():
-        logger.error("Failed to initialize camera, exiting")
+        logger.error("Failed to initialize camera, exiting (systemd restarts in 10s)")
         sys.exit(1)
 
     # Setup signal handlers

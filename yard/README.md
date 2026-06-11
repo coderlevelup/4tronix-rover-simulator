@@ -2,6 +2,8 @@
 
 Yard is a queue-based control system designed for classroom use with the 4tronix M.A.R.S. Rover. It adds a tablet-friendly Blockly interface and a TV monitor display for group activities.
 
+**Running a session, installing, or fixing something in the field? Start with the [Yard Manual](MANUAL.md).**
+
 ## What's in Yard?
 
 ```
@@ -15,6 +17,7 @@ yard/
 │   ├── web_server.py
 │   ├── camera_server.py
 │   └── templates/
+├── deploy/          # systemd units for all three services
 └── docs/
 ```
 
@@ -34,6 +37,7 @@ yard/
 
 | Doc | Description |
 |-----|-------------|
+| [Yard Manual](MANUAL.md) | **Start here** — operations, quick fixes, installation, debugging |
 | [Rover Server](docs/rover-server.md) | Setup and API for the queue server |
 | [Satellite](docs/satellite.md) | Web interface and camera server |
 | [Architecture](docs/architecture.md) | System design and data flow |

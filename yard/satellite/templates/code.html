@@ -873,6 +873,7 @@
                 block.moveBy(40, 40);
             } else {
                 pythonEditor.setValue('');
+                localStorage.removeItem(PYTHON_STORAGE_KEY);
             }
             if (isMockMode) {
                 roverService.clear();
@@ -942,25 +943,28 @@
 
         let pythonEditor;
 
+        const PYTHON_STORAGE_KEY = 'roverPythonCode';
+        const DEFAULT_PYTHON = [
+            '# Write Python directly — rover and time are available',
+            '# Examples:',
+            '#   rover.forward(60)',
+            '#   time.sleep(1)',
+            '#   rover.stop()',
+            '',
+            '# Loop:',
+            'for i in range(4):',
+            '    rover.forward(60)',
+            '    time.sleep(1)',
+            '    rover.stop()',
+            '    rover.spinLeft(60)',
+            '    time.sleep(0.5)',
+            '    rover.stop()',
+        ].join('\n');
+
         require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.52.0/min/vs' } });
         require(['vs/editor/editor.main'], function () {
             pythonEditor = monaco.editor.create(document.getElementById('pythonEditor'), {
-                value: [
-                    '# Write Python directly — rover and time are available',
-                    '# Examples:',
-                    '#   rover.forward(60)',
-                    '#   time.sleep(1)',
-                    '#   rover.stop()',
-                    '',
-                    '# Loop:',
-                    'for i in range(4):',
-                    '    rover.forward(60)',
-                    '    time.sleep(1)',
-                    '    rover.stop()',
-                    '    rover.spinLeft(60)',
-                    '    time.sleep(0.5)',
-                    '    rover.stop()',
-                ].join('\n'),
+                value: localStorage.getItem(PYTHON_STORAGE_KEY) || DEFAULT_PYTHON,
                 language: 'python',
                 theme: 'vs-dark',
                 fontSize: 14,
@@ -969,6 +973,15 @@
                 automaticLayout: true,
                 tabSize: 4,
                 insertSpaces: true,
+            });
+
+            // Save on change (debounced) — mirrors the Blockly persistence
+            let pySaveTimeout;
+            pythonEditor.onDidChangeModelContent(() => {
+                clearTimeout(pySaveTimeout);
+                pySaveTimeout = setTimeout(() => {
+                    localStorage.setItem(PYTHON_STORAGE_KEY, pythonEditor.getValue());
+                }, 500);
             });
         });
     </script>

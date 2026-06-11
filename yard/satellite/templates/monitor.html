@@ -556,8 +556,8 @@
                 this.ctx = this.canvas.getContext('2d');
                 this.ws = null;
                 this.reconnectAttempts = 0;
-                this.maxReconnectAttempts = 10;
                 this.reconnectInterval = 5000;
+                this.maxReconnectDelay = 30000;
 
                 this.cameraDot = document.getElementById('cameraDot');
                 this.cameraStatus = document.getElementById('cameraStatus');
@@ -617,13 +617,15 @@
             }
 
             handleReconnect(url) {
-                if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-                    this.updateStatus('disconnected', 'Connection failed');
-                    return;
-                }
-
+                // Retry forever with capped backoff — the camera service may
+                // be down for hours and must recover without a page reload
                 this.reconnectAttempts++;
-                setTimeout(() => this.connect(url), this.reconnectInterval);
+                const delay = Math.min(
+                    this.reconnectInterval * this.reconnectAttempts,
+                    this.maxReconnectDelay
+                );
+                this.updateStatus('disconnected', 'Reconnecting…');
+                setTimeout(() => this.connect(url), delay);
             }
 
             updateStatus(state, text) {

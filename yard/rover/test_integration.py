@@ -64,12 +64,21 @@ class TestHealthEndpoint:
 
         assert response.content_type == 'application/json'
 
-    def test_health_contains_status(self, client):
-        """Health response contains status field"""
+    def test_health_degraded_without_processor(self, client):
+        """Health reports degraded when no processor thread is running"""
         response = client.get('/health')
         data = response.get_json()
 
+        assert data['status'] == 'degraded'
+        assert data['processor_alive'] is False
+
+    def test_health_ok_with_processor(self, client_with_processor):
+        """Health reports ok while the processor thread is alive"""
+        response = client_with_processor.get('/health')
+        data = response.get_json()
+
         assert data['status'] == 'ok'
+        assert data['processor_alive'] is True
 
     def test_health_contains_driver(self, client):
         """Health response contains driver name"""

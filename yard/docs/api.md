@@ -97,10 +97,15 @@ curl http://marspi.local:8523/health
 ```json
 {
   "status": "ok",
+  "processor_alive": true,
   "driver": "MockRoverDriver",
   "queue_size": 0
 }
 ```
+
+`status` is `"ok"` while the queue processor thread is alive, `"degraded"` if
+it isn't running — a degraded rover accepts instructions but never executes
+them, so treat it as down.
 
 ## Satellite Server (mro.local:5050)
 
@@ -187,6 +192,12 @@ Submits a Python script for the rover to execute. Sent by both the Blockly tab a
 
 - `code` — the generated or hand-written Python to run. The rover environment has `rover` and `time` pre-imported.
 - `blockly_state` — optional. Present when submitted from the Blockly tab. Contains the serialised Blockly workspace JSON. Used by the monitor to display the original blocks instead of the generated code.
+
+Student code is supervised line-by-line with a trace hook: the Stop button
+interrupts it immediately (even a `while True: pass` loop), and any script
+running longer than 120 seconds (configurable via the service's
+`run_python_timeout`) is terminated with an error. Calls that block inside
+C code (e.g. a long hardware operation) can't be interrupted mid-call.
 
 ### Parameter Defaults
 

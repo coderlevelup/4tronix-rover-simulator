@@ -1,0 +1,16 @@
+[Unit]
+Description=Mars Yard Satellite Web Server (port 5050)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=mars
+WorkingDirectory=/home/mars/4tronix-rover-simulator/yard/satellite
+# Confirm the rover hostname on-site: marspi (old card) or curiosity (Bookworm)
+Environment=ROVER_URL=http://marspi.local:8523
+ExecStart=/home/mars/satellite-env/bin/python web_server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
