@@ -113,6 +113,25 @@ def test_read_distance_and_photo_blocks(page: Page, live_server):
     assert 'take_photo()' in code
 
 
+def test_led_blocks(page: Page, live_server):
+    """All-LEDs uses setColor; single LED uses setPixel with board numbering"""
+    code = _generate(page, live_server, '''
+        const hat = workspace.newBlock('rover_on_receive');
+        const all = workspace.newBlock('rover_leds_all');
+        all.setFieldValue('255, 0, 0', 'COLOUR');
+        const one = workspace.newBlock('rover_led_one');
+        one.setFieldValue('2', 'LED');               // front right
+        one.setFieldValue('0, 0, 255', 'COLOUR');
+        hat.getInput('DO').connection.connect(all.previousConnection);
+        all.nextConnection.connect(one.previousConnection);
+    ''')
+
+    compile(code, '<generated>', 'exec')
+    assert 'rover.setColor(rover.fromRGB(255, 0, 0))' in code
+    assert 'rover.setPixel(2, rover.fromRGB(0, 0, 255))' in code
+    assert code.count('rover.show()') == 2
+
+
 def test_nested_loops_emit_once(page: Page, live_server):
     """Nested repeat: inner body emitted once, correctly double-indented."""
     code = _generate(page, live_server, '''

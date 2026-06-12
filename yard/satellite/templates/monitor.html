@@ -636,6 +636,49 @@
             }
         };
 
+        const LED_COLOURS = [
+            ["red", "255, 0, 0"],
+            ["orange", "255, 96, 0"],
+            ["yellow", "255, 200, 0"],
+            ["green", "0, 255, 0"],
+            ["blue", "0, 0, 255"],
+            ["purple", "160, 0, 255"],
+            ["pink", "255, 64, 160"],
+            ["white", "255, 255, 255"],
+            ["off", "0, 0, 0"]
+        ];
+
+        const LED_POSITIONS = [
+            ["front left", "1"],
+            ["front right", "2"],
+            ["rear left", "0"],
+            ["rear right", "3"]
+        ];
+
+        Blockly.Blocks['rover_leds_all'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Set all LEDs")
+                    .appendField(new Blockly.FieldDropdown(LED_COLOURS), "COLOUR");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#F9A825");
+            }
+        };
+
+        Blockly.Blocks['rover_led_one'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Set")
+                    .appendField(new Blockly.FieldDropdown(LED_POSITIONS), "LED")
+                    .appendField("LED")
+                    .appendField(new Blockly.FieldDropdown(LED_COLOURS), "COLOUR");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#F9A825");
+            }
+        };
+
         const monitorDarkTheme = Blockly.Theme.defineTheme('monitorDark', {
             base: Blockly.Themes.Classic,
             componentStyles: {
