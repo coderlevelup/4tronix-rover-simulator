@@ -45,8 +45,10 @@ sudo systemctl enable --now satellite-web satellite-camera
 
 Check the rover hostname in `satellite-web.service` (`Environment=ROVER_URL=...`)
 matches the rover actually deployed — `marspi.local` (old card) or
-`curiosity.local` (Bookworm). Edit `/etc/systemd/system/satellite-web.service`
-and `sudo systemctl daemon-reload && sudo systemctl restart satellite-web` if not.
+`curiosity.local` (Bookworm). The easiest fix is the **edit** button next to
+the rover URL on `http://mro.local:5050/status` — it persists across restarts.
+(Editing `/etc/systemd/system/satellite-web.service` + `daemon-reload` works
+too, but a saved `/status` edit takes precedence over the unit's environment.)
 
 Watch logs:
 
@@ -162,6 +164,8 @@ All `/api/*` requests are proxied to the rover server:
 | `GET /api/queue/status` | `GET /queue/status` |
 | `GET /api/queue/events` | `GET /queue/events` (SSE stream proxy) |
 | `GET /api/health` | Local + rover health |
+| `GET /api/status` | (satellite-local) full component status for `/status` |
+| `POST /api/config/rover_url` | (satellite-local) change the rover URL at runtime |
 
 `/api/queue/events` is a persistent streaming response. The satellite opens one `requests.get(..., stream=True, timeout=(3.05, 45))` connection to the rover and forwards raw bytes to the browser. It does not parse or buffer SSE events. The rover emits a heartbeat comment every 30s of idle, so the 45s read timeout only fires when the rover has died without closing the socket — the proxy then ends the response and the browser's `EventSource` reconnects automatically.
 
@@ -169,11 +173,18 @@ All `/api/*` requests are proxied to the rover server:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ROVER_URL` | `http://marspi.local:8523` | Rover server URL |
+| `ROVER_URL` | `http://marspi.local:8523` | Rover server URL (startup default) |
+| `SATELLITE_CONFIG` | `satellite_config.json` next to `web_server.py` | Where runtime config is persisted |
 
 ```bash
 ROVER_URL=http://localhost:8523 python web_server.py
 ```
+
+The rover URL can also be changed at runtime from the **/status** page (edit
+button next to the URL). Edits are persisted to `satellite_config.json` and
+**take precedence over `ROVER_URL`** on the next start, so a field fix
+survives systemd restarts and reboots. Delete the file to fall back to the
+environment value.
 
 ## Camera Server (port 8890)
 
@@ -302,6 +313,7 @@ The label also differs: **Run Blockly** vs **run python**.
 Clicking the "Connected / Disconnected" badge in the queue panel opens a popover showing:
 - **Rover URL** — the URL the satellite is proxying to
 - **Rover** — live connection status (`connected`, `disconnected`, `timeout`, `error`)
+- **System status →** — link through to the `/status` page (where the rover URL can be edited)
 
 Click anywhere else to dismiss.
 

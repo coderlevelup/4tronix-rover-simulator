@@ -73,7 +73,7 @@ Symptom → action, most common first. SSH: user `mars`, password `R0v3r!`.
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | Tablet shows **Disconnected** dot | Rover off / wrong WiFi | Check rover power; confirm tablet is on `marsyard`. Check `/status`. |
-| Rover badge **Unreachable** | Rover powered off or not on WiFi | Power-cycle the rover; wait 1 min. |
+| Rover badge **Unreachable** | Rover off, not on WiFi, or wrong rover URL | Power-cycle the rover; wait 1 min. Still red? Check the rover URL shown on `/status` — the **edit** button fixes it live (e.g. `marspi.local` vs `curiosity.local`). |
 | Rover badge **Processor stalled** | Queue thread died on the rover | `ssh mars@<rover>.local` then `sudo systemctl restart rover-server` |
 | Rover badge **amber (Fake driver)** | Server running without hardware libs | `ssh` to rover, `journalctl -u rover-server -n 50` — usually a missing `PYTHONPATH=/home/mars/marsrover` or hardware lib error. |
 | Monitor queue panel frozen | Stale stream connection | It self-heals within ~45s. Or press the **↻** button on the monitor. |
@@ -147,9 +147,10 @@ Full walkthrough: [docs/satellite.md](docs/satellite.md).
    sudo systemctl enable --now satellite-web satellite-camera
    ```
 
-4. Make sure `ROVER_URL` in `/etc/systemd/system/satellite-web.service`
-   points at the rover actually deployed (`marspi.local` or
-   `curiosity.local`); `daemon-reload` + restart after editing.
+4. Make sure the rover URL points at the rover actually deployed
+   (`marspi.local` or `curiosity.local`): open
+   `http://mro.local:5050/status` and use the **edit** button next to the
+   rover URL — the change applies immediately and survives restarts.
 5. Verify: `curl http://localhost:5050/api/status` and open
    `http://mro.local:5050/status` from another device.
 

@@ -105,6 +105,63 @@
 
         .nav a { color: #4a9eff; text-decoration: none; margin-right: 1rem; }
         .nav a:hover { text-decoration: underline; }
+
+        .subtitle code { color: #ccc; }
+
+        .link-btn {
+            background: none;
+            border: none;
+            color: #4a9eff;
+            font-size: 0.85rem;
+            cursor: pointer;
+            padding: 0 0.25rem;
+        }
+
+        .link-btn:hover { text-decoration: underline; }
+
+        .url-editor {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: -1.25rem 0 2rem;
+            max-width: 640px;
+        }
+
+        /* the hidden attribute must beat the display:flex above */
+        .url-editor[hidden] { display: none; }
+
+        .url-editor input {
+            flex: 1;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+            color: #e0e0e0;
+            font-family: monospace;
+            font-size: 0.9rem;
+            padding: 0.45rem 0.6rem;
+        }
+
+        .editor-btn {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+            color: #ccc;
+            font-size: 0.85rem;
+            padding: 0.45rem 0.9rem;
+            cursor: pointer;
+        }
+
+        .editor-btn.save {
+            border-color: #22c55e;
+            color: #4ade80;
+        }
+
+        .editor-btn:hover { background: #222; }
+
+        .url-error {
+            color: #f87171;
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
@@ -115,7 +172,17 @@
     </div>
 
     <h1>System Status</h1>
-    <p class="subtitle">Rover URL: {{ rover_url }}</p>
+    <p class="subtitle">
+        Rover URL: <code id="rover-url">{{ rover_url }}</code>
+        <button class="link-btn" id="edit-url-btn">edit</button>
+    </p>
+    <div class="url-editor" id="url-editor" hidden>
+        <input type="text" id="url-input" spellcheck="false"
+               placeholder="http://curiosity.local:8523">
+        <button class="editor-btn save" id="save-url-btn">Save</button>
+        <button class="editor-btn" id="cancel-url-btn">Cancel</button>
+        <span class="url-error" id="url-error"></span>
+    </div>
 
     <div class="cards" id="cards">
         <!-- Satellite -->
@@ -180,6 +247,9 @@
                         row('IP', data.satellite.ip)
                     );
 
+                    // Keep the displayed rover URL in sync with the server
+                    document.getElementById('rover-url').textContent = data.rover.url;
+
                     // Rover
                     const r = data.rover;
                     if (!r.reachable) {
@@ -225,6 +295,53 @@
 
         poll();
         setInterval(poll, 5000);
+
+        // Rover URL editor
+        const urlEditor = document.getElementById('url-editor');
+        const urlInput = document.getElementById('url-input');
+        const urlError = document.getElementById('url-error');
+
+        document.getElementById('edit-url-btn').addEventListener('click', () => {
+            urlInput.value = document.getElementById('rover-url').textContent;
+            urlError.textContent = '';
+            urlEditor.hidden = false;
+            urlInput.focus();
+        });
+
+        document.getElementById('cancel-url-btn').addEventListener('click', () => {
+            urlEditor.hidden = true;
+        });
+
+        async function saveUrl() {
+            urlError.textContent = '';
+            try {
+                const resp = await fetch('/api/config/rover_url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: urlInput.value }),
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    urlError.textContent = data.error || 'Save failed';
+                    return;
+                }
+                document.getElementById('rover-url').textContent = data.rover_url;
+                if (data.persisted) {
+                    urlEditor.hidden = true;
+                } else {
+                    urlError.textContent = 'Applied, but could not write config file — will reset on restart';
+                }
+                poll();
+            } catch (e) {
+                urlError.textContent = 'Save failed: ' + e.message;
+            }
+        }
+
+        document.getElementById('save-url-btn').addEventListener('click', saveUrl);
+        urlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') saveUrl();
+            if (e.key === 'Escape') urlEditor.hidden = true;
+        });
     </script>
 </body>
 </html>

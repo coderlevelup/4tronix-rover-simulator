@@ -133,6 +133,27 @@ Health check with rover connectivity status.
 
 Possible `rover_status` values: `connected`, `disconnected`, `timeout`, `error`
 
+### POST /api/config/rover_url
+
+Change the rover URL the satellite proxies to, at runtime. Used by the edit
+button on the `/status` page. The value is persisted to
+`satellite_config.json` and takes precedence over the `ROVER_URL` environment
+variable on the next start.
+
+**Request:**
+```json
+{ "url": "http://curiosity.local:8523" }
+```
+
+**Response:**
+```json
+{ "status": "ok", "rover_url": "http://curiosity.local:8523", "persisted": true }
+```
+
+Returns 400 if the URL doesn't start with `http://` or `https://`.
+`persisted: false` means the change applied in memory but the config file
+could not be written (it will reset on restart).
+
 ### Web Routes
 
 | Route | Description |

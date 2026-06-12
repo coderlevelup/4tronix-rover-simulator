@@ -212,6 +212,15 @@
             word-break: break-all;
         }
 
+        .popover-link {
+            color: #4a9eff;
+            text-decoration: none;
+        }
+
+        .popover-link:hover {
+            text-decoration: underline;
+        }
+
         .queue-content {
             flex: 1;
             overflow-y: auto;
@@ -385,6 +394,9 @@
                 <div class="popover-row">
                     <span class="popover-label">Rover</span>
                     <span class="popover-value" id="popoverRoverStatus">—</span>
+                </div>
+                <div class="popover-row">
+                    <a class="popover-link" href="/status">System status &rarr;</a>
                 </div>
             </div>
             <div class="queue-content">

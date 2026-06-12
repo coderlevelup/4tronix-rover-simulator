@@ -105,3 +105,56 @@ def test_camera_red(page: Page, live_server):
     wait_for_badge(page, 'camera')
     assert 'red' in page.locator('#badge-camera').get_attribute('class')
     assert page.locator('#label-camera').text_content() == 'Port closed'
+
+
+def test_rover_url_shown_from_status(page: Page, live_server):
+    mock_status(page, rover={
+        'reachable': False, 'driver': None, 'queue_size': None, 'url': 'http://shown.local:8523'
+    })
+    page.goto(f'{live_server}/status')
+    wait_for_badge(page, 'rover')
+    assert page.locator('#rover-url').text_content() == 'http://shown.local:8523'
+
+
+def test_rover_url_editable(page: Page, live_server):
+    mock_status(page)
+    posted = {}
+
+    def handle(route):
+        posted.update(json.loads(route.request.post_data))
+        route.fulfill(
+            status=200, content_type='application/json',
+            body=json.dumps({'status': 'ok', 'rover_url': 'http://newrover.local:8523', 'persisted': True})
+        )
+
+    page.route('**/api/config/rover_url', handle)
+    page.goto(f'{live_server}/status')
+    wait_for_badge(page, 'rover')
+
+    page.click('#edit-url-btn')
+    assert not page.locator('#url-editor').is_hidden()
+    page.fill('#url-input', 'http://newrover.local:8523')
+    page.click('#save-url-btn')
+
+    # Editor closes only on the success path
+    page.wait_for_selector('#url-editor', state='hidden')
+    assert posted['url'] == 'http://newrover.local:8523'
+
+
+def test_rover_url_edit_rejected_shows_error(page: Page, live_server):
+    mock_status(page)
+    page.route('**/api/config/rover_url', lambda route: route.fulfill(
+        status=400, content_type='application/json',
+        body=json.dumps({'error': 'URL must start with http:// or https://'})
+    ))
+    page.goto(f'{live_server}/status')
+    wait_for_badge(page, 'rover')
+
+    page.click('#edit-url-btn')
+    page.fill('#url-input', 'not-a-url')
+    page.click('#save-url-btn')
+
+    page.wait_for_function(
+        "document.getElementById('url-error').textContent.includes('http://')"
+    )
+    assert not page.locator('#url-editor').is_hidden()

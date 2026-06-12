@@ -7,11 +7,31 @@ Proxies API calls to rover server.
 """
 
 import os
+import json
 import socket
 import requests
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 
 CAMERA_PORT = int(os.environ.get('CAMERA_PORT', 8890))
+
+# Runtime config persisted across restarts (e.g. rover URL edited on /status)
+CONFIG_FILE = os.environ.get(
+    'SATELLITE_CONFIG',
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'satellite_config.json')
+)
+
+
+def _load_config():
+    try:
+        with open(CONFIG_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_config(cfg):
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(cfg, f, indent=2)
 
 
 def _local_ip():
@@ -34,8 +54,9 @@ def _local_ip():
 
 app = Flask(__name__)
 
-# Rover server URL
-ROVER_URL = os.environ.get('ROVER_URL', 'http://marspi.local:8523')
+# Rover server URL — a value saved from the /status page wins over the
+# environment default, so field edits survive a systemd restart
+ROVER_URL = _load_config().get('rover_url') or os.environ.get('ROVER_URL', 'http://marspi.local:8523')
 
 # Request timeout for rover API calls
 ROVER_TIMEOUT = 5.0
@@ -93,6 +114,27 @@ def api_status():
         'rover': rover,
         'camera': camera,
     })
+
+
+@app.route('/api/config/rover_url', methods=['POST'])
+def api_set_rover_url():
+    """Set the rover URL at runtime (from the /status page) and persist it"""
+    global ROVER_URL
+    data = request.get_json(silent=True) or {}
+    url = (data.get('url') or '').strip().rstrip('/')
+    if not url.startswith(('http://', 'https://')) or len(url.split('//', 1)[1]) == 0:
+        return jsonify({'error': 'URL must start with http:// or https://'}), 400
+
+    ROVER_URL = url
+    persisted = True
+    try:
+        cfg = _load_config()
+        cfg['rover_url'] = url
+        _save_config(cfg)
+    except Exception:
+        persisted = False
+
+    return jsonify({'status': 'ok', 'rover_url': url, 'persisted': persisted})
 
 
 @app.route('/code/')
