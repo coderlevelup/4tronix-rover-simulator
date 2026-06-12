@@ -85,6 +85,9 @@ Symptom → action, most common first. SSH: user `mars`, password `R0v3r!`.
 **Last resort: power-cycle everything** in the power-on order above. You lose
 only the pending queue. Kids' code is preserved on their tablets.
 
+To check whether the rover hardware itself is fine independently of the web
+stack, see [Fallback: drive the rover directly over SSH](#fallback-drive-the-rover-directly-over-ssh).
+
 ### Update the code on a Pi
 
 ```bash
@@ -205,6 +208,32 @@ running — restart `rover-server`.
   cd yard/rover && ../venv/bin/python -m pytest -v          # service + HTTP + SSE
   cd yard/satellite && ../venv/bin/python -m pytest tests/ -v   # status page (Playwright) + SSE proxy
   ```
+
+### Fallback: drive the rover directly over SSH
+
+If the web stack is down (or you want to rule it out), you can bypass the
+whole satellite/queue pipeline and tele-operate the rover from a keyboard.
+The direct drive script and the rover server both want the hardware, so
+stop the server first:
+
+```bash
+ssh mars@marspi.local            # or curiosity.local
+sudo systemctl stop rover-server
+./drive.sh                       # runs sudo python marsrover/driveRover.py
+```
+
+Controls: **arrow keys** (or `w`/`a`/`s`/`d`) to steer, `,`/`.` to slow
+down/speed up, **space** to coast to a stop, `b` to brake, **Ctrl-C** to
+quit. When you're done, hand the hardware back to the queue server:
+
+```bash
+sudo systemctl start rover-server
+```
+
+If `./drive.sh` works but the web stack doesn't, the hardware and 4tronix
+libraries are fine — debug upwards from `curl http://localhost:8523/health`
+on the rover. There's also `./cam.sh` on the rover for a quick local
+camera preview (only useful with a monitor attached).
 
 ### Known limitations
 
