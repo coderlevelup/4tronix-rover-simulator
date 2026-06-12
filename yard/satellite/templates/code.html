@@ -548,6 +548,56 @@
             }
         };
 
+        Blockly.Blocks['rover_mast_turn'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Point Mast")
+                    .appendField(new Blockly.FieldDropdown([
+                        ["left", "LEFT"],
+                        ["centre", "CENTRE"],
+                        ["right", "RIGHT"]
+                    ]), "DIR")
+                    .appendField(new Blockly.FieldNumber(45, 5, 80, 5), "DEGREES")
+                    .appendField("°");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#00897B");
+                this.setTooltip("Turn the mast left or right, or point it straight ahead");
+            }
+        };
+
+        Blockly.Blocks['rover_read_distance'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Read Distance");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#00897B");
+                this.setTooltip("Measure how far away the nearest thing is and show it on the monitor");
+            }
+        };
+
+        Blockly.Blocks['rover_take_photo'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Take a Picture");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#00897B");
+                this.setTooltip("Take a photo with the mast camera and show it on the monitor");
+            }
+        };
+
+        Blockly.Blocks['rover_distance'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("distance (cm)");
+                this.setOutput(true, "Number");
+                this.setColour("#00897B");
+                this.setTooltip("The distance the mast sensor sees — for use with comparisons");
+            }
+        };
+
         // ============================================================
         // Toolbox Configuration
         // ============================================================
@@ -575,6 +625,17 @@
                         {kind: 'block', type: 'rover_spin_left'},
                         {kind: 'block', type: 'rover_spin_right'},
                         {kind: 'block', type: 'rover_stop'}
+                    ]
+                },
+                {
+                    kind: 'category',
+                    name: 'Mast',
+                    colour: '#00897B',
+                    contents: [
+                        {kind: 'block', type: 'rover_mast_turn'},
+                        {kind: 'block', type: 'rover_read_distance'},
+                        {kind: 'block', type: 'rover_take_photo'},
+                        {kind: 'block', type: 'rover_distance'}
                     ]
                 },
                 {
@@ -734,6 +795,23 @@
                     case 'rover_wait': {
                         const t = block.getFieldValue('TIME');
                         lines.push(`${pad}time.sleep(${t})`);
+                        break;
+                    }
+                    case 'rover_mast_turn': {
+                        // Mast servo is 0; positive degrees = left, negative = right
+                        const dir = block.getFieldValue('DIR');
+                        const deg = block.getFieldValue('DEGREES');
+                        const angle = dir === 'LEFT' ? deg : dir === 'RIGHT' ? -deg : 0;
+                        lines.push(`${pad}rover.setServo(0, ${angle})`);
+                        lines.push(`${pad}time.sleep(0.5)`);
+                        break;
+                    }
+                    case 'rover_read_distance': {
+                        lines.push(`${pad}print('Distance: ' + str(round(rover.getDistance())) + ' cm')`);
+                        break;
+                    }
+                    case 'rover_take_photo': {
+                        lines.push(`${pad}take_photo()`);
                         break;
                     }
                     case 'rover_repeat': {

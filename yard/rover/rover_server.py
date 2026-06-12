@@ -5,11 +5,13 @@ This is a thin adapter that translates HTTP requests to service calls.
 All business logic is in the RoverQueueService.
 """
 
-from flask import Flask, request, jsonify, Response, stream_with_context
+import os
+
+from flask import Flask, request, jsonify, Response, stream_with_context, send_file
 import queue as queue_module
 
 from drivers import create_driver
-from service import RoverQueueService
+from service import RoverQueueService, PHOTO_PATH
 
 app = Flask(__name__)
 
@@ -90,6 +92,14 @@ def health():
     """Health check endpoint"""
     result = service.get_health()
     return jsonify(result)
+
+
+@app.route('/photo', methods=['GET'])
+def photo():
+    """Serve the most recent photo taken by take_photo() in student code"""
+    if not os.path.exists(PHOTO_PATH):
+        return jsonify({'error': 'No photo taken yet'}), 404
+    return send_file(PHOTO_PATH, mimetype='image/jpeg', max_age=0)
 
 
 def main():

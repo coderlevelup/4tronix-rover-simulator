@@ -511,6 +511,72 @@ class TestRunPython:
         assert ('forward', 3) in self.calls
 
 
+class TestRunPythonOutput:
+    """Tests for stdout capture and take_photo in run_python"""
+
+    def setup_method(self):
+        self.driver = FakeRoverDriver()
+        self.photos = []
+
+        class _TestRover:
+            def stop(self): pass
+            def getDistance(self): return 42.0
+
+        self.service = RoverQueueService(
+            driver=self.driver,
+            rover_module=_TestRover(),
+            photo_provider=lambda: self.photos.append('snap') or '/tmp/test.jpg'
+        )
+
+    def teardown_method(self):
+        self.service.cleanup()
+
+    def _run(self, code, wait=0.5):
+        self.service.add_instructions([
+            {'cmd': 'run_python', 'params': {'code': code}}
+        ])
+        self.service.start_processor()
+        time.sleep(wait)
+        return self.service.get_status()
+
+    def test_print_output_captured(self):
+        """print() output lands in the instruction record"""
+        status = self._run("print('Distance: ' + str(round(rover.getDistance())) + ' cm')\n")
+
+        assert status['history'][0]['status'] == 'completed'
+        assert status['history'][0]['output'] == 'Distance: 42 cm'
+
+    def test_no_output_key_when_silent(self):
+        """Instructions that print nothing don't get an output field"""
+        status = self._run("rover.stop()\n")
+
+        assert 'output' not in status['history'][0]
+
+    def test_output_captured_even_on_error(self):
+        """Output printed before a crash is preserved"""
+        status = self._run("print('before')\nrover.no_such_method()\n")
+
+        assert status['history'][0]['status'] == 'error'
+        assert status['history'][0]['output'] == 'before'
+
+    def test_take_photo_calls_provider_and_marks_instruction(self):
+        status = self._run("take_photo()\n")
+
+        assert self.photos == ['snap']
+        assert status['history'][0]['photo'] is True
+        assert 'Photo taken' in status['history'][0]['output']
+
+    def test_photo_provider_failure_is_instruction_error(self):
+        def boom():
+            raise RuntimeError('no camera detected')
+
+        self.service._photo_provider = boom
+        status = self._run("take_photo()\n")
+
+        assert status['history'][0]['status'] == 'error'
+        assert 'no camera' in status['history'][0]['error']
+
+
 class TestRunPythonInterrupt:
     """Tests for trace-based interruption of runaway run_python code"""
 

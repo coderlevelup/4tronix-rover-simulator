@@ -106,6 +106,46 @@
             color: #666;
         }
 
+        /* Student-code output (e.g. distance readings) shown over the feed */
+        .output-toast {
+            position: absolute;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 137, 123, 0.92);
+            color: #fff;
+            font-size: 30px;
+            font-weight: 600;
+            padding: 14px 30px;
+            border-radius: 14px;
+            max-width: 80%;
+            text-align: center;
+            white-space: pre-wrap;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        .output-toast.visible { opacity: 1; }
+
+        .instruction-output {
+            font-family: monospace;
+            font-size: 13px;
+            color: #4ade80;
+            background: #0d1f12;
+            border-radius: 6px;
+            padding: 6px 8px;
+            margin-top: 6px;
+            white-space: pre-wrap;
+        }
+
+        .instruction-photo {
+            width: 100%;
+            border-radius: 8px;
+            margin-top: 6px;
+            display: block;
+        }
+
         .camera-message.hidden {
             display: none;
         }
@@ -373,6 +413,7 @@
                     <span class="camera-icon">&#128247;</span>
                     <span>Connecting to camera...</span>
                 </div>
+                <div class="output-toast" id="outputToast"></div>
             </div>
         </div>
         <div class="queue-panel">
@@ -549,6 +590,52 @@
             }
         };
 
+        Blockly.Blocks['rover_mast_turn'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Point Mast")
+                    .appendField(new Blockly.FieldDropdown([
+                        ["left", "LEFT"],
+                        ["centre", "CENTRE"],
+                        ["right", "RIGHT"]
+                    ]), "DIR")
+                    .appendField(new Blockly.FieldNumber(45, 5, 80, 5), "DEGREES")
+                    .appendField("°");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#00897B");
+            }
+        };
+
+        Blockly.Blocks['rover_read_distance'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Read Distance");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#00897B");
+            }
+        };
+
+        Blockly.Blocks['rover_take_photo'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("Take a Picture");
+                this.setPreviousStatement(true, null);
+                this.setNextStatement(true, null);
+                this.setColour("#00897B");
+            }
+        };
+
+        Blockly.Blocks['rover_distance'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField("distance (cm)");
+                this.setOutput(true, "Number");
+                this.setColour("#00897B");
+            }
+        };
+
         const monitorDarkTheme = Blockly.Theme.defineTheme('monitorDark', {
             base: Blockly.Themes.Classic,
             componentStyles: {
@@ -662,6 +749,9 @@
                 this.pendingWorkspaces = new Map();
                 this.renderCounter = 0;
                 this.lastDataJson = null;
+                this.seenOutputIds = new Set();
+                this.latestPhotoId = null;
+                this.firstUpdate = true;
             }
 
             async refresh() {
@@ -686,6 +776,21 @@
                 this.activeWorkspaces.clear();
                 this.pendingWorkspaces = new Map();
                 this.renderCounter = 0;
+
+                // Only the newest photo-bearing instruction shows the image
+                // (the rover keeps a single latest photo)
+                const all = [...(data.history || []), ...(data.current ? [data.current] : [])];
+                all.forEach(i => { if (i.photo) this.latestPhotoId = i.id; });
+
+                // Toast fresh student-code output over the camera feed
+                // (skip the backlog already in history when the page loads)
+                all.forEach(i => {
+                    if (i.output && !this.seenOutputIds.has(i.id)) {
+                        this.seenOutputIds.add(i.id);
+                        if (!this.firstUpdate) showOutputToast(i.output);
+                    }
+                });
+                this.firstUpdate = false;
 
                 // Current instruction
                 if (data.current) {
@@ -743,12 +848,23 @@
                     ? 'Run Blockly'
                     : cmd.replace(/_/g, ' ');
 
+                let extraHtml = '';
+                if (instr.output) {
+                    extraHtml += `<div class="instruction-output">${this.escapeHtml(instr.output)}</div>`;
+                }
+                if (instr.photo) {
+                    extraHtml += instr.id === this.latestPhotoId
+                        ? `<img class="instruction-photo" src="/api/photo?t=${encodeURIComponent(instr.id)}" alt="Rover photo">`
+                        : `<div class="instruction-params">&#128247; photo taken</div>`;
+                }
+
                 return `
                     <div class="instruction ${status}">
                         <div class="instruction-icon cmd-${cmd}"></div>
                         <div class="instruction-details">
                             <div class="instruction-cmd">${label}</div>
                             ${paramsHtml}
+                            ${extraHtml}
                         </div>
                     </div>
                 `;
@@ -791,6 +907,15 @@
         // ============================================================
 
         // Start camera client
+        const outputToastEl = document.getElementById('outputToast');
+        let outputToastTimer;
+        function showOutputToast(text) {
+            outputToastEl.textContent = text;
+            outputToastEl.classList.add('visible');
+            clearTimeout(outputToastTimer);
+            outputToastTimer = setTimeout(() => outputToastEl.classList.remove('visible'), 5000);
+        }
+
         const camera = new CameraClient('cameraCanvas');
         camera.connect();
 

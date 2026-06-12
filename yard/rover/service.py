@@ -6,11 +6,14 @@ This module implements the Ports & Adapters (Hexagonal) pattern:
 - RoverQueueService: Application service implementing the core logic
 """
 
+import io
+import os
 import sys
 import time
 import uuid
 import logging
 import threading
+import contextlib
 import queue as queue_module
 from abc import ABC, abstractmethod
 from collections import deque
@@ -20,6 +23,20 @@ from typing import Optional, Callable
 from drivers import RoverDriver
 
 logger = logging.getLogger(__name__)
+
+# Where take_photo() writes; served by GET /photo on the rover server
+PHOTO_PATH = os.environ.get('ROVER_PHOTO_PATH', '/tmp/rover_photo.jpg')
+
+
+def _default_take_photo() -> str:
+    """Capture a still from the rover's Pi camera via rpicam-still"""
+    import subprocess
+    subprocess.run(
+        ['rpicam-still', '-n', '--immediate', '-o', PHOTO_PATH,
+         '--width', '1024', '--height', '768'],
+        check=True, timeout=20, capture_output=True
+    )
+    return PHOTO_PATH
 
 # Filename given to compiled student code so the trace function can
 # distinguish student frames from rover module / service internals
@@ -83,7 +100,8 @@ class RoverQueueService(RoverQueuePort):
         time_provider: Callable[[], datetime] = None,
         uuid_provider: Callable[[], str] = None,
         rover_module=None,
-        run_python_timeout: float = 120.0
+        run_python_timeout: float = 120.0,
+        photo_provider: Optional[Callable[[], str]] = None
     ):
         """Initialize the queue service.
 
@@ -96,6 +114,7 @@ class RoverQueueService(RoverQueuePort):
         """
         self.driver = driver
         self._run_python_timeout = run_python_timeout
+        self._photo_provider = photo_provider or _default_take_photo
         self._rover_module = rover_module
         self._time_provider = time_provider or (lambda: datetime.now(timezone.utc))
         self._uuid_provider = uuid_provider or (lambda: str(uuid.uuid4()))
@@ -339,6 +358,13 @@ class RoverQueueService(RoverQueuePort):
                 class _interruptible_time:
                     sleep = staticmethod(lambda s: service_ref._interruptible_wait(s))
 
+                def _take_photo():
+                    path = self._photo_provider()
+                    # Mark the instruction so the monitor knows to fetch /photo
+                    instruction['photo'] = True
+                    print('Photo taken')
+                    return path
+
                 # Trace each line of student code (only — other frames return
                 # None) so the stop button and a wall-clock deadline can break
                 # out of loops like `while True: pass`. Blocking C calls are
@@ -356,11 +382,19 @@ class RoverQueueService(RoverQueuePort):
                             f'Code ran longer than {self._run_python_timeout:.0f}s and was stopped')
                     return _trace
 
+                # Capture print() output so distance readings etc. reach the
+                # monitor via the instruction record
+                stdout_buf = io.StringIO()
                 sys.settrace(_trace)
                 try:
-                    exec(compiled, {'rover': rover_module, 'time': _interruptible_time, '__builtins__': safe_builtins})
+                    with contextlib.redirect_stdout(stdout_buf):
+                        exec(compiled, {'rover': rover_module, 'time': _interruptible_time,
+                                        'take_photo': _take_photo, '__builtins__': safe_builtins})
                 finally:
                     sys.settrace(None)
+                    captured = stdout_buf.getvalue().strip()
+                    if captured:
+                        instruction['output'] = captured[:2000]
 
             instruction['status'] = 'completed'
 

@@ -75,6 +75,44 @@ def test_empty_loop_generates_valid_python(page: Page, live_server):
     assert 'pass' in code
 
 
+def test_mast_turn_left_right_centre(page: Page, live_server):
+    """Mast servo: positive degrees = left, negative = right, centre = 0"""
+    code = _generate(page, live_server, '''
+        const hat = workspace.newBlock('rover_on_receive');
+        const left = workspace.newBlock('rover_mast_turn');
+        left.setFieldValue('LEFT', 'DIR');
+        left.setFieldValue(45, 'DEGREES');
+        const right = workspace.newBlock('rover_mast_turn');
+        right.setFieldValue('RIGHT', 'DIR');
+        right.setFieldValue(30, 'DEGREES');
+        const centre = workspace.newBlock('rover_mast_turn');
+        centre.setFieldValue('CENTRE', 'DIR');
+        hat.getInput('DO').connection.connect(left.previousConnection);
+        left.nextConnection.connect(right.previousConnection);
+        right.nextConnection.connect(centre.previousConnection);
+    ''')
+
+    compile(code, '<generated>', 'exec')
+    assert 'rover.setServo(0, 45)' in code
+    assert 'rover.setServo(0, -30)' in code
+    assert 'rover.setServo(0, 0)' in code
+
+
+def test_read_distance_and_photo_blocks(page: Page, live_server):
+    code = _generate(page, live_server, '''
+        const hat = workspace.newBlock('rover_on_receive');
+        const dist = workspace.newBlock('rover_read_distance');
+        const photo = workspace.newBlock('rover_take_photo');
+        hat.getInput('DO').connection.connect(dist.previousConnection);
+        dist.nextConnection.connect(photo.previousConnection);
+    ''')
+
+    compile(code, '<generated>', 'exec')
+    assert 'rover.getDistance()' in code
+    assert "print('Distance: '" in code
+    assert 'take_photo()' in code
+
+
 def test_nested_loops_emit_once(page: Page, live_server):
     """Nested repeat: inner body emitted once, correctly double-indented."""
     code = _generate(page, live_server, '''

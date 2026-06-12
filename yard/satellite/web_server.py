@@ -238,6 +238,23 @@ def api_queue_events():
     )
 
 
+@app.route('/api/photo', methods=['GET'])
+def api_photo():
+    """Proxy the rover's latest photo (taken by the take-a-picture block)"""
+    try:
+        resp = requests.get(f'{ROVER_URL}/photo', timeout=ROVER_TIMEOUT)
+        return Response(
+            resp.content,
+            status=resp.status_code,
+            content_type=resp.headers.get('Content-Type', 'image/jpeg'),
+            headers={'Cache-Control': 'no-cache'}
+        )
+    except requests.exceptions.ConnectionError:
+        return jsonify({'error': 'Cannot connect to rover server'}), 503
+    except requests.exceptions.Timeout:
+        return jsonify({'error': 'Rover server timeout'}), 504
+
+
 @app.route('/api/health', methods=['GET'])
 def api_health():
     """Health check - also checks rover connectivity"""
