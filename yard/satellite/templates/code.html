@@ -528,7 +528,7 @@
                     .appendField("seconds");
                 this.setPreviousStatement(true, null);
                 this.setNextStatement(true, null);
-                this.setColour("#4CAF50");
+                this.setColour("#FF9800");
                 this.setTooltip("Wait for specified time");
             }
         };
@@ -626,7 +626,7 @@
                     .appendField(new Blockly.FieldDropdown(LED_COLOURS), "COLOUR");
                 this.setPreviousStatement(true, null);
                 this.setNextStatement(true, null);
-                this.setColour("#F9A825");
+                this.setColour("#673AB7");
                 this.setTooltip("Set all four LEDs to a colour (driving blocks change them back)");
             }
         };
@@ -640,7 +640,7 @@
                     .appendField(new Blockly.FieldDropdown(LED_COLOURS), "COLOUR");
                 this.setPreviousStatement(true, null);
                 this.setNextStatement(true, null);
-                this.setColour("#F9A825");
+                this.setColour("#673AB7");
                 this.setTooltip("Set one LED to a colour (driving blocks change them back)");
             }
         };
@@ -688,7 +688,7 @@
                 {
                     kind: 'category',
                     name: 'Lights',
-                    colour: '#F9A825',
+                    colour: '#673AB7',
                     contents: [
                         {kind: 'block', type: 'rover_leds_all'},
                         {kind: 'block', type: 'rover_led_one'}
