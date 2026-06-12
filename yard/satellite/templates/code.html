@@ -739,10 +739,13 @@
                     case 'rover_repeat': {
                         const times = block.getFieldValue('TIMES');
                         lines.push(`${pad}for _ in range(${times}):`);
-                        let inner = block.getInputTargetBlock('DO');
-                        while (inner) {
+                        const inner = block.getInputTargetBlock('DO');
+                        if (inner) {
+                            // recursion via getNextBlock() below walks the
+                            // rest of the body chain — do not iterate it here
                             blockToLines(inner, indent + 1);
-                            inner = inner.getNextBlock();
+                        } else {
+                            lines.push(`${pad}    pass`);
                         }
                         break;
                     }
