@@ -116,7 +116,7 @@
             background: #4CAF50;
         }
 
-        .status-dot.mock {
+        .status-dot.spy {
             background: #ff9800;
         }
 
@@ -187,8 +187,8 @@
             flex: 1;
         }
 
-        /* Mock output panel */
-        .mock-panel {
+        /* Spy output panel */
+        .spy-panel {
             display: none;
             position: absolute;
             bottom: 0;
@@ -201,11 +201,11 @@
             z-index: 100;
         }
 
-        .mock-panel.visible {
+        .spy-panel.visible {
             display: block;
         }
 
-        .mock-header {
+        .spy-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -216,21 +216,21 @@
             font-size: 12px;
         }
 
-        .mock-close {
+        .spy-close {
             cursor: pointer;
             padding: 2px 8px;
             background: rgba(0,0,0,0.2);
             border-radius: 4px;
         }
 
-        .mock-content {
+        .spy-content {
             padding: 8px 12px;
             font-family: monospace;
             font-size: 12px;
             color: #fff;
         }
 
-        .mock-content div {
+        .spy-content div {
             padding: 2px 0;
         }
 
@@ -290,12 +290,12 @@
         <div class="pane active" id="paneBlockly">
             <div class="blockly-container">
                 <div id="blocklyDiv"></div>
-                <div class="mock-panel" id="mockPanel">
-                    <div class="mock-header">
-                        <span>Mock Mode - Commands Preview</span>
-                        <span class="mock-close" id="mockClose">Close</span>
+                <div class="spy-panel" id="spyPanel">
+                    <div class="spy-header">
+                        <span>Spy Mode - Commands Preview</span>
+                        <span class="spy-close" id="spyClose">Close</span>
                     </div>
-                    <div class="mock-content" id="mockOutput"></div>
+                    <div class="spy-content" id="spyOutput"></div>
                 </div>
             </div>
         </div>
@@ -360,7 +360,7 @@
             }
         }
 
-        class MockRoverService extends RoverService {
+        class SpyRoverService extends RoverService {
             constructor(outputElement) {
                 super();
                 this.output = outputElement;
@@ -381,12 +381,12 @@
                         this.log(`  - ${i.cmd} {${params}}`);
                     }
                 });
-                return {status: 'mock', added: instructions.length};
+                return {status: 'spy', added: instructions.length};
             }
 
             async clearQueue() {
                 this.log('Would clear queue and stop rover');
-                return {status: 'mock', cleared: 0};
+                return {status: 'spy', cleared: 0};
             }
 
             async getStatus() {
@@ -398,7 +398,7 @@
             }
 
             log(msg) {
-                console.log(`[MOCK] ${msg}`);
+                console.log(`[SPY] ${msg}`);
                 if (this.output) {
                     this.output.innerHTML += `<div>${msg}</div>`;
                     this.output.scrollTop = this.output.scrollHeight;
@@ -784,21 +784,23 @@
         // Service Initialization (DI based on URL param)
         // ============================================================
 
-        const isMockMode = new URL(location).searchParams.get('mock') === 'true';
-        const mockOutput = document.getElementById('mockOutput');
-        const mockPanel = document.getElementById('mockPanel');
+        // ?spy=true preferred; ?mock=true kept as a legacy alias for old bookmarks
+        const urlParams = new URL(location).searchParams;
+        const isSpyMode = urlParams.get('spy') === 'true' || urlParams.get('mock') === 'true';
+        const spyOutput = document.getElementById('spyOutput');
+        const spyPanel = document.getElementById('spyPanel');
         const statusDot = document.getElementById('statusDot');
         const statusText = document.getElementById('statusText');
 
-        const roverService = isMockMode
-            ? new MockRoverService(mockOutput)
+        const roverService = isSpyMode
+            ? new SpyRoverService(spyOutput)
             : new RealRoverService('');
 
         // Update status indicator
-        if (isMockMode) {
-            statusDot.classList.add('mock');
-            statusText.textContent = 'Mock Mode';
-            mockPanel.classList.add('visible');
+        if (isSpyMode) {
+            statusDot.classList.add('spy');
+            statusText.textContent = 'Spy Mode';
+            spyPanel.classList.add('visible');
         } else {
             // Check connection status periodically
             async function checkConnection() {
@@ -841,7 +843,7 @@
                 }
             }
 
-            if (isMockMode) {
+            if (isSpyMode) {
                 roverService.clear();
             }
 
@@ -875,14 +877,14 @@
                 pythonEditor.setValue('');
                 localStorage.removeItem(PYTHON_STORAGE_KEY);
             }
-            if (isMockMode) {
+            if (isSpyMode) {
                 roverService.clear();
             }
             showToast('Cleared');
         });
 
-        document.getElementById('mockClose').addEventListener('click', () => {
-            mockPanel.classList.remove('visible');
+        document.getElementById('spyClose').addEventListener('click', () => {
+            spyPanel.classList.remove('visible');
         });
 
         // ============================================================

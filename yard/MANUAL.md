@@ -33,7 +33,7 @@ Open **`http://mro.local:5050/status`**. Three badges:
 | Badge | Green | Amber | Red |
 |-------|-------|-------|-----|
 | **Satellite** | OK (always green if the page loads) | — | — |
-| **Rover** | OK, real hardware | Mock driver — server is up but **not** driving hardware | *Unreachable* (network/power) or *Processor stalled* (accepts commands, never runs them) |
+| **Rover** | OK, real hardware | Fake driver — server is up but **not** driving hardware | *Unreachable* (network/power) or *Processor stalled* (accepts commands, never runs them) |
 | **Camera** | OK | — | Port closed — camera service down |
 
 Any red: see [Quick Fixes](#2-quick-fixes).
@@ -75,7 +75,7 @@ Symptom → action, most common first. SSH: user `mars`, password `R0v3r!`.
 | Tablet shows **Disconnected** dot | Rover off / wrong WiFi | Check rover power; confirm tablet is on `marsyard`. Check `/status`. |
 | Rover badge **Unreachable** | Rover powered off or not on WiFi | Power-cycle the rover; wait 1 min. |
 | Rover badge **Processor stalled** | Queue thread died on the rover | `ssh mars@<rover>.local` then `sudo systemctl restart rover-server` |
-| Rover badge **amber (Mock driver)** | Server running without hardware libs | `ssh` to rover, `journalctl -u rover-server -n 50` — usually a missing `PYTHONPATH=/home/mars/marsrover` or hardware lib error. |
+| Rover badge **amber (Fake driver)** | Server running without hardware libs | `ssh` to rover, `journalctl -u rover-server -n 50` — usually a missing `PYTHONPATH=/home/mars/marsrover` or hardware lib error. |
 | Monitor queue panel frozen | Stale stream connection | It self-heals within ~45s. Or press the **↻** button on the monitor. |
 | Camera black on monitor | Camera service down or cable loose | Wait 40s (auto-restart + reconnect). Else `ssh mars@mro.local`, `sudo systemctl restart satellite-camera`; check the ribbon cable. |
 | Whole web UI down (`/code/` won't load) | Satellite web service down | `ssh mars@mro.local`, `sudo systemctl restart satellite-web`. If SSH fails, power-cycle the satellite. |
@@ -192,11 +192,11 @@ running — restart `rover-server`.
 
 ### Testing without hardware
 
-- The rover server falls back to a **mock driver** automatically when the
+- The rover server falls back to a **fake driver** automatically when the
   4tronix libraries aren't present, so the full stack runs on a laptop:
   `python yard/rover/rover_server.py` plus
   `ROVER_URL=http://localhost:8523 python yard/satellite/web_server.py`.
-- The tablet UI has an offline mock mode: `/code/?mock=true` shows what would
+- The tablet UI has an offline spy mode: `/code/?spy=true` shows what would
   be sent without any network calls.
 - Test suites (see [docs/testing.md](docs/testing.md)):
 

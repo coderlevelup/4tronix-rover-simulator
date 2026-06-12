@@ -88,7 +88,7 @@ class RoverQueueService(RoverQueuePort):
         """Initialize the queue service.
 
         Args:
-            driver: RoverDriver instance (real or mock)
+            driver: RoverDriver instance (real or fake)
             history_size: Max number of completed instructions to keep
             time_provider: Optional callable returning current datetime (for testing)
             uuid_provider: Optional callable returning UUID string (for testing)
@@ -231,6 +231,7 @@ class RoverQueueService(RoverQueuePort):
             'status': 'ok' if alive else 'degraded',
             'processor_alive': alive,
             'driver': self.driver.__class__.__name__,
+            'hardware': getattr(self.driver, 'hardware', True),
             'queue_size': len(self._queue)
         }
 

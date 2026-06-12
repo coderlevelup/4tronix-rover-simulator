@@ -10,7 +10,7 @@ import pytest
 from datetime import datetime
 from unittest.mock import MagicMock, call
 
-from drivers import MockRoverDriver
+from drivers import FakeRoverDriver
 from service import RoverQueueService
 
 
@@ -19,7 +19,7 @@ class TestRoverQueueService:
 
     def setup_method(self):
         """Set up test fixtures"""
-        self.driver = MockRoverDriver()
+        self.driver = FakeRoverDriver()
         # Use fixed time/uuid for deterministic tests
         self.fixed_time = datetime(2024, 1, 15, 12, 0, 0)
         self.uuid_counter = 0
@@ -168,7 +168,7 @@ class TestRoverQueueService:
         """Health check returns driver class name"""
         result = self.service.get_health()
 
-        assert result['driver'] == 'MockRoverDriver'
+        assert result['driver'] == 'FakeRoverDriver'
 
     def test_health_degraded_without_processor(self):
         """Health reports degraded when the processor thread isn't running"""
@@ -202,8 +202,8 @@ class TestQueueProcessor:
     """Tests for background queue processing"""
 
     def setup_method(self):
-        """Set up test fixtures with mock driver"""
-        self.driver = MockRoverDriver()
+        """Set up test fixtures with fake driver"""
+        self.driver = FakeRoverDriver()
         self.service = RoverQueueService(driver=self.driver)
 
     def teardown_method(self):
@@ -283,8 +283,8 @@ class TestInstructionExecution:
     """Tests for individual instruction execution"""
 
     def setup_method(self):
-        """Set up with tracking mock driver"""
-        self.driver = MockRoverDriver()
+        """Set up with tracking fake driver"""
+        self.driver = FakeRoverDriver()
         self.calls = []
 
         # Track all driver method calls
@@ -411,7 +411,7 @@ class TestRunPython:
     """Tests for run_python instruction execution"""
 
     def setup_method(self):
-        self.driver = MockRoverDriver()
+        self.driver = FakeRoverDriver()
         self.calls = []
         self.driver.forward = lambda s: self.calls.append(('forward', s))
         self.driver.reverse = lambda s: self.calls.append(('reverse', s))
@@ -515,7 +515,7 @@ class TestRunPythonInterrupt:
     """Tests for trace-based interruption of runaway run_python code"""
 
     def setup_method(self):
-        self.driver = MockRoverDriver()
+        self.driver = FakeRoverDriver()
         self.calls = []
         self.driver.stop = lambda: self.calls.append(('stop',))
 
@@ -607,7 +607,7 @@ class TestProcessorResilience:
     """Tests that the processor thread survives unexpected exceptions"""
 
     def setup_method(self):
-        self.driver = MockRoverDriver()
+        self.driver = FakeRoverDriver()
         self.service = RoverQueueService(driver=self.driver)
 
     def teardown_method(self):

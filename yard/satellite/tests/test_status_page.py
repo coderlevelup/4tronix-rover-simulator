@@ -51,7 +51,7 @@ def test_satellite_always_green(page: Page, live_server):
 def test_rover_green(page: Page, live_server):
     mock_status(page, rover={
         'reachable': True, 'driver': 'RealRoverDriver', 'queue_size': 0, 'url': 'http://x',
-        'status': 'ok', 'processor_alive': True
+        'status': 'ok', 'processor_alive': True, 'hardware': True
     })
     page.goto(f'{live_server}/status')
     wait_for_badge(page, 'rover')
@@ -59,15 +59,15 @@ def test_rover_green(page: Page, live_server):
     assert page.locator('#label-rover').text_content() == 'OK'
 
 
-def test_rover_amber_mock_driver(page: Page, live_server):
+def test_rover_amber_fake_driver(page: Page, live_server):
     mock_status(page, rover={
-        'reachable': True, 'driver': 'MockRoverDriver', 'queue_size': 0, 'url': 'http://x',
-        'status': 'ok', 'processor_alive': True
+        'reachable': True, 'driver': 'FakeRoverDriver', 'queue_size': 0, 'url': 'http://x',
+        'status': 'ok', 'processor_alive': True, 'hardware': False
     })
     page.goto(f'{live_server}/status')
     wait_for_badge(page, 'rover')
     assert 'amber' in page.locator('#badge-rover').get_attribute('class')
-    assert 'Mock' in page.locator('#label-rover').text_content()
+    assert 'Fake' in page.locator('#label-rover').text_content()
 
 
 def test_rover_red_processor_stalled(page: Page, live_server):

@@ -194,9 +194,8 @@
                             row('Queue', r.queue_size)
                         );
                     } else {
-                        const isMock = r.driver && r.driver.toLowerCase().includes('mock');
-                        if (isMock) {
-                            setBadge('rover', { colour: 'amber', icon: '!', text: 'Mock driver (no hardware)' });
+                        if (r.hardware === false) {
+                            setBadge('rover', { colour: 'amber', icon: '!', text: 'Fake driver (no hardware)' });
                         } else {
                             setBadge('rover', { colour: 'green', icon: '✓', text: 'OK' });
                         }

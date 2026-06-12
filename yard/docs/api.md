@@ -98,7 +98,8 @@ curl http://marspi.local:8523/health
 {
   "status": "ok",
   "processor_alive": true,
-  "driver": "MockRoverDriver",
+  "driver": "FakeRoverDriver",
+  "hardware": false,
   "queue_size": 0
 }
 ```

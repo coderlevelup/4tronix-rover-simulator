@@ -77,7 +77,7 @@ The rover server follows the Ports & Adapters (Hexagonal) pattern for testabilit
 │  │    - forward(), reverse(), spin_left(), spin_right() │   │
 │  │    - steer_left(), steer_right(), stop()             │   │
 │  ├─────────────────────────────────────────────────────┤   │
-│  │  RealRoverDriver    │  MockRoverDriver               │   │
+│  │  RealRoverDriver    │  FakeRoverDriver               │   │
 │  │  (Pi hardware)      │  (logging for dev/test)        │   │
 │  └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
@@ -87,7 +87,7 @@ The rover server follows the Ports & Adapters (Hexagonal) pattern for testabilit
 
 - **Unit tests** call `RoverQueueService` directly (no HTTP overhead)
 - **Integration tests** use Flask test client (full stack)
-- **Mock driver** enables testing without hardware
+- **Fake driver** enables testing without hardware
 - **Dependency injection** for time/uuid providers in tests
 
 ## Directory Structure
@@ -97,7 +97,7 @@ yard/
 ├── rover/
 │   ├── rover_server.py      # Flask HTTP adapter (thin layer)
 │   ├── service.py           # RoverQueueService (business logic)
-│   ├── drivers.py           # RoverDriver interface + Real/Mock implementations
+│   ├── drivers.py           # RoverDriver interface + Real/Fake implementations
 │   ├── test_service.py      # Unit tests (26 tests)
 │   ├── test_integration.py  # Integration tests (26 tests)
 │   └── requirements.txt
@@ -236,13 +236,13 @@ class RoverService {
 // Real adapter - calls actual API
 class RealRoverService extends RoverService { ... }
 
-// Mock adapter - logs to UI for testing
-class MockRoverService extends RoverService { ... }
+// Spy adapter - records and displays what would be sent
+class SpyRoverService extends RoverService { ... }
 
 // Injection via URL parameter
-const service = new URL(location).searchParams.get('mock')
-    ? new MockRoverService(outputElement)
+const service = isSpyMode
+    ? new SpyRoverService(outputElement)
     : new RealRoverService('/api');
 ```
 
-Test mode: `/code/?mock=true` - works offline, shows what would be sent.
+Spy mode: `/code/?spy=true` - works offline, shows what would be sent (`?mock=true` is a legacy alias).

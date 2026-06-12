@@ -54,7 +54,7 @@ Tests inject fixed time and UUID providers for deterministic results:
 
 ```python
 self.service = RoverQueueService(
-    driver=MockRoverDriver(),
+    driver=FakeRoverDriver(),
     time_provider=lambda: datetime(2024, 1, 15, 12, 0, 0),
     uuid_provider=lambda: f"test-uuid-{counter}"
 )
@@ -67,7 +67,7 @@ Integration tests use Flask's test client:
 ```python
 @pytest.fixture
 def client():
-    driver = MockRoverDriver()
+    driver = FakeRoverDriver()
     service = RoverQueueService(driver=driver)
     create_app(service)
 
@@ -91,33 +91,33 @@ def test_add_returns_200(self, client):
 
 ## Manual Testing
 
-### Test Rover Server (Mock Mode)
+### Test Rover Server (Fake Driver)
 
-On any machine (not Pi), the server auto-detects and uses MockRoverDriver:
+On any machine (not Pi), the server auto-detects and uses FakeRoverDriver:
 
 ```bash
 cd yard/rover
 python rover_server.py
-# Output: "Using MockRoverDriver (not on Pi)"
+# Output: "Using FakeRoverDriver (not on Pi)"
 
 # Test with curl
 curl -X POST http://localhost:8523/queue/add \
   -H "Content-Type: application/json" \
   -d '[{"cmd": "forward", "params": {"speed": 60, "seconds": 1}}]'
 
-# Watch server logs for mock commands:
-# [MOCK] Forward at speed 60
-# [MOCK] Stop
+# Watch server logs for fake-driver commands:
+# [FAKE] Forward at speed 60
+# [FAKE] Stop
 ```
 
-### Test Tablet Client (Mock Mode)
+### Test Tablet Client (Spy Mode)
 
 ```
-http://localhost:5050/code/?mock=true
+http://localhost:5050/code/?spy=true
 ```
 
-In mock mode:
-- Shows mock output panel below Blockly workspace
+In spy mode:
+- Shows spy output panel below Blockly workspace
 - Displays exactly what instructions would be sent
 - No network calls - works completely offline
 
@@ -132,23 +132,23 @@ In mock mode:
 7. Click Stop mid-execution
 8. Verify immediate stop and queue clear
 
-## Mock Driver
+## Fake Driver
 
-The `MockRoverDriver` logs all commands instead of controlling hardware:
+The `FakeRoverDriver` logs all commands instead of controlling hardware:
 
 ```python
-class MockRoverDriver(RoverDriver):
+class FakeRoverDriver(RoverDriver):
     def forward(self, speed):
-        print(f"[MOCK] Forward at speed {speed}")
+        print(f"[FAKE] Forward at speed {speed}")
 
     def stop(self):
-        print(f"[MOCK] Stop")
+        print(f"[FAKE] Stop")
 ```
 
 Auto-detection logic in `create_driver()`:
 - Checks for `/dev/i2c-1` (Pi I2C bus)
 - If found: returns `RealRoverDriver`
-- If not found: returns `MockRoverDriver`
+- If not found: returns `FakeRoverDriver`
 
 ## Writing New Tests
 

@@ -79,6 +79,7 @@ def api_status():
             rover['queue_size'] = data.get('queue_size')
             rover['status'] = data.get('status')
             rover['processor_alive'] = data.get('processor_alive')
+            rover['hardware'] = data.get('hardware')
     except Exception:
         pass
 

@@ -21,7 +21,7 @@ yard/
 └── docs/
 ```
 
-**Rover** (marspi.local:8523) - Receives instructions via REST API and executes them in order. Automatically uses mock mode when not on a Pi.
+**Rover** (marspi.local:8523) - Receives instructions via REST API and executes them in order. Automatically falls back to a fake driver (logs instead of moving) when not on a Pi.
 
 **Satellite** (mro.local:5050) - Serves the tablet Blockly interface at `/code/` and the TV monitor at `/monitor/`. Also streams the Pi camera at port 8890.
 

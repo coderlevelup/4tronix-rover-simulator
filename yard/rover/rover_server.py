@@ -100,8 +100,8 @@ def main():
     service = RoverQueueService(driver)
 
     driver_name = driver.__class__.__name__
-    if driver_name == 'MockRoverDriver':
-        print("Using MockRoverDriver (not on Pi)")
+    if driver_name == 'FakeRoverDriver':
+        print("Using FakeRoverDriver (not on Pi)")
     else:
         print("Using RealRoverDriver (Pi detected)")
 

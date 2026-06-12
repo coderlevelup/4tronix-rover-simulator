@@ -2,7 +2,7 @@
 Rover Driver Interface and Implementations
 
 Provides abstraction layer for rover hardware control with injectable drivers
-for testability (real hardware vs mock logging).
+for testability (real hardware vs fake logging stand-in).
 """
 
 import os
@@ -13,6 +13,10 @@ from abc import ABC, abstractmethod
 
 class RoverDriver(ABC):
     """Base class for rover hardware interface"""
+
+    # True when the driver moves a physical rover; the status page shows
+    # an amber badge when this is False
+    hardware = True
 
     @abstractmethod
     def forward(self, speed: int) -> None:
@@ -60,47 +64,49 @@ class RoverDriver(ABC):
         pass
 
 
-class MockRoverDriver(RoverDriver):
-    """Mock driver for testing - logs commands to console"""
+class FakeRoverDriver(RoverDriver):
+    """Fake driver - a working stand-in that logs commands instead of moving hardware"""
+
+    hardware = False
 
     def __init__(self):
         self.animation_running = False
         self.animation_thread = None
-        print("[MOCK] MockRoverDriver initialized")
+        print("[FAKE] FakeRoverDriver initialized")
 
     def forward(self, speed: int) -> None:
-        print(f"[MOCK] Forward at speed {speed}")
+        print(f"[FAKE] Forward at speed {speed}")
 
     def reverse(self, speed: int) -> None:
-        print(f"[MOCK] Reverse at speed {speed}")
+        print(f"[FAKE] Reverse at speed {speed}")
 
     def spin_left(self, speed: int) -> None:
-        print(f"[MOCK] Spin left at speed {speed}")
+        print(f"[FAKE] Spin left at speed {speed}")
         self._start_animation('left')
 
     def spin_right(self, speed: int) -> None:
-        print(f"[MOCK] Spin right at speed {speed}")
+        print(f"[FAKE] Spin right at speed {speed}")
         self._start_animation('right')
 
     def steer_left(self, degrees: float, speed: int) -> None:
-        print(f"[MOCK] Steer left {degrees}° at speed {speed}")
+        print(f"[FAKE] Steer left {degrees}° at speed {speed}")
 
     def steer_right(self, degrees: float, speed: int) -> None:
-        print(f"[MOCK] Steer right {degrees}° at speed {speed}")
+        print(f"[FAKE] Steer right {degrees}° at speed {speed}")
 
     def stop(self) -> None:
-        print("[MOCK] Stop")
+        print("[FAKE] Stop")
         self._stop_animation()
 
     def set_leds(self, pattern: str) -> None:
-        print(f"[MOCK] Set LEDs to pattern: {pattern}")
+        print(f"[FAKE] Set LEDs to pattern: {pattern}")
 
     def cleanup(self) -> None:
         self._stop_animation()
-        print("[MOCK] Cleanup complete")
+        print("[FAKE] Cleanup complete")
 
     def _start_animation(self, direction: str) -> None:
-        """Start mock LED spin animation"""
+        """Start fake LED spin animation"""
         self._stop_animation()
         self.animation_running = True
         self.animation_thread = threading.Thread(
@@ -109,18 +115,18 @@ class MockRoverDriver(RoverDriver):
         self.animation_thread.start()
 
     def _stop_animation(self) -> None:
-        """Stop mock LED animation"""
+        """Stop fake LED animation"""
         self.animation_running = False
         if self.animation_thread:
             self.animation_thread.join(timeout=0.5)
             self.animation_thread = None
 
     def _animate_spin(self, direction: str) -> None:
-        """Mock spin animation - just logs periodically"""
+        """Fake spin animation - just logs periodically"""
         sequence = [1, 2, 3, 0] if direction == 'right' else [1, 0, 3, 2]
         idx = 0
         while self.animation_running:
-            # Don't print every frame in mock mode to avoid spam
+            # Don't print every frame in fake mode to avoid spam
             time.sleep(0.15)
             idx = (idx + 1) % 4
 
@@ -284,7 +290,7 @@ def create_driver() -> RoverDriver:
         try:
             return RealRoverDriver()
         except ImportError:
-            print("Warning: rover module not found, falling back to MockRoverDriver")
-            return MockRoverDriver()
+            print("Warning: rover module not found, falling back to FakeRoverDriver")
+            return FakeRoverDriver()
     else:
-        return MockRoverDriver()
+        return FakeRoverDriver()

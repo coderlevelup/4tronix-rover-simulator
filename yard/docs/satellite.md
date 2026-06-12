@@ -235,13 +235,14 @@ Both tabs submit a `run_python` instruction when Run is pressed. Blockly submiss
 | Wait | Green | time (seconds) |
 | Repeat | Orange | times, inner blocks |
 
-### Mock Mode
+### Spy Mode
 
 ```
-http://mro.local:5050/code/?mock=true
+http://mro.local:5050/code/?spy=true
 ```
 
-Shows what instructions would be sent without making network calls.
+Shows what instructions would be sent without making network calls
+(`?mock=true` still works as a legacy alias).
 
 ### Ports & Adapters
 
@@ -249,11 +250,11 @@ Shows what instructions would be sent without making network calls.
 // Real mode (production)
 const service = new RealRoverService('/api');
 
-// Mock mode (testing)
-const service = new MockRoverService(outputElement);
+// Spy mode (testing) — records and displays what would be sent
+const service = new SpyRoverService(outputElement);
 
-// Auto-detect via URL parameter
-const isMock = new URL(location).searchParams.get('mock') === 'true';
+// Auto-detect via URL parameter (?spy=true, or legacy ?mock=true)
+const isSpyMode = urlParams.get('spy') === 'true' || urlParams.get('mock') === 'true';
 ```
 
 ### PWA Installation (iPad)

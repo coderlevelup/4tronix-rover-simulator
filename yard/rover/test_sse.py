@@ -19,7 +19,7 @@ import threading
 import pytest
 from datetime import datetime
 
-from drivers import MockRoverDriver
+from drivers import FakeRoverDriver
 from service import RoverQueueService
 from rover_server import app, create_app
 
@@ -110,7 +110,7 @@ def _collect_sse_chunks(client, path, count, trigger_fn=None, trigger_delay=0.1,
 
 @pytest.fixture
 def service():
-    driver = MockRoverDriver()
+    driver = FakeRoverDriver()
     svc = RoverQueueService(driver=driver)
     yield svc
     svc.cleanup()
@@ -118,7 +118,7 @@ def service():
 
 @pytest.fixture
 def service_with_processor():
-    driver = MockRoverDriver()
+    driver = FakeRoverDriver()
     svc = RoverQueueService(driver=driver)
     svc.start_processor()
     yield svc
@@ -309,7 +309,7 @@ class TestSSEHTTPEndpoint:
 class TestStopInterruptsRunPython:
 
     def setup_method(self):
-        self.driver = MockRoverDriver()
+        self.driver = FakeRoverDriver()
         self.driver.stop = lambda: None
 
         class _TestRover:

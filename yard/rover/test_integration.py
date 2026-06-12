@@ -9,15 +9,15 @@ import time
 import pytest
 from datetime import datetime
 
-from drivers import MockRoverDriver
+from drivers import FakeRoverDriver
 from service import RoverQueueService
 from rover_server import app, create_app
 
 
 @pytest.fixture
 def client():
-    """Create test client with injected mock service"""
-    driver = MockRoverDriver()
+    """Create test client with injected fake-driver service"""
+    driver = FakeRoverDriver()
     service = RoverQueueService(
         driver=driver,
         time_provider=lambda: datetime(2024, 1, 15, 12, 0, 0),
@@ -36,7 +36,7 @@ def client():
 @pytest.fixture
 def client_with_processor():
     """Create test client with running queue processor"""
-    driver = MockRoverDriver()
+    driver = FakeRoverDriver()
     service = RoverQueueService(driver=driver)
     service.start_processor()
 
@@ -85,7 +85,7 @@ class TestHealthEndpoint:
         response = client.get('/health')
         data = response.get_json()
 
-        assert data['driver'] == 'MockRoverDriver'
+        assert data['driver'] == 'FakeRoverDriver'
 
     def test_health_contains_queue_size(self, client):
         """Health response contains queue size"""

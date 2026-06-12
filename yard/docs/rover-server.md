@@ -1,6 +1,6 @@
 # Rover Server
 
-The rover server is a queue-based REST API that processes instructions for the rover. It can run in mock mode (for development) or connect to real hardware on a Raspberry Pi.
+The rover server is a queue-based REST API that processes instructions for the rover. It can run with a fake driver (for development) or connect to real hardware on a Raspberry Pi.
 
 ## Hardware Assembly
 
@@ -370,12 +370,12 @@ python rover_server.py
 
 You should see a message like:
 ```
-Using MockRoverDriver (not on Pi)
+Using FakeRoverDriver (not on Pi)
 Queue processor started
 Starting rover server on port 8523...
 ```
 
-The "MockRoverDriver" message means it's running in simulator mode - perfect for development!
+The "FakeRoverDriver" message means it's running in simulator mode - perfect for development!
 
 ## Sending Commands
 
@@ -389,8 +389,8 @@ curl -X POST http://localhost:8523/queue/add \
 
 This tells the rover to move forward at speed 60 for 2 seconds. Back in your server window, you should see:
 ```
-[MOCK] Forward at speed 60
-[MOCK] Stop
+[FAKE] Forward at speed 60
+[FAKE] Stop
 ```
 
 You can also check what the rover is doing:
@@ -431,7 +431,7 @@ This runs 52 tests that check all the different parts of the server. If you see 
 
 ## On a Raspberry Pi
 
-When running on a Raspberry Pi with the real rover hardware connected, the server automatically detects this and uses the real hardware driver instead of the mock. You'll see:
+When running on a Raspberry Pi with the real rover hardware connected, the server automatically detects this and uses the real hardware driver instead of the fake. You'll see:
 
 ```
 Using RealRoverDriver (Pi detected)
