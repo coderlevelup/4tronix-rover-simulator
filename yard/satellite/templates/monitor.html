@@ -146,6 +146,29 @@
             display: block;
         }
 
+        .instruction-photo-error {
+            margin-top: 6px;
+            padding: 12px;
+            border-radius: 8px;
+            background: #2a1010;
+            border: 1px solid #f44336;
+            text-align: center;
+        }
+
+        .photo-error-title {
+            color: #ff8a80;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .photo-error-why {
+            color: #c98;
+            font-family: monospace;
+            font-size: 11px;
+            margin-top: 4px;
+            word-break: break-word;
+        }
+
         .camera-message.hidden {
             display: none;
         }
@@ -899,6 +922,13 @@
                     extraHtml += instr.id === this.latestPhotoId
                         ? `<img class="instruction-photo" src="/api/photo?t=${encodeURIComponent(instr.id)}" alt="Rover photo">`
                         : `<div class="instruction-params">&#128247; photo taken</div>`;
+                } else if (instr.photo_attempted) {
+                    // Photo block ran but capture failed — show it where the
+                    // picture would have been instead of failing silently
+                    const why = instr.error ? this.escapeHtml(instr.error) : 'Camera error';
+                    extraHtml += `<div class="instruction-photo-error">`
+                        + `<div class="photo-error-title">&#128247; Photo failed</div>`
+                        + `<div class="photo-error-why">${why}</div></div>`;
                 }
 
                 return `

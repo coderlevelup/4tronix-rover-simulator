@@ -564,6 +564,7 @@ class TestRunPythonOutput:
 
         assert self.photos == ['snap']
         assert status['history'][0]['photo'] is True
+        assert status['history'][0]['photo_attempted'] is True
         assert 'Photo taken' in status['history'][0]['output']
 
     def test_photo_provider_failure_is_instruction_error(self):
@@ -573,8 +574,13 @@ class TestRunPythonOutput:
         self.service._photo_provider = boom
         status = self._run("take_photo()\n")
 
-        assert status['history'][0]['status'] == 'error'
-        assert 'no camera' in status['history'][0]['error']
+        instr = status['history'][0]
+        assert instr['status'] == 'error'
+        assert 'no camera' in instr['error']
+        # photo_attempted set but photo not — lets the monitor show a
+        # "photo failed" placeholder where the picture would have been
+        assert instr['photo_attempted'] is True
+        assert 'photo' not in instr
 
 
 class TestRunPythonInterrupt:

@@ -359,8 +359,11 @@ class RoverQueueService(RoverQueuePort):
                     sleep = staticmethod(lambda s: service_ref._interruptible_wait(s))
 
                 def _take_photo():
+                    # Mark the attempt first so a failed capture is
+                    # distinguishable from "no photo block" on the monitor
+                    instruction['photo_attempted'] = True
                     path = self._photo_provider()
-                    # Mark the instruction so the monitor knows to fetch /photo
+                    # photo=True means a photo is available to fetch at /photo
                     instruction['photo'] = True
                     print('Photo taken')
                     return path
