@@ -94,6 +94,18 @@ class TestHealthEndpoint:
 
         assert 'queue_size' in data
 
+    def test_health_contains_camera(self, client, monkeypatch):
+        """Health reports mast-camera detection (cached probe)"""
+        import rover_server
+        rover_server._camera_status = None  # reset cache for the test
+        monkeypatch.setattr(rover_server, '_probe_camera',
+                            lambda: {'detected': True, 'model': 'imx219'})
+        response = client.get('/health')
+        data = response.get_json()
+
+        assert data['camera'] == {'detected': True, 'model': 'imx219'}
+        rover_server._camera_status = None  # don't leak cache to other tests
+
 
 class TestQueueAddEndpoint:
     """Tests for POST /queue/add"""

@@ -101,6 +101,7 @@ def api_status():
             rover['status'] = data.get('status')
             rover['processor_alive'] = data.get('processor_alive')
             rover['hardware'] = data.get('hardware')
+            rover['camera'] = data.get('camera')
     except Exception:
         pass
 

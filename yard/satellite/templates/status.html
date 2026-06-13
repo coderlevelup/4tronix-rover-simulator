@@ -236,6 +236,16 @@
             return label + ': <span>' + (value ?? '—') + '</span>  ';
         }
 
+        // Mast camera line for the rover card (the rover's own camera, used by
+        // the Take a Picture block — distinct from the satellite stream below)
+        function roverCam(r) {
+            const cam = r.camera;
+            if (!cam) return '';
+            return cam.detected
+                ? '<br>Mast cam: <span style="color:#4ade80">' + (cam.model || 'detected') + ' ✓</span>'
+                : '<br>Mast cam: <span style="color:#f87171">not detected ✗ (reseat + reboot)</span>';
+        }
+
         function poll() {
             fetch('/api/status')
                 .then(r => r.json())
@@ -261,7 +271,8 @@
                         setBadge('rover', { colour: 'red', icon: '✗', text: 'Processor stalled' });
                         setDetail('rover',
                             row('Driver', r.driver) +
-                            row('Queue', r.queue_size)
+                            row('Queue', r.queue_size) +
+                            roverCam(r)
                         );
                     } else {
                         if (r.hardware === false) {
@@ -271,7 +282,8 @@
                         }
                         setDetail('rover',
                             row('Driver', r.driver) +
-                            row('Queue', r.queue_size)
+                            row('Queue', r.queue_size) +
+                            roverCam(r)
                         );
                     }
 

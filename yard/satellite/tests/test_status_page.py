@@ -70,6 +70,30 @@ def test_rover_amber_fake_driver(page: Page, live_server):
     assert 'Fake' in page.locator('#label-rover').text_content()
 
 
+def test_rover_mast_camera_detected(page: Page, live_server):
+    mock_status(page, rover={
+        'reachable': True, 'driver': 'RealRoverDriver', 'queue_size': 0, 'url': 'http://x',
+        'status': 'ok', 'processor_alive': True, 'hardware': True,
+        'camera': {'detected': True, 'model': 'imx219'}
+    })
+    page.goto(f'{live_server}/status')
+    wait_for_badge(page, 'rover')
+    detail = page.locator('#detail-rover').inner_text()
+    assert 'imx219' in detail
+
+
+def test_rover_mast_camera_not_detected(page: Page, live_server):
+    mock_status(page, rover={
+        'reachable': True, 'driver': 'RealRoverDriver', 'queue_size': 0, 'url': 'http://x',
+        'status': 'ok', 'processor_alive': True, 'hardware': True,
+        'camera': {'detected': False, 'model': None}
+    })
+    page.goto(f'{live_server}/status')
+    wait_for_badge(page, 'rover')
+    detail = page.locator('#detail-rover').inner_text()
+    assert 'not detected' in detail
+
+
 def test_rover_red_processor_stalled(page: Page, live_server):
     mock_status(page, rover={
         'reachable': True, 'driver': 'RealRoverDriver', 'queue_size': 3, 'url': 'http://x',

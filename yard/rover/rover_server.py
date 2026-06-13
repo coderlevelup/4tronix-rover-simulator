@@ -6,6 +6,8 @@ All business logic is in the RoverQueueService.
 """
 
 import os
+import re
+import subprocess
 
 from flask import Flask, request, jsonify, Response, stream_with_context, send_file
 import queue as queue_module
@@ -14,6 +16,31 @@ from drivers import create_driver
 from service import RoverQueueService, PHOTO_PATH
 
 app = Flask(__name__)
+
+# Mast-camera detection is fixed at boot (the CSI sensor is probed once), so
+# we detect on first request and cache it for the process lifetime. A reboot
+# restarts this process and re-probes — exactly when the answer can change.
+_camera_status = None
+
+
+def _probe_camera():
+    """Return {'detected': bool, 'model': str|None}. Cheap I2C-level detect."""
+    try:
+        out = subprocess.run(
+            ['rpicam-hello', '--list-cameras'],
+            capture_output=True, text=True, timeout=10
+        ).stdout
+        m = re.search(r'imx\d+', out)
+        return {'detected': bool(m), 'model': m.group(0) if m else None}
+    except Exception:
+        return {'detected': False, 'model': None}
+
+
+def get_camera_status():
+    global _camera_status
+    if _camera_status is None:
+        _camera_status = _probe_camera()
+    return _camera_status
 
 # Service instance - initialized in main() or create_app()
 service: RoverQueueService = None
@@ -91,6 +118,7 @@ def queue_events():
 def health():
     """Health check endpoint"""
     result = service.get_health()
+    result['camera'] = get_camera_status()
     return jsonify(result)
 
 
