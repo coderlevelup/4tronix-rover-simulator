@@ -279,14 +279,27 @@ data", we swapped each variable and watched the result hold or change:
 - **OS + camera stack** (Bookworm libcamera → Bullseye libcamera → Bullseye
   *legacy firmware* via `start_x=1` + `raspistill`, which bypasses libcamera
   entirely) — all identical → **not software, not libcamera.**
-- **The Pi itself** (moved the SD card to a different board) — **fixed it.**
-  That isolates the fault to the original Pi's CSI connector (ESD damage from
-  handling is a common cause — see RPi forum thread 278738).
+- **The Pi itself** (moved the SD card to a different board) — **started
+  working.** Tempting to conclude "the old Pi's CSI port was dead" — but
+  beware: moving boards also meant *replugging the camera ribbon*, so "new Pi"
+  and "fresh reseat" changed together. That is **not** a clean single-variable
+  test, and the reseat alone could be the real cure.
 
-The lesson: *detected-but-no-data that survives every software and accessory
-swap is a dead CSI data path.* On a Pi Zero the camera connector is wired to
-one fixed lane set, so there's no software lane-remap — the fix is a different
-Pi (a Zero 2 W drops straight in).
+**Heisenbug discipline.** Intermittent CSI faults (a marginal contact,
+oxidation, a hairline ribbon crack that conducts when flexed one way) mimic a
+hard failure perfectly — until they don't. Two rules this saga taught:
+
+1. *A fix that changed more than one variable hasn't proven a root cause.* It
+   proved "the system can work," not "X was broken."
+2. *Confirm by reverting.* Put the same now-working camera+cable back on the
+   original Pi and retest **several times**. Fails repeatably → that port is
+   genuinely bad. Works now → it was intermittent and a reseat was the cure;
+   the "different Pi" was a red herring.
+
+For a classroom rig the practical upshot is the same either way — *if a camera
+won't stream, reseat both ends firmly first; if that fails, try a different
+Pi* — but don't write "dead port" in the logbook until the revert test backs
+it up.
 
 **One gotcha that masquerades as a hardware fault:** an OS too old for the
 sensor reports `No cameras available` even with a perfect cable. Old Bullseye
