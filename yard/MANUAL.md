@@ -235,6 +235,66 @@ libraries are fine — debug upwards from `curl http://localhost:8523/health`
 on the rover. There's also `./cam.sh` on the rover for a quick local
 camera preview (only useful with a monitor attached).
 
+### Diagnosing the camera (a worked method)
+
+The camera is the flakiest part of the rig, so this is the fullest worked
+example of *how to think* about a rover fault — the same method applies to
+any subsystem.
+
+**The mental model — two independent layers on one ribbon.** A camera cable
+carries two separate things:
+
+1. **I2C control wires** — used to *detect and configure* the sensor at boot.
+2. **CSI high-speed data lanes** — used to actually *move pixels*.
+
+These fail independently, and which one is broken tells you where to look.
+Always find out which layer works before touching anything.
+
+**The three commands that localise it** (run on the rover over SSH):
+
+```bash
+# Layer 1 — is the sensor seen at all? (I2C control path)
+rpicam-hello --list-cameras        # Bookworm
+libcamera-hello --list-cameras     # Bullseye
+vcgencmd get_camera                # firmware-level: detected=1 means I2C ok
+
+# Layer 2 — can it actually stream pixels? (CSI data path)
+rpicam-still -n --immediate -o /tmp/t.jpg     # Bookworm
+libcamera-still -t 1500 -o /tmp/t.jpg         # Bullseye
+```
+
+**Read the result as a decision tree:**
+
+| `--list-cameras` | capture | Meaning | Where to look |
+|---|---|---|---|
+| shows the sensor | makes a JPEG | **Working.** | — |
+| shows the sensor | `Device timeout` / `frontend timed out` / `No data received from sensor` | I2C fine, **data lanes dead** | Physical: cable seating/orientation, a cracked ribbon, or a damaged CSI connector. **Not software.** |
+| `No cameras available` | — | Sensor not even detected | Cable fully unseated/backwards, OR the OS/stack is too old for this sensor (see below) |
+
+**Isolate by changing ONE variable at a time.** When we hit "detects but no
+data", we swapped each variable and watched the result hold or change:
+
+- **Camera module** (v2 / CM3 / v3) — symptom unchanged → not the camera.
+- **Cable** — symptom unchanged → not (just) the cable.
+- **OS + camera stack** (Bookworm libcamera → Bullseye libcamera → Bullseye
+  *legacy firmware* via `start_x=1` + `raspistill`, which bypasses libcamera
+  entirely) — all identical → **not software, not libcamera.**
+- **The Pi itself** (moved the SD card to a different board) — **fixed it.**
+  That isolates the fault to the original Pi's CSI connector (ESD damage from
+  handling is a common cause — see RPi forum thread 278738).
+
+The lesson: *detected-but-no-data that survives every software and accessory
+swap is a dead CSI data path.* On a Pi Zero the camera connector is wired to
+one fixed lane set, so there's no software lane-remap — the fix is a different
+Pi (a Zero 2 W drops straight in).
+
+**One gotcha that masquerades as a hardware fault:** an OS too old for the
+sensor reports `No cameras available` even with a perfect cable. Old Bullseye
+libcamera (≈v0.0.5) has no auto-detect for the Camera Module 3 (imx708) — you
+must force it with `dtoverlay=imx708` (and `camera_auto_detect=0`) in
+`/boot/firmware/config.txt`. Bookworm auto-detects all current modules, so
+prefer Bookworm on the rover and this whole class of confusion disappears.
+
 ### Known limitations
 
 - **Pending queue is lost on rover reboot** — by design; kids press Run again.
