@@ -1,0 +1,10 @@
+# Satellite dependencies for macOS (laptop satellite replacing the Pi)
+# Use this instead of requirements.txt — omits picamera2 which won't pip-install on macOS.
+# pip install -r requirements-mac.txt
+flask>=2.0.0
+requests>=2.28.0
+websockets>=10.0
+opencv-python
+# pyobjc-framework-AVFoundation is optional but recommended:
+# gives friendly camera names ("FaceTime HD Camera") in the /status picker.
+pyobjc-framework-AVFoundation

@@ -990,7 +990,7 @@
         }
 
         const camera = new CameraClient('cameraCanvas');
-        camera.connect();
+        camera.connect('ws://' + location.hostname + ':8890');
 
         // Queue — SSE push with manual refresh fallback
         const queue = new QueuePoller();

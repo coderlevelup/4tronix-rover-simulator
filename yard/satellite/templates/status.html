@@ -162,6 +162,28 @@
             color: #f87171;
             font-size: 0.8rem;
         }
+
+        .cam-picker {
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .cam-picker select {
+            background: #111;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+            color: #ccc;
+            font-size: 0.82rem;
+            padding: 0.3rem 0.5rem;
+            cursor: pointer;
+        }
+
+        .cam-picker label {
+            font-size: 0.8rem;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -212,6 +234,11 @@
                 <div class="card-title">Camera</div>
                 <div class="card-detail" id="detail-camera">Loading&hellip;</div>
                 <div class="status-label grey" id="label-camera">checking</div>
+                <!-- Mac only: camera source picker (hidden on Pi — no control server) -->
+                <div class="cam-picker" id="cam-picker" hidden>
+                    <label for="camera-source">Source:</label>
+                    <select id="camera-source"></select>
+                </div>
             </div>
         </div>
     </div>
@@ -354,6 +381,47 @@
             if (e.key === 'Enter') saveUrl();
             if (e.key === 'Escape') urlEditor.hidden = true;
         });
+
+        // Camera source picker (Mac satellite only)
+        // Fetches /api/camera/devices; hides itself when {available:false} (Pi case).
+        const camPicker = document.getElementById('cam-picker');
+        const camSelect = document.getElementById('camera-source');
+
+        function renderCamPicker(data) {
+            if (!data.available || !data.devices || data.devices.length === 0) {
+                camPicker.hidden = true;
+                return;
+            }
+            camPicker.hidden = false;
+            // Rebuild options, preserving current selection
+            const active = data.devices.find(d => d.active);
+            const activeIdx = active ? active.index : data.devices[0].index;
+            camSelect.innerHTML = data.devices.map(d =>
+                `<option value="${d.index}"${d.index === activeIdx ? ' selected' : ''}>${d.name}</option>`
+            ).join('');
+        }
+
+        function fetchCamDevices() {
+            fetch('/api/camera/devices')
+                .then(r => r.json())
+                .then(renderCamPicker)
+                .catch(() => { camPicker.hidden = true; });
+        }
+
+        camSelect.addEventListener('change', () => {
+            fetch('/api/camera/select', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ index: parseInt(camSelect.value) }),
+            })
+                .then(r => r.json())
+                .then(renderCamPicker)
+                .catch(() => {});
+        });
+
+        // Load picker once on page open; the 5s poll keeps status fresh but
+        // the device list rarely changes so we don't re-fetch on every poll.
+        fetchCamDevices();
     </script>
 </body>
 </html>

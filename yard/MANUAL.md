@@ -3,6 +3,8 @@
 Everything you need to run, install, and fix the Mars Yard. Operational steps
 first — installation and debugging follow for when you need them.
 
+**Running on a MacBook instead of a satellite Pi?** See [MacBook Setup](MACBOOK_SETUP.md).
+
 The system is three devices:
 
 | Device | Hostname | What it does |

@@ -38,6 +38,7 @@ yard/
 | Doc | Description |
 |-----|-------------|
 | [Yard Manual](MANUAL.md) | **Start here** — operations, quick fixes, installation, debugging |
+| [MacBook Setup](MACBOOK_SETUP.md) | Running the satellite on a Mac (webcam instead of Pi camera) |
 | [Rover Server](docs/rover-server.md) | Setup and API for the queue server |
 | [Satellite](docs/satellite.md) | Web interface and camera server |
 | [Architecture](docs/architecture.md) | System design and data flow |

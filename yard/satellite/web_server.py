@@ -14,6 +14,10 @@ from flask import Flask, render_template, request, jsonify, Response, stream_wit
 
 CAMERA_PORT = int(os.environ.get('CAMERA_PORT', 8890))
 
+# Control API port exposed by mac_camera_server.py (not present on the Pi —
+# routes that call it gracefully return {available:false} on connection error)
+CAMERA_CONTROL_PORT = int(os.environ.get('CAMERA_CONTROL_PORT', 8891))
+
 # Runtime config persisted across restarts (e.g. rover URL edited on /status)
 CONFIG_FILE = os.environ.get(
     'SATELLITE_CONFIG',
@@ -276,6 +280,34 @@ def api_health():
         'rover_url': ROVER_URL,
         'rover_status': rover_status
     })
+
+
+@app.route('/api/camera/devices', methods=['GET'])
+def api_camera_devices():
+    """List cameras available on mac_camera_server.  Returns {available:false} on Pi
+    (no control server) so the /status dropdown silently stays hidden."""
+    try:
+        resp = requests.get(
+            f'http://127.0.0.1:{CAMERA_CONTROL_PORT}/devices', timeout=2.0
+        )
+        return jsonify(resp.json()), resp.status_code
+    except Exception:
+        return jsonify({'devices': [], 'available': False})
+
+
+@app.route('/api/camera/select', methods=['POST'])
+def api_camera_select():
+    """Switch the active camera (Mac only — no-op / 503 if no control server)."""
+    try:
+        data = request.get_json(silent=True) or {}
+        resp = requests.post(
+            f'http://127.0.0.1:{CAMERA_CONTROL_PORT}/select',
+            json=data,
+            timeout=2.0
+        )
+        return jsonify(resp.json()), resp.status_code
+    except Exception:
+        return jsonify({'error': 'Camera control server unavailable'}), 503
 
 
 if __name__ == '__main__':
