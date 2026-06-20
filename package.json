@@ -1,0 +1,13 @@
+{
+  "name": "sapient-rocks-mission-control",
+  "private": true,
+  "scripts": {
+    "dev:authoring": "npm run dev --prefix mission-authoring",
+    "dev:control": "npm run dev --prefix mission-control",
+    "dev:yard": "node scripts/dev-yard.js",
+    "dev": "concurrently --names \"authoring,control,yard\" --prefix-colors \"cyan,magenta,yellow\" \"npm run dev:authoring\" \"npm run dev:control\" \"npm run dev:yard\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

@@ -1,0 +1,392 @@
+openapi: 3.0.3
+info:
+  title: Rover API
+  version: 1.0.0
+  description: |
+    Unified API for controlling physical Pi Zero rovers and cloud-based simulators.
+    Supports queue-based instruction execution with Python code.
+  contact:
+    name: Mission Control Team
+    email: mission-control-team@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://marspi.local:8523
+    description: Physical Rover (Local Network)
+  - url: http://localhost:8080
+    description: Cloud Simulator (Development)
+
+tags:
+  - name: Queue
+    description: Instruction queue management
+  - name: Health
+    description: Service health and status
+
+paths:
+  /queue/add:
+    post:
+      tags:
+        - Queue
+      summary: Add instruction to queue
+      description: |
+        Submits one or more Python code execution instructions to the rover's queue.
+        Physical rovers execute asynchronously; simulators execute synchronously.
+      operationId: addInstructionToQueue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/InstructionRequest'
+            examples:
+              simpleForward:
+                summary: Simple forward movement
+                value:
+                  - apiVersion: v1
+                    cmd: run_python
+                    params:
+                      code: |
+                        rover.forward(60)
+                        time.sleep(2)
+                        rover.stop()
+                      id: mission-abc123
+              multipleCommands:
+                summary: Multiple movement commands
+                value:
+                  - apiVersion: v1
+                    cmd: run_python
+                    params:
+                      code: |
+                        rover.forward(60)
+                        time.sleep(1)
+                        rover.spinLeft(50)
+                        time.sleep(2)
+                        rover.stop()
+                      id: mission-xyz789
+      responses:
+        '200':
+          description: Instructions successfully queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueResponse'
+              examples:
+                physicalRover:
+                  summary: Physical rover response
+                  value:
+                    apiVersion: v1
+                    status: ok
+                    added: 1
+                    instructions:
+                      - id: 550e8400-e29b-41d4-a716-446655440000
+                        apiVersion: v1
+                        cmd: run_python
+                        params:
+                          code: rover.forward(60)\ntime.sleep(2)\nrover.stop()
+                          id: mission-abc123
+                        timestamp: '2026-05-14T10:30:00.000Z'
+                        status: pending
+                simulator:
+                  summary: Simulator response (completed immediately)
+                  value:
+                    apiVersion: v1
+                    status: ok
+                    added: 1
+                    instructions:
+                      - id: 550e8400-e29b-41d4-a716-446655440000
+                        apiVersion: v1
+                        cmd: run_python
+                        params:
+                          code: rover.forward(60)\ntime.sleep(2)\nrover.stop()
+                          id: mission-abc123
+                        timestamp: '2026-05-14T10:30:00.000Z'
+                        status: completed
+                        trajectory:
+                          - x: 0
+                            y: 0
+                            heading: 0
+                          - x: 12.5
+                            y: 0
+                            heading: 0
+                        final_position:
+                          x: 12.5
+                          y: 0
+                          heading: 0
+        '400':
+          description: Bad request (invalid payload or unsupported version)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                validationError:
+                  summary: Code validation failed
+                  value:
+                    apiVersion: v1
+                    status: error
+                    error: Code validation failed
+                    validation_errors:
+                      - 'Forbidden import: os'
+                    added: 0
+                    instructions: []
+                unsupportedVersion:
+                  summary: Unsupported API version
+                  value:
+                    apiVersion: v1
+                    status: error
+                    error: 'Unsupported API version: v2. Supported versions: v1'
+                    unsupportedVersion: true
+                    added: 0
+                    instructions: []
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /queue/clear:
+    post:
+      tags:
+        - Queue
+      summary: Clear instruction queue
+      description: |
+        Clears all pending instructions from the rover's queue.
+        Used for emergency stops.
+      operationId: clearQueue
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Queue cleared successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  message:
+                    type: string
+                  cleared:
+                    type: integer
+                    description: Number of instructions removed
+              examples:
+                physicalRover:
+                  summary: Physical rover cleared 3 instructions
+                  value:
+                    status: ok
+                    message: Queue cleared
+                    cleared: 3
+                simulator:
+                  summary: Simulator (no queue)
+                  value:
+                    status: ok
+                    message: Queue cleared (simulator executes synchronously, no queue to clear)
+                    cleared: 0
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Returns the health status of the rover service
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  service:
+                    type: string
+                    example: rover-simulator-v2
+
+components:
+  schemas:
+    InstructionRequest:
+      type: object
+      required:
+        - apiVersion
+        - cmd
+        - params
+      properties:
+        apiVersion:
+          type: string
+          enum: [v1]
+          description: API version for compatibility checking
+          example: v1
+        cmd:
+          type: string
+          enum: [run_python]
+          description: Command type
+          example: run_python
+        params:
+          type: object
+          required:
+            - code
+            - id
+          properties:
+            code:
+              type: string
+              description: Python code to execute on the rover
+              example: |
+                rover.forward(60)
+                time.sleep(2)
+                rover.stop()
+            id:
+              type: string
+              description: Mission ID for correlation and tracking
+              example: mission-abc123
+
+    InstructionResponse:
+      type: object
+      required:
+        - id
+        - cmd
+        - params
+        - timestamp
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Server-generated instruction ID
+          example: 550e8400-e29b-41d4-a716-446655440000
+        apiVersion:
+          type: string
+          enum: [v1]
+          description: API version used for this instruction
+          example: v1
+        cmd:
+          type: string
+          enum: [run_python]
+          example: run_python
+        params:
+          type: object
+          properties:
+            code:
+              type: string
+              example: rover.forward(60)\ntime.sleep(2)\nrover.stop()
+            id:
+              type: string
+              example: mission-abc123
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when instruction was queued
+          example: '2026-05-14T10:30:00.000Z'
+        status:
+          type: string
+          enum: [pending, executing, completed, error]
+          description: Current status of the instruction
+        trajectory:
+          type: array
+          description: Rover position trajectory (simulator only)
+          items:
+            type: object
+            properties:
+              x:
+                type: number
+                example: 12.5
+              y:
+                type: number
+                example: 0
+              heading:
+                type: number
+                example: 0
+        final_position:
+          type: object
+          description: Final rover position (simulator only)
+          properties:
+            x:
+              type: number
+              example: 12.5
+            y:
+              type: number
+              example: 0
+            heading:
+              type: number
+              example: 0
+        error:
+          type: string
+          description: Error message if status is 'error'
+
+    QueueResponse:
+      type: object
+      required:
+        - status
+        - added
+        - instructions
+      properties:
+        apiVersion:
+          type: string
+          enum: [v1]
+          description: API version echoed back from rover
+          example: v1
+        status:
+          type: string
+          enum: [ok, error]
+          description: Status of the add operation
+        added:
+          type: integer
+          description: Number of instructions successfully added
+          example: 1
+        instructions:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstructionResponse'
+
+    ErrorResponse:
+      type: object
+      required:
+        - status
+        - error
+        - added
+        - instructions
+      properties:
+        apiVersion:
+          type: string
+          enum: [v1]
+          example: v1
+        status:
+          type: string
+          enum: [error]
+        error:
+          type: string
+          description: Human-readable error message
+          example: Code validation failed
+        validation_errors:
+          type: array
+          description: Specific validation errors (if applicable)
+          items:
+            type: string
+          example:
+            - 'Forbidden import: os'
+        unsupportedVersion:
+          type: boolean
+          description: True if the requested API version is not supported
+        added:
+          type: integer
+          description: Number of instructions added (usually 0 for errors)
+          example: 0
+        instructions:
+          type: array
+          description: Instructions array (usually empty for errors)
+          items:
+            $ref: '#/components/schemas/InstructionResponse'
+          example: []

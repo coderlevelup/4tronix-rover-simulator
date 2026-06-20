@@ -14,8 +14,10 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Anchored to repo root so these Python build dirs do NOT match the Next apps'
+# source dirs (e.g. mission-authoring/src/lib/).
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -162,3 +164,13 @@ cython_debug/
 # Yard satellite runtime config (rover URL edited via /status page)
 yard/satellite/satellite_config.json
 .DS_Store
+
+# Node (root workspace tooling + the two Next apps)
+node_modules/
+npm-debug.log*
+
+# Generated simulation videos
+*.mp4
+
+# Root lockfile — dev-only tooling (concurrently); apps own their lockfiles
+/package-lock.json
