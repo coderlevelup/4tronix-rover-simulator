@@ -1,7 +1,7 @@
 """
 Satellite Web Server - Flask server for web interfaces
 
-Runs on mro.local:5050
+Runs on mro.local:3001 (override with the SATELLITE_PORT env var).
 Serves tablet Blockly interface and TV monitor display.
 Proxies API calls to rover server.
 """
@@ -279,9 +279,10 @@ def api_health():
 
 
 if __name__ == '__main__':
-    print(f"Starting satellite web server on port 5050")
+    port = int(os.environ.get('SATELLITE_PORT', 3001))
+    print(f"Starting satellite web server on port {port}")
     print(f"Rover URL: {ROVER_URL}")
     print("Routes:")
     print("  /code/    - Tablet Blockly interface")
     print("  /monitor/ - TV display interface")
-    app.run(host='0.0.0.0', port=5050, threaded=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=port, threaded=True, use_reloader=False)

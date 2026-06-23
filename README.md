@@ -2,6 +2,26 @@
 
 Simulator library to allow dev and test of code for the Raspberry Pi-based 4tronix M.A.R.S. Rover without being connected to the actual Rover.
 
+## Mission Control platform (hub + yard)
+
+This repo also hosts the Mission Control web platform built on top of the simulator.
+From the repo root, `npm run dev` brings the services up on fixed ports:
+
+| Service | URL | What it is |
+|---------|-----|------------|
+| Hub (`mission-authoring`) | http://localhost:3000 | Learner-facing Mission Control app |
+| Yard satellite UI | http://localhost:3001 | Operator/run surface — Blockly editor + TV monitor |
+| Rover backend | http://localhost:8523 | Yard rover server (`yard/rover`) |
+
+```bash
+npm install      # first time only
+npm run dev      # hub:3000 + yard satellite:3001 + rover:8523
+```
+
+Run a single service with `npm run dev:authoring`, `npm run dev:satellite`, or
+`npm run dev:yard`. The satellite port can be overridden with the `SATELLITE_PORT`
+env var. (The legacy `mission-control` app also starts, on :3002, until it is retired.)
+
 ## Getting things set up
 
 We normally use the [Python](https://www.python.org) programming language to program the M.A.R.S. Rover, so this simulator is also all written in Python. The simulator uses a few Python libraries, so the first time you use this on a particular computer you'll need to take some steps to download those libraries.
