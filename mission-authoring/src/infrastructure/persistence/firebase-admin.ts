@@ -7,9 +7,11 @@
 
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { getAuth, Auth } from 'firebase-admin/auth';
 
 let app: App | undefined;
 let firestoreInstance: Firestore | undefined;
+let authInstance: Auth | undefined;
 
 type FirebaseAdminConfig = {
   projectId: string;
@@ -116,4 +118,20 @@ export function getFirestoreInstance(): Firestore {
   firestoreInstance = getFirestore();
 
   return firestoreInstance;
+}
+
+/**
+ * Get Firebase Admin Auth instance
+ * Initializes Firebase Admin if not already initialized.
+ * Used by server-side routes for verifying ID tokens and setting custom claims.
+ */
+export function getFirebaseAdminAuth(): Auth {
+  if (authInstance) {
+    return authInstance;
+  }
+
+  initializeFirebaseAdmin();
+  authInstance = getAuth();
+
+  return authInstance;
 }

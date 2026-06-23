@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Fredoka } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
+import { AuthProvider } from "@/contexts/AuthContext";
 import { LearnerProvider } from "@/contexts/LearnerContext";
 import { PageTransition } from "@/components/layout/PageTransition";
 
@@ -46,13 +47,15 @@ export default function RootLayout({
         <div className="pointer-events-none fixed -top-40 -left-40 h-[480px] w-[480px] rounded-full bg-cosmic/30 blur-3xl" />
         <div className="pointer-events-none fixed -bottom-60 -right-40 h-[640px] w-[640px] rounded-full bg-gradient-mars opacity-30 blur-3xl" />
 
-        <LearnerProvider>
-          <Navbar />
-          {/* pb on mobile keeps content clear of the fixed bottom tab bar */}
-          <div className="pb-16 md:pb-0">
-            <PageTransition>{children}</PageTransition>
-          </div>
-        </LearnerProvider>
+        <AuthProvider>
+          <LearnerProvider>
+            <Navbar />
+            {/* pb on mobile keeps content clear of the fixed bottom tab bar */}
+            <div className="pb-16 md:pb-0">
+              <PageTransition>{children}</PageTransition>
+            </div>
+          </LearnerProvider>
+        </AuthProvider>
       </body>
     </html>
   );
