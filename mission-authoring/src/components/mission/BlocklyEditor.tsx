@@ -1,6 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import {
+  defineRoverBlocks,
+  ROVER_TOOLBOX,
+  workspaceToPython,
+  workspaceToCommands,
+} from './roverBlockly';
 
 interface BlocklyEditorProps {
   onGenerateCommands: (commands: any[]) => void;
@@ -12,6 +18,10 @@ declare global {
     Blockly: any;
   }
 }
+
+// Hub-local storage of the serialized workspace. Separate origin from the yard,
+// so the key name need not match — but the JSON format does (Blockly.serialization).
+const STORAGE_KEY = 'roverWorkspace';
 
 export function BlocklyEditor({ onGenerateCommands, onCodeChange }: BlocklyEditorProps) {
   const blocklyDivRef = useRef<HTMLDivElement>(null);
@@ -56,30 +66,14 @@ export function BlocklyEditor({ onGenerateCommands, onCodeChange }: BlocklyEdito
     const timer = setTimeout(() => {
       if (!blocklyDivRef.current || !window.Blockly || workspaceRef.current) return;
 
-      // Define blocks first
-      defineCustomBlocks();
+      const Blockly = window.Blockly;
 
-      // Create toolbox XML
-      const toolboxXml = `
-        <xml xmlns="https://developers.google.com/blockly/xml" id="toolbox" style="display: none">
-          <category name="Movement" colour="#2196F3">
-            <block type="rover_forward"></block>
-            <block type="rover_backward"></block>
-            <block type="rover_spin_left"></block>
-            <block type="rover_spin_right"></block>
-            <block type="rover_steer_left"></block>
-            <block type="rover_steer_right"></block>
-            <block type="rover_stop"></block>
-          </category>
-          <category name="Control" colour="#4CAF50">
-            <block type="rover_repeat"></block>
-          </category>
-        </xml>
-      `;
+      // Register the shared rover blocks (same defs the yard uses).
+      defineRoverBlocks(Blockly);
 
-      // Initialize workspace
-      const workspace = window.Blockly.inject(blocklyDivRef.current, {
-        toolbox: toolboxXml,
+      // Initialize workspace with the shared category toolbox.
+      const workspace = Blockly.inject(blocklyDivRef.current, {
+        toolbox: ROVER_TOOLBOX,
         renderer: 'zelos',
         zoom: {
           controls: true,
@@ -103,34 +97,45 @@ export function BlocklyEditor({ onGenerateCommands, onCodeChange }: BlocklyEdito
         },
       });
 
-      console.log('Blockly workspace created');
-      console.log('Registered blocks:', Object.keys(window.Blockly.Blocks).filter((k: string) => k.startsWith('rover_')));
-
       workspaceRef.current = workspace;
       setIsInitialized(true);
 
       // Resize after paint so Blockly measures the final container dimensions.
       requestAnimationFrame(() => {
-        window.Blockly.svgResize(workspace);
+        Blockly.svgResize(workspace);
       });
 
-      // Auto-save
-      workspace.addChangeListener(() => {
-        const xml = window.Blockly.Xml.workspaceToDom(workspace);
-        const xmlText = window.Blockly.Xml.domToPrettyText(xml);
-        localStorage.setItem('rover_blockly_workspace', xmlText);
-      });
+      // Restore the saved workspace (JSON via Blockly.serialization), or start
+      // with a fresh "On uplink" hat block — mirrors the yard's bootstrap.
+      const startWithHat = () => {
+        const block = workspace.newBlock('rover_on_receive');
+        block.initSvg();
+        block.render();
+        block.moveBy(40, 40);
+      };
 
-      // Load saved
-      const saved = localStorage.getItem('rover_blockly_workspace');
+      const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         try {
-          const xml = window.Blockly.utils.xml.textToDom(saved);
-          window.Blockly.Xml.domToWorkspace(xml, workspace);
+          Blockly.serialization.workspaces.load(JSON.parse(saved), workspace);
         } catch (e) {
-          console.error('Failed to load saved workspace', e);
+          console.warn('Failed to load saved workspace, starting fresh', e);
+          workspace.clear();
+          startWithHat();
         }
+      } else {
+        startWithHat();
       }
+
+      // Auto-save serialized state on every change.
+      workspace.addChangeListener(() => {
+        try {
+          const state = Blockly.serialization.workspaces.save(workspace);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch {
+          // Non-fatal — a transient change event during load can race; ignore.
+        }
+      });
     }, 200);
 
     return () => {
@@ -173,53 +178,22 @@ export function BlocklyEditor({ onGenerateCommands, onCodeChange }: BlocklyEdito
   const handleRun = () => {
     if (!workspaceRef.current) return;
 
-    const commands = blocksToCommands(workspaceRef.current);
+    const commands = workspaceToCommands(workspaceRef.current);
     if (commands.length === 0) {
-      alert('Add some blocks first!');
+      alert('Add some movement blocks inside "On uplink" first!');
       return;
     }
 
     onGenerateCommands(commands);
   };
 
-  // Generate Python code from blocks for submission
-  const generatePythonCode = () => {
-    if (!workspaceRef.current) return '';
-
-    const commands = blocksToCommands(workspaceRef.current);
-    const pythonLines = commands.map((cmd: any) => {
-      switch (cmd.command) {
-        case 'forward':
-          return `rover.forward(${cmd.speed}, ${cmd.duration})`;
-        case 'backward':
-        case 'reverse':
-          return `rover.reverse(${cmd.speed}, ${cmd.duration})`;
-        case 'spinLeft':
-          return `rover.spinLeft(${cmd.speed}, ${cmd.duration})`;
-        case 'spinRight':
-          return `rover.spinRight(${cmd.speed}, ${cmd.duration})`;
-        case 'steerLeft':
-          return `rover.steerLeft(${cmd.degrees}, ${cmd.speed}, ${cmd.duration})`;
-        case 'steerRight':
-          return `rover.steerRight(${cmd.degrees}, ${cmd.speed}, ${cmd.duration})`;
-        case 'stop':
-          return 'rover.stop()';
-        default:
-          return '';
-      }
-    });
-
-    return pythonLines.filter(line => line).join('\n');
-  };
-
-  // Listen for workspace changes and update parent
+  // Listen for workspace changes and push generated Python up to the parent.
   useEffect(() => {
-    if (!workspaceRef.current || !onCodeChange) return;
+    if (!isInitialized || !workspaceRef.current || !onCodeChange) return;
 
     const workspace = workspaceRef.current;
     const listener = () => {
-      const code = generatePythonCode();
-      onCodeChange(code);
+      onCodeChange(workspaceToPython(workspace));
     };
 
     workspace.addChangeListener(listener);
@@ -244,7 +218,7 @@ export function BlocklyEditor({ onGenerateCommands, onCodeChange }: BlocklyEdito
     <div ref={containerRef} className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <div className="flex items-center justify-between">
         <p className="text-xs text-slate-400">
-          Stack blocks, tune values, and launch a rover run.
+          Stack blocks inside “On uplink”, tune values, and launch a rover run.
         </p>
         <button
           onClick={handleRun}
@@ -261,218 +235,4 @@ export function BlocklyEditor({ onGenerateCommands, onCodeChange }: BlocklyEdito
       />
     </div>
   );
-}
-
-function defineCustomBlocks() {
-  if (!window.Blockly) return;
-
-  // Forward
-  window.Blockly.Blocks['rover_forward'] = {
-    init: function () {
-      this.appendDummyInput()
-        .appendField('Move Forward')
-        .appendField(new window.Blockly.FieldNumber(1.5, 0.1, 10, 0.1), 'DURATION')
-        .appendField('seconds at speed')
-        .appendField(new window.Blockly.FieldNumber(80, 0, 100, 10), 'SPEED');
-      this.setPreviousStatement(true, null);
-      this.setNextStatement(true, null);
-      this.setColour('#2196F3');
-      this.setTooltip('Move forward');
-    },
-  };
-
-  // Backward
-  window.Blockly.Blocks['rover_backward'] = {
-    init: function () {
-      this.appendDummyInput()
-        .appendField('Move Backward')
-        .appendField(new window.Blockly.FieldNumber(1.5, 0.1, 10, 0.1), 'DURATION')
-        .appendField('seconds at speed')
-        .appendField(new window.Blockly.FieldNumber(80, 0, 100, 10), 'SPEED');
-      this.setPreviousStatement(true, null);
-      this.setNextStatement(true, null);
-      this.setColour('#2196F3');
-      this.setTooltip('Move backward');
-    },
-  };
-
-  // Spin Left
-  window.Blockly.Blocks['rover_spin_left'] = {
-    init: function () {
-      this.appendDummyInput()
-        .appendField('Spin Left')
-        .appendField(new window.Blockly.FieldNumber(1, 0.1, 10, 0.1), 'DURATION')
-        .appendField('seconds at speed')
-        .appendField(new window.Blockly.FieldNumber(60, 0, 100, 10), 'SPEED');
-      this.setPreviousStatement(true, null);
-      this.setNextStatement(true, null);
-      this.setColour('#9C27B0');
-      this.setTooltip('Spin left');
-    },
-  };
-
-  // Spin Right
-  window.Blockly.Blocks['rover_spin_right'] = {
-    init: function () {
-      this.appendDummyInput()
-        .appendField('Spin Right')
-        .appendField(new window.Blockly.FieldNumber(1, 0.1, 10, 0.1), 'DURATION')
-        .appendField('seconds at speed')
-        .appendField(new window.Blockly.FieldNumber(60, 0, 100, 10), 'SPEED');
-      this.setPreviousStatement(true, null);
-      this.setNextStatement(true, null);
-      this.setColour('#9C27B0');
-      this.setTooltip('Spin right');
-    },
-  };
-
-  // Steer Left
-  window.Blockly.Blocks['rover_steer_left'] = {
-    init: function () {
-      this.appendDummyInput()
-        .appendField('Steer Left')
-        .appendField(new window.Blockly.FieldNumber(30, 5, 45, 5), 'DEGREES')
-        .appendField('degrees for')
-        .appendField(new window.Blockly.FieldNumber(1.5, 0.1, 10, 0.1), 'DURATION')
-        .appendField('seconds at speed')
-        .appendField(new window.Blockly.FieldNumber(60, 0, 100, 10), 'SPEED');
-      this.setPreviousStatement(true, null);
-      this.setNextStatement(true, null);
-      this.setColour('#03A9F4');
-      this.setTooltip('Steer left');
-    },
-  };
-
-  // Steer Right
-  window.Blockly.Blocks['rover_steer_right'] = {
-    init: function () {
-      this.appendDummyInput()
-        .appendField('Steer Right')
-        .appendField(new window.Blockly.FieldNumber(30, 5, 45, 5), 'DEGREES')
-        .appendField('degrees for')
-        .appendField(new window.Blockly.FieldNumber(1.5, 0.1, 10, 0.1), 'DURATION')
-        .appendField('seconds at speed')
-        .appendField(new window.Blockly.FieldNumber(60, 0, 100, 10), 'SPEED');
-      this.setPreviousStatement(true, null);
-      this.setNextStatement(true, null);
-      this.setColour('#03A9F4');
-      this.setTooltip('Steer right');
-    },
-  };
-
-  // Stop
-  window.Blockly.Blocks['rover_stop'] = {
-    init: function () {
-      this.appendDummyInput().appendField('Stop');
-      this.setPreviousStatement(true, null);
-      this.setNextStatement(true, null);
-      this.setColour('#F44336');
-      this.setTooltip('Stop');
-    },
-  };
-
-  // Repeat
-  window.Blockly.Blocks['rover_repeat'] = {
-    init: function () {
-      this.appendDummyInput()
-        .appendField('Repeat')
-        .appendField(new window.Blockly.FieldNumber(4, 1, 10, 1), 'TIMES')
-        .appendField('times');
-      this.appendStatementInput('DO').setCheck(null);
-      this.setPreviousStatement(true, null);
-      this.setNextStatement(true, null);
-      this.setColour('#4CAF50');
-      this.setTooltip('Repeat blocks');
-    },
-  };
-}
-
-function blocksToCommands(workspace: any): any[] {
-  const commands: any[] = [];
-  const topBlocks = workspace.getTopBlocks(false);
-
-  for (const block of topBlocks) {
-    processBlock(block, commands);
-  }
-
-  return commands;
-}
-
-function processBlock(block: any, commands: any[]): void {
-  if (!block) return;
-
-  const type = block.type;
-
-  switch (type) {
-    case 'rover_forward':
-      commands.push({
-        command: 'forward',
-        speed: block.getFieldValue('SPEED'),
-        duration: block.getFieldValue('DURATION'),
-      });
-      break;
-
-    case 'rover_backward':
-      commands.push({
-        command: 'reverse',
-        speed: block.getFieldValue('SPEED'),
-        duration: block.getFieldValue('DURATION'),
-      });
-      break;
-
-    case 'rover_spin_left':
-      commands.push({
-        command: 'spinLeft',
-        speed: block.getFieldValue('SPEED'),
-        duration: block.getFieldValue('DURATION'),
-      });
-      break;
-
-    case 'rover_spin_right':
-      commands.push({
-        command: 'spinRight',
-        speed: block.getFieldValue('SPEED'),
-        duration: block.getFieldValue('DURATION'),
-      });
-      break;
-
-    case 'rover_steer_left':
-      commands.push({
-        command: 'steerLeft',
-        degrees: block.getFieldValue('DEGREES'),
-        speed: block.getFieldValue('SPEED'),
-        duration: block.getFieldValue('DURATION'),
-      });
-      break;
-
-    case 'rover_steer_right':
-      commands.push({
-        command: 'steerRight',
-        degrees: block.getFieldValue('DEGREES'),
-        speed: block.getFieldValue('SPEED'),
-        duration: block.getFieldValue('DURATION'),
-      });
-      break;
-
-    case 'rover_stop':
-      commands.push({ command: 'stop' });
-      break;
-
-    case 'rover_repeat':
-      const times = block.getFieldValue('TIMES');
-      const doBlock = block.getInputTargetBlock('DO');
-      const loopCommands: any[] = [];
-      if (doBlock) {
-        processBlock(doBlock, loopCommands);
-      }
-      for (let i = 0; i < times; i++) {
-        commands.push(...loopCommands);
-      }
-      break;
-  }
-
-  const nextBlock = block.getNextBlock();
-  if (nextBlock) {
-    processBlock(nextBlock, commands);
-  }
 }
