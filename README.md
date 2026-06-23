@@ -20,7 +20,7 @@ npm run dev      # hub:3000 + yard satellite:3001 + rover:8523
 
 Run a single service with `npm run dev:authoring`, `npm run dev:satellite`, or
 `npm run dev:yard`. The satellite port can be overridden with the `SATELLITE_PORT`
-env var. (The legacy `mission-control` app also starts, on :3002, until it is retired.)
+env var.
 
 ## Getting things set up
 
