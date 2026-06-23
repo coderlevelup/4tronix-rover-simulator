@@ -1,6 +1,11 @@
+# Web server (web_server.py) — also all that's needed for local `npm run dev`.
 flask>=2.0.0
 requests>=2.28.0
 websockets>=10.0
-picamera2
+
+# Camera capture (camera_server.py) — only runs on the Raspberry Pi.
+# picamera2 is Pi-only; the marker lets `pip install -r` succeed on macOS/Windows
+# (it is simply skipped off Linux).
+picamera2; sys_platform == "linux"
 numpy
 opencv-python

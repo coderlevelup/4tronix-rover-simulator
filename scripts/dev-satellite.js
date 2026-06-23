@@ -32,7 +32,7 @@ if (!fs.existsSync(venvPython)) {
     `[satellite] virtualenv not found at ${venvPython} — falling back to "${python}" on PATH.\n` +
       `[satellite] If imports fail, create the venv and install deps:\n` +
       `[satellite]   python -m venv .venv\n` +
-      `[satellite]   ${isWindows ? '.venv\\Scripts\\pip' : '.venv/bin/pip'} install -r yard/satellite/requirements.txt`
+      `[satellite]   ${isWindows ? '.venv\\Scripts\\pip' : '.venv/bin/pip'} install flask requests`
   );
 }
 
