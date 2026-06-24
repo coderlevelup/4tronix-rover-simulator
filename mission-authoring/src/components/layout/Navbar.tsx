@@ -42,7 +42,7 @@ export function Navbar() {
   const { openEmailPrompt } = useLearner();
   const { isOperator } = useAuth();
 
-  // Real notifications will be wired to the backend later — no placeholder data.
+  // Real notifications will be wired to the backend later - no placeholder data.
   const sampleNotifications: ComponentProps<typeof NotificationModal>['notifications'] = [];
 
   const isActive = (path: string): boolean => {
@@ -104,7 +104,7 @@ export function Navbar() {
                   </Link>
                 ))}
 
-                {/* Operator console — only for signed-in operators */}
+                {/* Operator console - only for signed-in operators */}
                 {isOperator && (
                   <Link href="/operator" className={desktopLinkClass('/operator')}>
                     <Shield className="h-4 w-4" />

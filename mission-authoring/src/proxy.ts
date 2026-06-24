@@ -187,7 +187,7 @@ export async function proxy(request: NextRequest) {
 
   // User has valid operator role. Build trusted claim headers from the VERIFIED
   // token only. We first delete any operator headers the client may have tried
-  // to smuggle in, then set values derived from the decoded JWT — so downstream
+  // to smuggle in, then set values derived from the decoded JWT - so downstream
   // routes that read these headers can trust them.
   const requestHeaders = new Headers(request.headers);
   requestHeaders.delete(OPERATOR_ACCESS_HEADER);

@@ -47,12 +47,12 @@ export function LearnerProvider({ children }: { children: ReactNode }) {
       if (stored) setLearnerEmailState(stored);
       else setShowEmailPrompt(true);
     } catch {
-      // localStorage unavailable — skip
+      // localStorage unavailable - skip
     }
   }, []);
 
   /**
-   * Save (or clear) the learner's email — persisted to localStorage and, if a
+   * Save (or clear) the learner's email - persisted to localStorage and, if a
    * session exists, merged into the learner's Firestore document.
    */
   async function setLearnerEmail(email: string | null): Promise<void> {
@@ -60,7 +60,7 @@ export function LearnerProvider({ children }: { children: ReactNode }) {
       if (email) localStorage.setItem('learnerEmail', email);
       else localStorage.removeItem('learnerEmail');
     } catch {
-      // localStorage unavailable — continue with in-memory state
+      // localStorage unavailable - continue with in-memory state
     }
     setLearnerEmailState(email);
     setShowEmailPrompt(false);

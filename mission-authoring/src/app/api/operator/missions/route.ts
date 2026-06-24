@@ -1,5 +1,5 @@
 /**
- * GET /api/operator/missions — Operator mission list
+ * GET /api/operator/missions - Operator mission list
  *
  * Protected endpoint for operators to view all submitted missions across yards.
  * Requires operator authentication (proxy.ts also guards /api/operator, so this

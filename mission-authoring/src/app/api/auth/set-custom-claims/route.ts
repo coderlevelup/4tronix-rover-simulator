@@ -5,7 +5,7 @@
  * Should be called when a user's role is updated in Firestore.
  *
  * SECURITY NOTE: This endpoint is locked behind ADMIN_API_SECRET and fails
- * closed — if the secret is unset server-side, every request is denied. Do NOT
+ * closed - if the secret is unset server-side, every request is denied. Do NOT
  * expose this to client-side requests without proper validation.
  */
 

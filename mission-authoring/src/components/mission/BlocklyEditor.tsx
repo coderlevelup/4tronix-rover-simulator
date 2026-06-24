@@ -20,7 +20,7 @@ declare global {
 }
 
 // Hub-local storage of the serialized workspace. Separate origin from the yard,
-// so the key name need not match — but the JSON format does (Blockly.serialization).
+// so the key name need not match - but the JSON format does (Blockly.serialization).
 const STORAGE_KEY = 'roverWorkspace';
 
 export function BlocklyEditor({ onGenerateCommands, onCodeChange }: BlocklyEditorProps) {
@@ -106,7 +106,7 @@ export function BlocklyEditor({ onGenerateCommands, onCodeChange }: BlocklyEdito
       });
 
       // Restore the saved workspace (JSON via Blockly.serialization), or start
-      // with a fresh "On uplink" hat block — mirrors the yard's bootstrap.
+      // with a fresh "On uplink" hat block - mirrors the yard's bootstrap.
       const startWithHat = () => {
         const block = workspace.newBlock('rover_on_receive');
         block.initSvg();
@@ -133,7 +133,7 @@ export function BlocklyEditor({ onGenerateCommands, onCodeChange }: BlocklyEdito
           const state = Blockly.serialization.workspaces.save(workspace);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         } catch {
-          // Non-fatal — a transient change event during load can race; ignore.
+          // Non-fatal - a transient change event during load can race; ignore.
         }
       });
     }, 200);

@@ -1,11 +1,11 @@
 /**
- * PATCH /api/operator/missions/[missionId] — Admin-only mission actions
+ * PATCH /api/operator/missions/[missionId] - Admin-only mission actions
  *
  * Actions: add-youtube-url | mark-complete | cancel | mark-failed.
  * Requires operator authentication (unauthenticated requests get 401).
  *
  * Note: the execute/dispatch action from the old mission-control app (and its
- * rover-config / GroundStationDispatch dependencies) is intentionally dropped —
+ * rover-config / GroundStationDispatch dependencies) is intentionally dropped -
  * the yard runs missions directly, so the hub only records outcomes.
  */
 

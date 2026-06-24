@@ -67,7 +67,7 @@ export function MissionHistoryScaffold() {
     <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 px-5 py-3 text-sm">
       <p className="text-slate-400">
         Showing missions for{' '}
-        <span className="font-semibold text-slate-200">{learnerEmail}</span> — synced across your devices.
+        <span className="font-semibold text-slate-200">{learnerEmail}</span> - synced across your devices.
       </p>
       <button
         onClick={openEmailPrompt}

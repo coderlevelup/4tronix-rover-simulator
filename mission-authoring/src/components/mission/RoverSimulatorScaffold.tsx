@@ -273,7 +273,7 @@ export function RoverSimulatorScaffold({ trajectory = [], isPlaying = false, onR
         </p>
       </div>
 
-      {/* Sim video player — shown when a video capture is available */}
+      {/* Sim video player - shown when a video capture is available */}
       {simVideoLoading && (
         <div className="flex items-center justify-center gap-3 rounded-xl border border-slate-700 bg-slate-900 py-16">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-600 border-t-orange-400" />
@@ -294,7 +294,7 @@ export function RoverSimulatorScaffold({ trajectory = [], isPlaying = false, onR
         </div>
       )}
 
-      {/* Canvas trajectory — shown when no video is available */}
+      {/* Canvas trajectory - shown when no video is available */}
       {!simVideoUrl && !simVideoLoading && (
         <div className="w-full rounded-xl border border-slate-700 overflow-hidden">
           <canvas

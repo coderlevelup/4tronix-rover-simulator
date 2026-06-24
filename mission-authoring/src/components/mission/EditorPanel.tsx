@@ -166,10 +166,10 @@ export function EditorPanel({
         {editorMode === 'code' && <MonacoCodeEditor onGenerateCommands={onGenerateCommands} onCodeChange={onCodeChange} />}
       </div>
 
-      {/* Mission name + submit — Blockly mode */}
+      {/* Mission name + submit - Blockly mode */}
       {editorMode === 'blockly' && <div className="flex gap-2 flex-shrink-0">{submitBar}</div>}
 
-      {/* Available commands + submit — Code mode */}
+      {/* Available commands + submit - Code mode */}
       {editorMode === 'code' && (
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start flex-shrink-0">
           <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-3 text-xs text-slate-400 lg:w-[42%]">

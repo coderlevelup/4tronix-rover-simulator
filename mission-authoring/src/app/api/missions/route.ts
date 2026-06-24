@@ -1,5 +1,5 @@
 /**
- * POST /api/missions — server-side mission submission (Tasks 40 & 41).
+ * POST /api/missions - server-side mission submission (Tasks 40 & 41).
  *
  * Validates the payload (schema + command allowlist) before persisting, so
  * submission can be trusted even if it bypasses the client UI. The client may

@@ -124,7 +124,7 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
                 <div>
                   <p className="text-slate-500 text-xs mb-1">Duration</p>
                   <p className="text-slate-200 font-mono">
-                    {mission.executionMetadata?.duration_ms ? `${Math.round(mission.executionMetadata.duration_ms / 1000)}s` : '—'}
+                    {mission.executionMetadata?.duration_ms ? `${Math.round(mission.executionMetadata.duration_ms / 1000)}s` : '-'}
                   </p>
                 </div>
                 <div>

@@ -6,7 +6,7 @@ import { useLearner } from '@/contexts/LearnerContext';
 /**
  * Non-blocking email capture prompt. Shown on first visit (no stored email) and
  * whenever the learner chooses "Edit email". Saving persists via LearnerContext
- * (localStorage + Firestore). Skipping just closes it — email is optional.
+ * (localStorage + Firestore). Skipping just closes it - email is optional.
  */
 export function EmailPrompt() {
   const { learnerEmail, setLearnerEmail, showEmailPrompt, closeEmailPrompt } = useLearner();
@@ -40,7 +40,7 @@ export function EmailPrompt() {
       >
         <h2 className="text-center text-lg font-bold">Stay in touch</h2>
         <p className="mt-2 text-center text-sm text-muted-foreground">
-          Enter your email so we can send mission updates and completion notices. This is optional — you can skip it.
+          Enter your email so we can send mission updates and completion notices. This is optional - you can skip it.
         </p>
 
         <label className="mt-4 block">

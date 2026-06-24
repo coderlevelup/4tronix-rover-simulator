@@ -25,7 +25,7 @@ const STATUS_STYLES: Record<MissionStatus, { pill: string; label: string }> = {
 
 interface MissionCardProps {
   mission: Mission;
-  /** Show the learner identifier — intended for operator views */
+  /** Show the learner identifier - intended for operator views */
   showLearnerId?: boolean;
 }
 

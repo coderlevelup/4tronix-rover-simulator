@@ -213,7 +213,7 @@ export function defineRoverBlocks(Blockly: any): void {
       this.appendDummyInput().appendField('distance (cm)');
       this.setOutput(true, 'Number');
       this.setColour('#00897B');
-      this.setTooltip('The distance the mast sensor sees — for use with comparisons');
+      this.setTooltip('The distance the mast sensor sees - for use with comparisons');
     },
   };
 
@@ -244,7 +244,7 @@ export function defineRoverBlocks(Blockly: any): void {
   };
 }
 
-/** Category toolbox — mirrors the yard's. */
+/** Category toolbox - mirrors the yard's. */
 export const ROVER_TOOLBOX = {
   kind: 'categoryToolbox',
   contents: [
@@ -302,7 +302,7 @@ export const ROVER_TOOLBOX = {
 
 /**
  * Generate rover Python from the workspace. Only blocks inside an
- * `rover_on_receive` hat are emitted — matching the yard exactly.
+ * `rover_on_receive` hat are emitted - matching the yard exactly.
  */
 export function workspaceToPython(workspace: any): string {
   const lines: string[] = [];
@@ -315,7 +315,7 @@ export function workspaceToPython(workspace: any): string {
     switch (type) {
       case 'rover_on_receive': {
         blockToLines(block.getInputTargetBlock('DO'), indent);
-        return; // hat block — no next block to follow
+        return; // hat block - no next block to follow
       }
       case 'rover_forward': {
         const t = block.getFieldValue('TIME');
@@ -465,7 +465,7 @@ export interface SimulationCommand {
 }
 
 /**
- * Map the workspace to local-simulator commands (movement only — the 2D sim
+ * Map the workspace to local-simulator commands (movement only - the 2D sim
  * has no concept of mast/LED/photo/wait). Speed is fixed at 60 to match the
  * Python the rover actually runs. Only blocks inside `rover_on_receive` count.
  */

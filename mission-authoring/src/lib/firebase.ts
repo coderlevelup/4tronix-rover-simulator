@@ -79,7 +79,7 @@ export function getFirestoreClient(): Firestore {
       });
     } catch {
       // initializeFirestore throws if Firestore was already initialised for this
-      // app (e.g. across HMR reloads) — fall back to the existing instance.
+      // app (e.g. across HMR reloads) - fall back to the existing instance.
       firestore = getFirestore(app);
     }
   }
