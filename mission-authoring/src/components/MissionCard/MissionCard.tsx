@@ -27,11 +27,9 @@ interface MissionCardProps {
   mission: Mission;
   /** Show the learner identifier — intended for operator views */
   showLearnerId?: boolean;
-  /** Show challenge badge when true and mission.challengeId is set */
-  showChallengeBadge?: boolean;
 }
 
-export function MissionCard({ mission, showLearnerId = false, showChallengeBadge = true }: MissionCardProps) {
+export function MissionCard({ mission, showLearnerId = false }: MissionCardProps) {
   const status = STATUS_STYLES[mission.status];
   const videoUrl = mission.youtubeUrl || mission.videoUrl;
   const embedUrl = videoUrl ? getYouTubeEmbedUrl(videoUrl) : null;
@@ -47,11 +45,6 @@ export function MissionCard({ mission, showLearnerId = false, showChallengeBadge
           <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${status.pill}`}>
             {status.label}
           </span>
-          {showChallengeBadge && mission.challengeId && (
-            <span className="shrink-0 rounded-full bg-purple-500/20 border border-purple-500/30 px-2.5 py-0.5 text-xs font-semibold text-purple-400">
-              {mission.challengeId}
-            </span>
-          )}
         </div>
         <div className="shrink-0 flex items-center gap-3 font-mono text-xs text-slate-500">
           {showLearnerId && (

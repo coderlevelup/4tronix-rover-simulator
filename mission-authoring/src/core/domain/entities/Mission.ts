@@ -43,7 +43,6 @@ export interface Mission {
   // Payload
   name?: string;                     // Optional - mission name given by learner
   code: string;                      // Python code submitted by learner
-  challengeId?: string;              // Optional - which challenge/level (e.g., "M1-FORWARD")
 
   // Queue management (inspired by yard/rover/service.py)
   status: MissionStatus;

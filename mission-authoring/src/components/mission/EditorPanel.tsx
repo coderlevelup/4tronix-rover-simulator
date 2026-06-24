@@ -15,19 +15,9 @@ type SimulationCommand = {
   degrees?: number;
 };
 
-export interface ChallengeInfo {
-  title: string;
-  description: string;
-  difficulty: string;
-  xp: string;
-}
-
 interface EditorPanelProps {
   panelSplit: number;
   onPanelSplitChange: (value: number) => void;
-
-  isChallengeMode: boolean;
-  challenge: ChallengeInfo | null;
 
   editorMode: EditorMode;
   onEditorModeChange: (mode: EditorMode) => void;
@@ -56,8 +46,6 @@ interface EditorPanelProps {
 export function EditorPanel({
   panelSplit,
   onPanelSplitChange,
-  isChallengeMode,
-  challenge,
   editorMode,
   onEditorModeChange,
   error,
@@ -139,47 +127,22 @@ export function EditorPanel({
         </div>
       </div>
 
-      {/* Challenge banner */}
-      {challenge && (
-        <div className="mb-3 rounded-2xl border border-orange-500/20 bg-orange-500/5 p-4 text-slate-100">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.24em] text-orange-300">Challenge Mode</p>
-              <h2 className="mt-1 text-lg font-semibold text-white">
-                {challenge.title || 'Challenge in progress'}
-              </h2>
-            </div>
-            <div className="rounded-full border border-orange-500/40 bg-orange-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-orange-200">
-              {challenge.difficulty ? `${challenge.difficulty} difficulty` : 'Challenge'}
-            </div>
-          </div>
-          {challenge.description && <p className="mt-2 text-sm text-slate-300">{challenge.description}</p>}
-          {challenge.xp && <p className="mt-2 text-xs text-slate-400">Reward: {challenge.xp} XP</p>}
-        </div>
-      )}
-
-      {/* Editor mode tabs (or challenge code-only label) */}
-      {!isChallengeMode ? (
-        <div className="flex gap-1 flex-shrink-0">
-          {(['manual', 'blockly', 'code'] as EditorMode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => onEditorModeChange(mode)}
-              className={`flex-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
-                editorMode === mode
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-              }`}
-            >
-              {mode === 'manual' ? 'Manual' : mode === 'blockly' ? 'Blockly' : 'Code'}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-full border border-orange-500/40 bg-orange-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-orange-200">
-          Code editor only
-        </div>
-      )}
+      {/* Editor mode tabs */}
+      <div className="flex gap-1 flex-shrink-0">
+        {(['manual', 'blockly', 'code'] as EditorMode[]).map((mode) => (
+          <button
+            key={mode}
+            onClick={() => onEditorModeChange(mode)}
+            className={`flex-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+              editorMode === mode
+                ? 'bg-emerald-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+            }`}
+          >
+            {mode === 'manual' ? 'Manual' : mode === 'blockly' ? 'Blockly' : 'Code'}
+          </button>
+        ))}
+      </div>
 
       {error && (
         <div className="animate-in slide-in-from-top-2 fade-in duration-300 rounded-lg border border-red-500/20 bg-red-500/10 backdrop-blur-xl p-1.5 text-xs text-red-400 flex-shrink-0">

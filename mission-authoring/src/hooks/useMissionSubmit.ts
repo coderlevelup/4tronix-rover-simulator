@@ -20,7 +20,6 @@ interface MissionSubmitParams {
   yardId: string;
   learnerId: string;
   sessionId: string;
-  challengeId?: string;
   missionName?: string;
 }
 
@@ -52,7 +51,6 @@ export function useMissionSubmit() {
         yardId: params.yardId,
         learnerId: params.learnerId,
         sessionId: params.sessionId,
-        challengeId: params.challengeId,
         name: params.missionName,
       });
 

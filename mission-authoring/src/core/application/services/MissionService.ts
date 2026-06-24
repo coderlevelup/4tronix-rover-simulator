@@ -41,7 +41,6 @@ export class MissionService {
         learnerEmail: dto.learnerEmail,
         name: dto.name,
         code: dto.code,
-        challengeId: dto.challengeId,
         status: 'queued',
         submittedAt: new Date().toISOString(),
       });

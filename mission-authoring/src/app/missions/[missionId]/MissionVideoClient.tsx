@@ -86,12 +86,6 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
             <span className="font-mono">{mission.yardId}</span>
             <span>•</span>
             <span>{new Date(mission.completedAt || mission.submittedAt).toLocaleDateString()}</span>
-            {mission.challengeId && (
-              <>
-                <span>•</span>
-                <span className="bg-slate-800 px-2 py-0.5 rounded text-xs font-mono text-slate-300">{mission.challengeId}</span>
-              </>
-            )}
           </div>
         </div>
       </div>
@@ -138,10 +132,6 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
                   <p className={`font-semibold ${mission.executionResult?.isSuccessful ? 'text-green-400' : 'text-red-400'}`}>
                     {mission.executionResult?.isSuccessful ? 'Successful' : mission.executionResult ? 'Failed' : 'N/A'}
                   </p>
-                </div>
-                <div>
-                  <p className="text-slate-500 text-xs mb-1">Challenge</p>
-                  <p className="text-slate-200">{mission.challengeId || '—'}</p>
                 </div>
               </div>
             </div>

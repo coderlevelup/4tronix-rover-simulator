@@ -9,7 +9,7 @@ import { getFirestoreClient } from '@/lib/firebase';
 import { FirestoreMissionRepository } from '@/infrastructure/persistence/FirestoreMissionRepository';
 import { MissionService } from '@/core/application/services/MissionService';
 import { validateMission } from '@/infrastructure/validation/schemas';
-import { EditorPanel, type EditorMode, type ChallengeInfo } from '@/components/mission/EditorPanel';
+import { EditorPanel, type EditorMode } from '@/components/mission/EditorPanel';
 import { SimulationPanel } from '@/components/mission/SimulationPanel';
 
 interface TrajectoryPoint {
@@ -31,28 +31,15 @@ type SimulationCommand = {
 export function MissionWorkspace() {
   const { learnerEmail } = useLearner();
   const searchParams = useSearchParams();
-  const rawMode = searchParams.get('mode');
-  const isChallengeMode = rawMode === 'challenge';
-  const initialMode = (rawMode as EditorMode) || 'manual';
-  const resolvedMode: EditorMode = isChallengeMode ? 'code' : initialMode;
+  const initialMode = (searchParams.get('mode') as EditorMode) || 'manual';
   const initialCode = searchParams.get('code') ?? '';
-  const initialChallengeId = searchParams.get('challengeId') ?? '';
-
-  const challenge: ChallengeInfo | null = initialChallengeId
-    ? {
-        title: searchParams.get('challengeTitle') ?? '',
-        description: searchParams.get('challengeDescription') ?? '',
-        difficulty: searchParams.get('difficulty') ?? '',
-        xp: searchParams.get('xpReward') ?? '',
-      }
-    : null;
 
   const [trajectory, setTrajectory] = useState<TrajectoryPoint[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [simVideoUrl, setSimVideoUrl] = useState<string | null>(null);
   const [simVideoLoading, setSimVideoLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [editorMode, setEditorMode] = useState<EditorMode>(resolvedMode);
+  const [editorMode, setEditorMode] = useState<EditorMode>(initialMode);
   const [panelSplit, setPanelSplit] = useState(60);
   const [currentCode, setCurrentCode] = useState(initialCode);
   const [submitting, setSubmitting] = useState(false);
@@ -183,7 +170,6 @@ export function MissionWorkspace() {
         // Stamp the email when the learner has provided one so this mission
         // shows up in their cross-device history.
         ...(learnerEmail ? { learnerEmail } : {}),
-        challengeId: initialChallengeId || 'user-submission',
         name: missionName,
       });
 
@@ -220,8 +206,6 @@ export function MissionWorkspace() {
         <EditorPanel
           panelSplit={panelSplit}
           onPanelSplitChange={setPanelSplit}
-          isChallengeMode={isChallengeMode}
-          challenge={challenge}
           editorMode={editorMode}
           onEditorModeChange={setEditorMode}
           error={error}

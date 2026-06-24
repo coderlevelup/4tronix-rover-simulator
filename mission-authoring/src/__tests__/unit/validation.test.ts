@@ -16,7 +16,6 @@ describe('Mission Schema Validation', () => {
         sessionId: 'test-session-123',
         name: 'Test Mission',
         code: 'rover.forward(100)\nrover.wait(2)',
-        challengeId: 'M1-FORWARD',
       };
 
       const result = validateMission(validData);
@@ -26,7 +25,7 @@ describe('Mission Schema Validation', () => {
       expect(result.errors).toBeUndefined();
     });
 
-    it('should accept mission without optional challengeId', () => {
+    it('should accept a minimal valid mission', () => {
       const validData = {
         yardId: 'yard-1',
         learnerId: 'learner-456',
@@ -38,7 +37,7 @@ describe('Mission Schema Validation', () => {
       const result = validateMission(validData);
 
       expect(result.success).toBe(true);
-      expect(result.data?.challengeId).toBeUndefined();
+      expect(result.data).toEqual(validData);
     });
 
     it('should reject empty yardId', () => {
@@ -180,7 +179,6 @@ describe('Mission Schema Validation', () => {
         sessionId: 'sess_abc123',
         name: 'Zod Parse Mission',
         code: 'rover.forward(100)\nrover.stop()',
-        challengeId: 'LEVEL-1',
       };
 
       const parsed = createMissionSchema.parse(validData);

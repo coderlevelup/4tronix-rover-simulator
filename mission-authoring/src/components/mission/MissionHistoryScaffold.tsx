@@ -116,7 +116,7 @@ export function MissionHistoryScaffold() {
         </div>
       ) : (
         missions.map((mission) => (
-          <MissionCard key={mission.id} mission={mission} showChallengeBadge />
+          <MissionCard key={mission.id} mission={mission} />
         ))
       )}
     </div>

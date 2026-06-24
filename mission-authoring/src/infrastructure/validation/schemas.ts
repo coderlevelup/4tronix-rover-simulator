@@ -57,11 +57,6 @@ export const createMissionSchema = z.object({
     .refine((code) => code.trim().length > 0, {
       message: 'Code cannot be only whitespace',
     }),
-
-  challengeId: z
-    .string()
-    .max(50, 'Challenge ID too long')
-    .optional(),
 });
 
 /**

@@ -1,7 +1,7 @@
 /**
  * Global Navigation Bar
  *
- * Desktop (md+): top bar with explicit Home, Challenges, Leaderboard, My History links,
+ * Desktop (md+): top bar with explicit Home and My History links,
  * a prominent "Create Mission" button, and the notification bell.
  * Mobile (< md): top bar shows logo + bell; the destinations move to a fixed
  * bottom tab bar (kid-friendly, always visible, no hidden hamburger menu).
@@ -15,31 +15,17 @@ import { usePathname } from 'next/navigation';
 import {
   Bell,
   Home,
-  Trophy,
   Clock,
   Plus,
   Mail,
-  Target,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { NotificationModal } from './NotificationModal';
 import { useLearner } from '@/contexts/LearnerContext';
 import { EmailPrompt } from '@/components/learner/EmailPrompt';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Home', mobileLabel: 'Home', icon: Home },
-  {
-    href: '/challenges',
-    label: 'Challenges',
-    mobileLabel: 'Challenges',
-    icon: Target,
-  },
-  {
-    href: '/leaderboard',
-    label: 'Leaderboard',
-    mobileLabel: 'Board',
-    icon: Trophy,
-  },
   {
     href: '/history',
     label: 'My History',
@@ -53,29 +39,8 @@ export function Navbar() {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const { openEmailPrompt } = useLearner();
 
-  // TODO: Replace with actual notifications from your backend/database
-  const sampleNotifications = [
-    {
-      type: 'completed' as const,
-      missionName: 'Red Planet Explorer',
-      completedAt: '1 day ago',
-    },
-    {
-      type: 'new-mission' as const,
-      missionName: 'Peak-Wonderer-721',
-      message: 'See mission Peak-Wonderer-721 explore Mars!',
-    },
-    {
-      type: 'completed' as const,
-      missionName: 'Crater Investigation',
-      completedAt: '2 days ago',
-    },
-    {
-      type: 'new-mission' as const,
-      missionName: 'Valley-Scout-892',
-      message: 'Check out Valley-Scout-892 discovering ancient riverbeds!',
-    },
-  ];
+  // Real notifications will be wired to the backend later — no placeholder data.
+  const sampleNotifications: ComponentProps<typeof NotificationModal>['notifications'] = [];
 
   const isActive = (path: string): boolean => {
     if (path === '/') return pathname === '/';
@@ -183,30 +148,6 @@ export function Navbar() {
           >
             <Home className="h-5 w-5" />
             Home
-          </Link>
-
-          <Link
-            href="/challenges"
-            className={`flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] font-medium ${
-              isActive('/challenges')
-                ? 'text-foreground'
-                : 'text-muted-foreground'
-            }`}
-          >
-            <Target className="h-5 w-5" />
-            Challenges
-          </Link>
-
-          <Link
-            href="/leaderboard"
-            className={`flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] font-medium ${
-              isActive('/leaderboard')
-                ? 'text-foreground'
-                : 'text-muted-foreground'
-            }`}
-          >
-            <Trophy className="h-5 w-5" />
-            Board
           </Link>
 
           <Link

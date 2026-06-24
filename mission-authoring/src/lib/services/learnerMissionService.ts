@@ -48,7 +48,6 @@ export interface LearnerMission {
   executionNotes?: string;
   code?: string;
   yardId?: string;
-  challengeId?: string;
 }
 
 /**
