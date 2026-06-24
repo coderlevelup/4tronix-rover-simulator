@@ -34,7 +34,6 @@ describe('FirestoreMissionRepository', () => {
       sessionId: 'session-1',
       learnerUid: undefined,
       code: 'rover.forward(100)',
-      challengeId: undefined,
       status: 'queued',
       executionResult: {
         isSuccessful: false,
@@ -100,7 +99,6 @@ describe('FirestoreMissionRepository', () => {
       sessionId: 'session-1',
       learnerUid: undefined,
       code: '# comment line\nrover.forward(100)  # move\n\n# another comment\nrover.stop()',
-      challengeId: undefined,
       status: 'queued',
       executionResult: {
         isSuccessful: false,

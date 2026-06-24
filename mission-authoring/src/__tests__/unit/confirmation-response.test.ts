@@ -73,7 +73,6 @@ describe('queue confirmation', () => {
       yardId: 'uct-rover-1',
       sessionId: 'test-session-123',
       code: 'rover.forward(100)',
-      challengeId: 'M1-FORWARD',
     };
 
     // Mock the repository response - simulate mission with queue position
@@ -82,7 +81,6 @@ describe('queue confirmation', () => {
       yardId: 'uct-rover-1',
       sessionId: 'test-session-123',
       code: 'rover.forward(100)',
-      challengeId: 'M1-FORWARD',
       status: 'queued',
       submittedAt: new Date().toISOString(),
       queuePosition: 3, // Third in queue

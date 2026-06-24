@@ -53,6 +53,15 @@ export const ROVER_COMMAND_ALLOWLIST = [
   // Sensor commands (for future challenges)
   'rover.get_distance',
   'rover.get_heading',
+
+  // Low-level rover API emitted by the Blockly generator (runs on the rover via
+  // the yard): servo positioning, distance read, and NeoPixel LEDs.
+  'rover.setServo',
+  'rover.getDistance',
+  'rover.setColor',
+  'rover.fromRGB',
+  'rover.setPixel',
+  'rover.show',
 ] as const;
 
 /**

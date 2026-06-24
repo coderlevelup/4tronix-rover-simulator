@@ -99,7 +99,7 @@ describe('MissionService', () => {
   describe('submitMission', () => {
     it('should successfully submit a mission', async () => {
       const result = await service.submitMission(
-        makeDto({ yardId: 'yard-1', code: 'rover.forward(100)', challengeId: 'M1' })
+        makeDto({ yardId: 'yard-1', code: 'rover.forward(100)' })
       );
 
       expect(result.success).toBe(true);
@@ -111,13 +111,13 @@ describe('MissionService', () => {
       expect(result.mission?.id).toBeDefined();
     });
 
-    it('should submit mission without optional challengeId', async () => {
+    it('should submit a minimal mission', async () => {
       const result = await service.submitMission(
         makeDto({ yardId: 'yard-1', code: 'rover.spinLeft(50)' })
       );
 
       expect(result.success).toBe(true);
-      expect(result.mission?.challengeId).toBeUndefined();
+      expect(result.mission?.code).toBe('rover.spinLeft(50)');
     });
 
     it('should set initial status to queued', async () => {
