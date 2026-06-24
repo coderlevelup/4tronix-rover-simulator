@@ -18,10 +18,12 @@ import {
   Clock,
   Plus,
   Mail,
+  Shield,
 } from 'lucide-react';
 import { useState, type ComponentProps } from 'react';
 import { NotificationModal } from './NotificationModal';
 import { useLearner } from '@/contexts/LearnerContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { EmailPrompt } from '@/components/learner/EmailPrompt';
 
 const NAV_ITEMS = [
@@ -38,6 +40,7 @@ export function Navbar() {
   const pathname = usePathname();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const { openEmailPrompt } = useLearner();
+  const { isOperator } = useAuth();
 
   // Real notifications will be wired to the backend later — no placeholder data.
   const sampleNotifications: ComponentProps<typeof NotificationModal>['notifications'] = [];
@@ -101,6 +104,14 @@ export function Navbar() {
                   </Link>
                 ))}
 
+                {/* Operator console — only for signed-in operators */}
+                {isOperator && (
+                  <Link href="/operator" className={desktopLinkClass('/operator')}>
+                    <Shield className="h-4 w-4" />
+                    Operator
+                  </Link>
+                )}
+
                 {/* Prominent primary action */}
                 <Link
                   href="/mission"
@@ -159,6 +170,18 @@ export function Navbar() {
               <Plus className="h-5 w-5" />
             </span>
           </Link>
+
+          {isOperator && (
+            <Link
+              href="/operator"
+              className={`flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] font-medium ${
+                isActive('/operator') ? 'text-foreground' : 'text-muted-foreground'
+              }`}
+            >
+              <Shield className="h-5 w-5" />
+              Operator
+            </Link>
+          )}
 
           <Link
             href="/history"
