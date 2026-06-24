@@ -28,6 +28,7 @@ interface EditorPanelProps {
   manualResetVersion: number;
   onGenerateCommands: (commands: SimulationCommand[]) => void;
   onCodeChange: (code: string) => void;
+  onBlocklyStateChange?: (state: string) => void;
 
   missionName: string;
   onMissionNameChange: (name: string) => void;
@@ -54,6 +55,7 @@ export function EditorPanel({
   manualResetVersion,
   onGenerateCommands,
   onCodeChange,
+  onBlocklyStateChange,
   missionName,
   onMissionNameChange,
   missionNameError,
@@ -162,7 +164,7 @@ export function EditorPanel({
             resetVersion={manualResetVersion}
           />
         )}
-        {editorMode === 'blockly' && <BlocklyEditor onGenerateCommands={onGenerateCommands} onCodeChange={onCodeChange} />}
+        {editorMode === 'blockly' && <BlocklyEditor onGenerateCommands={onGenerateCommands} onCodeChange={onCodeChange} onBlocklyStateChange={onBlocklyStateChange} />}
         {editorMode === 'code' && <MonacoCodeEditor onGenerateCommands={onGenerateCommands} onCodeChange={onCodeChange} />}
       </div>
 

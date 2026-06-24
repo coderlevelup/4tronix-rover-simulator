@@ -11,6 +11,7 @@ import {
 interface BlocklyEditorProps {
   onGenerateCommands: (commands: any[]) => void;
   onCodeChange?: (code: string) => void;
+  onBlocklyStateChange?: (state: string) => void;
 }
 
 declare global {
@@ -23,7 +24,7 @@ declare global {
 // so the key name need not match - but the JSON format does (Blockly.serialization).
 const STORAGE_KEY = 'roverWorkspace';
 
-export function BlocklyEditor({ onGenerateCommands, onCodeChange }: BlocklyEditorProps) {
+export function BlocklyEditor({ onGenerateCommands, onCodeChange, onBlocklyStateChange }: BlocklyEditorProps) {
   const blocklyDivRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const workspaceRef = useRef<any>(null);
@@ -187,24 +188,30 @@ export function BlocklyEditor({ onGenerateCommands, onCodeChange }: BlocklyEdito
     onGenerateCommands(commands);
   };
 
-  // Listen for workspace changes and push generated Python up to the parent.
+  // Listen for workspace changes and push the generated Python (and the
+  // serialized Blockly state) up to the parent.
   useEffect(() => {
-    if (!isInitialized || !workspaceRef.current || !onCodeChange) return;
+    if (!isInitialized || !workspaceRef.current) return;
 
     const workspace = workspaceRef.current;
     const listener = () => {
-      onCodeChange(workspaceToPython(workspace));
+      onCodeChange?.(workspaceToPython(workspace));
+      if (onBlocklyStateChange && window.Blockly) {
+        onBlocklyStateChange(
+          JSON.stringify(window.Blockly.serialization.workspaces.save(workspace))
+        );
+      }
     };
 
     workspace.addChangeListener(listener);
 
-    // Initial code generation
+    // Initial generation
     listener();
 
     return () => {
       workspace.removeChangeListener(listener);
     };
-  }, [isInitialized, onCodeChange]);
+  }, [isInitialized, onCodeChange, onBlocklyStateChange]);
 
   if (!blocklyLoaded) {
     return (

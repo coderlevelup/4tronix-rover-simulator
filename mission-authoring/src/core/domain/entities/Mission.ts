@@ -43,6 +43,7 @@ export interface Mission {
   // Payload
   name?: string;                     // Optional - mission name given by learner
   code: string;                      // Python code submitted by learner
+  blocklyState?: string;             // Serialized Blockly workspace JSON (block-built missions only)
 
   // Queue management (inspired by yard/rover/service.py)
   status: MissionStatus;

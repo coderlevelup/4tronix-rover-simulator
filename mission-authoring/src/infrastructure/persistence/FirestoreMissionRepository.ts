@@ -351,6 +351,7 @@ export class FirestoreMissionRepository implements IMissionRepository {
       learnerUid: data.learnerUid,
       name: data.name,
       code: data.code,
+      blocklyState: data.blocklyState,
       status: data.status,
       executionResult: data.executionResult,
       executionMetadata: data.executionMetadata,

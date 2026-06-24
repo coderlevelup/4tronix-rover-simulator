@@ -41,6 +41,7 @@ export class MissionService {
         learnerEmail: dto.learnerEmail,
         name: dto.name,
         code: dto.code,
+        blocklyState: dto.blocklyState,
         status: 'queued',
         submittedAt: new Date().toISOString(),
       });

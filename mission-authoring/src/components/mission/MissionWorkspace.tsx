@@ -42,6 +42,7 @@ export function MissionWorkspace() {
   const [editorMode, setEditorMode] = useState<EditorMode>(initialMode);
   const [panelSplit, setPanelSplit] = useState(60);
   const [currentCode, setCurrentCode] = useState(initialCode);
+  const [blocklyState, setBlocklyState] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [missionName, setMissionName] = useState('');
@@ -170,6 +171,7 @@ export function MissionWorkspace() {
         // Stamp the email when the learner has provided one so this mission
         // shows up in their cross-device history.
         ...(learnerEmail ? { learnerEmail } : {}),
+        ...(editorMode === 'blockly' && blocklyState ? { blocklyState } : {}),
         name: missionName,
       });
 
@@ -214,6 +216,7 @@ export function MissionWorkspace() {
           manualResetVersion={manualResetVersion}
           onGenerateCommands={runSimulationVideo}
           onCodeChange={setCurrentCode}
+          onBlocklyStateChange={setBlocklyState}
           missionName={missionName}
           onMissionNameChange={setMissionName}
           missionNameError={missionNameError}

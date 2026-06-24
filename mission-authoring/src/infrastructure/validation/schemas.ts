@@ -57,6 +57,8 @@ export const createMissionSchema = z.object({
     .refine((code) => code.trim().length > 0, {
       message: 'Code cannot be only whitespace',
     }),
+
+  blocklyState: z.string().optional(),
 });
 
 /**
