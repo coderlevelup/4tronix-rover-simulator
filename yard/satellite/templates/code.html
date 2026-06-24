@@ -272,6 +272,7 @@
                 <button class="btn btn-run" id="runBtn">Run</button>
                 <button class="btn btn-stop" id="stopBtn">Stop</button>
                 <button class="btn btn-clear" id="clearBtn">Clear</button>
+                <button class="btn btn-clear" id="importBtn">Import</button>
             </div>
             <div class="toolbar-right">
                 <div class="status-indicator">
@@ -1031,6 +1032,17 @@
                 roverService.clear();
             }
             showToast('Cleared');
+        });
+
+        document.getElementById('importBtn').addEventListener('click', () => {
+            const json = prompt('Paste Blockly blocks JSON (copied from the hub operator page):');
+            if (!json || !json.trim()) return;
+            try {
+                Blockly.serialization.workspaces.load(JSON.parse(json), workspace);
+                showToast('Blocks imported', 'success');
+            } catch (e) {
+                showToast('Invalid blocks JSON', 'error');
+            }
         });
 
         document.getElementById('spyClose').addEventListener('click', () => {
