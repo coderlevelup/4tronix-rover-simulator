@@ -37,12 +37,21 @@ const MISSIONS_COLLECTION = 'missions';
 
 type FirestoreLike = AdminFirestore | ClientFirestore;
 
+// The admin and client Firestore SDKs have incompatible nominal types, so this
+// repository reads snapshots through the minimal structural shapes it actually
+// uses rather than `any`.
+type MissionDocData = Record<string, unknown>;
+type MissionDocSnapshot = { id: string; data: () => MissionDocData };
+type QuerySnapshotLike = { docs: MissionDocSnapshot[] };
+type DocSnapshotLike = { exists: () => boolean; data: () => MissionDocData | undefined };
+type CountSnapshotLike = { data: () => { count: number } };
+
 export class FirestoreMissionRepository implements IMissionRepository {
   constructor(private readonly firestore: FirestoreLike) {}
 
   async create(mission: Omit<Mission, 'id' | 'queuePosition' | 'estimatedWait' | 'submittedAt'>): Promise<Mission> {
     const id = nanoid();
-    const submittedAt = (mission as any).submittedAt || new Date().toISOString();
+    const submittedAt = (mission as { submittedAt?: string }).submittedAt || new Date().toISOString();
 
     const newMission: Mission = {
       ...mission,
@@ -83,10 +92,10 @@ export class FirestoreMissionRepository implements IMissionRepository {
   async findByLearnerId(learnerId: string): Promise<Mission[]> {
     const snapshot = await this.getLearnerMissionsSnapshot(learnerId);
 
-    return snapshot.docs.map((missionDoc: any) => this.fromFirestoreDoc(missionDoc.id, missionDoc.data()));
+    return snapshot.docs.map((missionDoc) => this.fromFirestoreDoc(missionDoc.id, missionDoc.data()));
   }
 
-  async findBySessionId(sessionId: string): Promise<Mission[]> {
+  async findBySessionId(_sessionId: string): Promise<Mission[]> {
     // Session-based history removed; keep method for compatibility but return empty.
     return [];
   }
@@ -94,7 +103,7 @@ export class FirestoreMissionRepository implements IMissionRepository {
   async getQueuedMissions(yardId: string): Promise<Mission[]> {
     const snapshot = await this.getQueuedMissionsSnapshot(yardId);
 
-    const missions: Mission[] = snapshot.docs.map((missionDoc: any) => this.fromFirestoreDoc(missionDoc.id, missionDoc.data()));
+    const missions: Mission[] = snapshot.docs.map((missionDoc) => this.fromFirestoreDoc(missionDoc.id, missionDoc.data()));
 
     return missions.map((mission, index) => ({
       ...mission,
@@ -123,7 +132,7 @@ export class FirestoreMissionRepository implements IMissionRepository {
   async findAll(): Promise<Mission[]> {
     const snapshot = await this.getAllMissionsSnapshot();
 
-    const missions: Mission[] = snapshot.docs.map((missionDoc: any) => this.fromFirestoreDoc(missionDoc.id, missionDoc.data()));
+    const missions: Mission[] = snapshot.docs.map((missionDoc) => this.fromFirestoreDoc(missionDoc.id, missionDoc.data()));
 
     return Promise.all(
       missions.map(async (mission) => {
@@ -196,12 +205,12 @@ export class FirestoreMissionRepository implements IMissionRepository {
     return this.firestore as ClientFirestore;
   }
 
-  private async getMissionDoc(id: string): Promise<any> {
+  private async getMissionDoc(id: string): Promise<DocSnapshotLike> {
     if (this.isAdminFirestore()) {
-      return this.adminDb().collection(MISSIONS_COLLECTION).doc(id).get();
+      return (await this.adminDb().collection(MISSIONS_COLLECTION).doc(id).get()) as unknown as DocSnapshotLike;
     }
 
-    return getDoc(doc(this.clientDb(), MISSIONS_COLLECTION, id));
+    return (await getDoc(doc(this.clientDb(), MISSIONS_COLLECTION, id))) as unknown as DocSnapshotLike;
   }
 
   private async writeMission(id: string, mission: Partial<Mission>): Promise<void> {
@@ -212,7 +221,7 @@ export class FirestoreMissionRepository implements IMissionRepository {
       return;
     }
 
-    await setDoc(doc(this.clientDb(), MISSIONS_COLLECTION, id), payload as Record<string, any>);
+    await setDoc(doc(this.clientDb(), MISSIONS_COLLECTION, id), payload);
   }
 
   private async updateMission(id: string, updates: Partial<Mission>): Promise<void> {
@@ -223,16 +232,16 @@ export class FirestoreMissionRepository implements IMissionRepository {
       return;
     }
 
-    await updateDoc(doc(this.clientDb(), MISSIONS_COLLECTION, id), payload as Record<string, any>);
+    await updateDoc(doc(this.clientDb(), MISSIONS_COLLECTION, id), payload);
   }
 
-  private async getLearnerMissionsSnapshot(learnerId: string): Promise<any> {
+  private async getLearnerMissionsSnapshot(learnerId: string): Promise<QuerySnapshotLike> {
     if (this.isAdminFirestore()) {
       return this.adminDb()
         .collection(MISSIONS_COLLECTION)
         .where('learnerId', '==', learnerId)
         .orderBy('submittedAt', 'desc')
-        .get();
+        .get() as unknown as QuerySnapshotLike;
     }
 
     const missionsQuery = query(
@@ -241,17 +250,17 @@ export class FirestoreMissionRepository implements IMissionRepository {
       orderBy('submittedAt', 'desc')
     );
 
-    return getDocs(missionsQuery);
+    return (await getDocs(missionsQuery)) as unknown as QuerySnapshotLike;
   }
 
-  private async getQueuedMissionsSnapshot(yardId: string): Promise<any> {
+  private async getQueuedMissionsSnapshot(yardId: string): Promise<QuerySnapshotLike> {
     if (this.isAdminFirestore()) {
       return this.adminDb()
         .collection(MISSIONS_COLLECTION)
         .where('yardId', '==', yardId)
         .where('status', '==', 'queued')
         .orderBy('submittedAt', 'asc')
-        .get();
+        .get() as unknown as QuerySnapshotLike;
     }
 
     const missionsQuery = query(
@@ -261,27 +270,27 @@ export class FirestoreMissionRepository implements IMissionRepository {
       orderBy('submittedAt', 'asc')
     );
 
-    return getDocs(missionsQuery);
+    return (await getDocs(missionsQuery)) as unknown as QuerySnapshotLike;
   }
 
-  private async getAllMissionsSnapshot(): Promise<any> {
+  private async getAllMissionsSnapshot(): Promise<QuerySnapshotLike> {
     if (this.isAdminFirestore()) {
-      return this.adminDb().collection(MISSIONS_COLLECTION).orderBy('submittedAt', 'asc').limit(100).get();
+      return this.adminDb().collection(MISSIONS_COLLECTION).orderBy('submittedAt', 'asc').limit(100).get() as unknown as QuerySnapshotLike;
     }
 
     const missionsQuery = query(collection(this.clientDb(), MISSIONS_COLLECTION), orderBy('submittedAt', 'asc'), limit(100));
 
-    return getDocs(missionsQuery);
+    return (await getDocs(missionsQuery)) as unknown as QuerySnapshotLike;
   }
 
-  private async getQueueLengthSnapshot(yardId: string): Promise<any> {
+  private async getQueueLengthSnapshot(yardId: string): Promise<CountSnapshotLike> {
     if (this.isAdminFirestore()) {
       return this.adminDb()
         .collection(MISSIONS_COLLECTION)
         .where('yardId', '==', yardId)
         .where('status', '==', 'queued')
         .count()
-        .get();
+        .get() as unknown as CountSnapshotLike;
     }
 
     const missionsQuery = query(
@@ -290,10 +299,10 @@ export class FirestoreMissionRepository implements IMissionRepository {
       where('status', '==', 'queued')
     );
 
-    return getCountFromServer(missionsQuery);
+    return (await getCountFromServer(missionsQuery)) as unknown as CountSnapshotLike;
   }
 
-  private async getQueuePositionSnapshot(yardId: string, submittedAt: string): Promise<any> {
+  private async getQueuePositionSnapshot(yardId: string, submittedAt: string): Promise<CountSnapshotLike> {
     if (this.isAdminFirestore()) {
       return this.adminDb()
         .collection(MISSIONS_COLLECTION)
@@ -301,7 +310,7 @@ export class FirestoreMissionRepository implements IMissionRepository {
         .where('status', '==', 'queued')
         .where('submittedAt', '<', submittedAt)
         .count()
-        .get();
+        .get() as unknown as CountSnapshotLike;
     }
 
     const missionsQuery = query(
@@ -311,10 +320,10 @@ export class FirestoreMissionRepository implements IMissionRepository {
       where('submittedAt', '<', submittedAt)
     );
 
-    return getCountFromServer(missionsQuery);
+    return (await getCountFromServer(missionsQuery)) as unknown as CountSnapshotLike;
   }
 
-  private getCountValue(snapshot: { data: () => { count: number } }): number {
+  private getCountValue(snapshot: CountSnapshotLike): number {
     return snapshot.data().count;
   }
 
@@ -342,24 +351,24 @@ export class FirestoreMissionRepository implements IMissionRepository {
   /**
    * Convert Firestore document to Mission entity
    */
-  private fromFirestoreDoc(id: string, data: FirebaseFirestore.DocumentData): Mission {
+  private fromFirestoreDoc(id: string, data: MissionDocData): Mission {
     return {
       id,
-      yardId: data.yardId,
-      learnerId: data.learnerId || data.sessionId,
-      sessionId: data.sessionId,
-      learnerUid: data.learnerUid,
-      name: data.name,
-      code: data.code,
-      blocklyState: data.blocklyState,
-      status: data.status,
-      executionResult: data.executionResult,
-      executionMetadata: data.executionMetadata,
-      videoUrl: data.videoUrl,
-      youtubeUrl: data.youtubeUrl,
-      submittedAt: data.submittedAt,
-      startedAt: data.startedAt,
-      completedAt: data.completedAt,
+      yardId: data.yardId as string,
+      learnerId: (data.learnerId as string) || (data.sessionId as string),
+      sessionId: data.sessionId as string,
+      learnerUid: data.learnerUid as string | undefined,
+      name: data.name as string | undefined,
+      code: data.code as string,
+      blocklyState: data.blocklyState as string | undefined,
+      status: data.status as Mission['status'],
+      executionResult: data.executionResult as Mission['executionResult'],
+      executionMetadata: data.executionMetadata as Mission['executionMetadata'],
+      videoUrl: data.videoUrl as string | undefined,
+      youtubeUrl: data.youtubeUrl as string | undefined,
+      submittedAt: data.submittedAt as string,
+      startedAt: data.startedAt as string | undefined,
+      completedAt: data.completedAt as string | undefined,
     };
   }
 }

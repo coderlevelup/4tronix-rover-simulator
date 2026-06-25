@@ -3,7 +3,6 @@
  */
 
 import {
-  Learner,
   createAnonymousLearner,
   isActiveLearner,
   sanitizeDisplayName,

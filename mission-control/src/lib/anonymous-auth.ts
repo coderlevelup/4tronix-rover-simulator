@@ -40,7 +40,7 @@ export function getOrCreateSession(): LearnerSession {
         console.log('📋 Retrieved existing session:', session.sessionId);
         return session;
       }
-    } catch (error) {
+    } catch {
       console.warn('⚠️ Failed to parse stored session, creating new one');
     }
   }

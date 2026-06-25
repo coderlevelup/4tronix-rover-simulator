@@ -10,7 +10,7 @@ import { getFirebaseAdminAuth } from '@/infrastructure/persistence/firebase-admi
 export interface CustomClaims {
   role?: 'learner' | 'operator' | 'admin';
   yardIds?: string[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**

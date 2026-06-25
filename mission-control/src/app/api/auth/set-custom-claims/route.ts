@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { setUserRole, setUserCustomClaims } from '@/infrastructure/auth/set-custom-claims';
+import { setUserCustomClaims, type CustomClaims } from '@/infrastructure/auth/set-custom-claims';
 
 interface SetClaimsRequest {
   uid: string;
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build the claims object
-    const claims: any = {};
+    const claims: CustomClaims = {};
     if (role) {
       if (!['learner', 'operator', 'admin'].includes(role)) {
         return NextResponse.json(
@@ -89,10 +89,10 @@ export async function POST(request: NextRequest) {
       },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Failed to set custom claims:', error);
 
-    if (error.code === 'auth/user-not-found') {
+    if ((error as { code?: string }).code === 'auth/user-not-found') {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }

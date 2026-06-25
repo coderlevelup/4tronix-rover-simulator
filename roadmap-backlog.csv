@@ -1,0 +1,27 @@
+Work Item Type,Title,Description,Tags,Priority
+Epic,Platform consolidation: one hub + David's yard,"Retire the separate mission-control Next app. One Next app (mission-authoring) becomes the Mission Control hub on localhost:3000; David's yard is the operator/run surface on localhost:3001. Operators log into the hub for admin access.",close-the-loop; architecture,1
+User Story,Retire the mission-control Next app,"As a maintainer, I want the duplicated mission-control app removed (and CI, root package.json, README updated) so the platform is one hub + the yard.",architecture; epic-consolidation,1
+User Story,Point David's yard satellite at port 3001,"As a developer, I want the yard satellite UI served on 3001 (rover backend stays on 8523) so npm run dev brings up hub:3000 + yard:3001.",architecture; yard; epic-consolidation,1
+User Story,Operator login and admin access on the hub,"As an operator, I want to log into the hub and get admin access so I can manage missions. Port operator-claims + JWT proxy/middleware from mission-control; reuse the hub's AuthContext/firebase-admin; keep set-custom-claims locked down.",auth; epic-consolidation,1
+User Story,Minimal operator API in the hub,"As an operator, I want hub APIs to list not-run missions, attach a YouTube URL, and mark a mission run/complete (admin-only). Drop rover-config, simulator, and dispatch routes per David.",auth; api; epic-consolidation,1
+Epic,Close the loop - Python path,"Operator finds a not-run mission, copies its Python, pastes into the yard, runs it, and attaches the resulting video. The priority deliverable; testable this weekend.",close-the-loop; David-priority,1
+User Story,Operator page lists not-run missions with code,"As an operator, I want a hub page listing not-yet-run missions with their code and a Copy Python button so I can take the code to the yard.",close-the-loop; epic-loop-python,1
+User Story,Attach a YouTube video to a mission,"As an operator, I want to attach a YouTube URL to a completed mission so the learner sees their run. Admin-only; reuse add-youtube-url logic.",close-the-loop; epic-loop-python,1
+Epic,Close the loop - Blockly round-trip,"Operator can copy a learner's blocks and load them into the yard's Blockly editor (David wants both Python and Blockly).",close-the-loop,2
+User Story,Align hub Blockly with the yard's,"As a developer, I want the hub's BlocklyEditor to use the yard's block definitions and the JSON serialization API so a learner's workspace is portable to the yard.",blockly; epic-loop-blockly,2
+User Story,Persist Blockly state on submission,"As a learner, I want my block workspace saved with my mission (blocklyState field) so an operator can reload my exact blocks.",blockly; epic-loop-blockly,2
+User Story,Copy blocks in the operator page,"As an operator, I want a Copy blocks button (when blocklyState exists) so I can paste blocks into the yard.",blockly; epic-loop-blockly,2
+User Story,Yard: import blocks paste box,"As an operator at the yard, I want to paste a learner's Blockly state into the yard editor and have the blocks load.",blockly; yard; epic-loop-blockly,2
+Epic,Quick David-asks,"Small, unambiguous fixes David named in the standup.",polish,2
+User Story,Move email prompt to post-submission,"As a learner, I should never be asked for email on landing; only optionally after submitting a mission, framed as notifications. Identity stays on local storage.",email; privacy; epic-david-asks,2
+User Story,Rename brand Rover Cadets to Mission Control,"As a user, the app should read 'Mission Control' (layout title, navbar, leaderboard heading).",branding; epic-david-asks,2
+User Story,Simplify generated mission names,"As a learner, generated mission names should drop the numeric suffix and dashes (e.g. 'Helios Explorer'); names need not be unique.",polish; epic-david-asks,3
+Epic,Landing as a single-purpose mission viewer,"Restyle the feed toward a YouTube card aesthetic; the landing is the mission viewer.",ux,3
+User Story,YouTube-style mission feed,"As a learner, I want a clean YouTube-like card feed (code + video), with 'Try it yourself' moved out of the card middle, and leaderboard/challenges de-cluttered from the core viewer.",ux; epic-landing,3
+Epic,Challenges framing,"Keep the challenges page for the marking stakeholder but frame not-yet-operational parts as coming soon.",ux,3
+User Story,Frame challenges as coming soon,"As a product owner, I don't want to promise teachers challenges we can't operate; mark non-working parts 'coming soon'.",ux; epic-challenges,3
+Epic,Deploy,"Get the hub + yard to a deployable target. Partly blocked on David/Werner's host choice (GCP likely; YouTube for video; Firestore as DB).",infra; blocked,2
+User Story,Deploy workflow skeleton and runtime docs,"As a maintainer, I want a deploy pipeline skeleton and documented build/runtime needs so we can ship as soon as the host is chosen. BLOCKED: host TBD.",infra; blocked; epic-deploy,2
+Epic,Housekeeping,"Repo and demo hygiene after the migration.",chore,4
+User Story,Archive the old island repo,"As a maintainer, I want the old sapient.rocks-mission-control GitHub repo archived (history preserved) once everyone is on the fork.",chore; epic-housekeeping,4
+User Story,Architecture diagram for the next demo,"As a presenter, I want an architecture diagram (hub to yard to rover) to lead the next demo, as David requested.",docs; epic-housekeeping,4

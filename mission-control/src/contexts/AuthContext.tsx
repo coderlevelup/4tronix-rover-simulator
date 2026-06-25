@@ -78,8 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       console.log('✅ SignIn successful:', result.user.email);
-    } catch (err: any) {
-      console.error('❌ Firebase signIn error:', err.code || err.name, err.message || err);
+    } catch (err) {
+      const e = err as { code?: string; name?: string; message?: string };
+      console.error('❌ Firebase signIn error:', e.code || e.name, e.message || err);
       throw err;
     }
   };

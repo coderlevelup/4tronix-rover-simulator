@@ -27,7 +27,7 @@ export function LearnerProfileCard() {
       await updateDisplayName(displayName);
       setIsEditing(false);
       setDisplayName('');
-    } catch (err) {
+    } catch {
       setError('Invalid name. Please avoid personal information.');
     }
   };

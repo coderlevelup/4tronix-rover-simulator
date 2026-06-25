@@ -64,7 +64,7 @@ export function SimulatorVisualization({ mission }: SimulatorVisualizationProps)
 
         if (data.success && data.trajectory && data.trajectory.length > 0) {
           // Convert the trajectory to ExtendedRoverPose format
-          const simulationPoses: ExtendedRoverPose[] = data.trajectory.map((state: any) => ({
+          const simulationPoses: ExtendedRoverPose[] = data.trajectory.map((state: { x: number; y: number; heading: number }) => ({
             x: state.x + 300, // Offset to center on canvas
             y: -state.y + 300, // Flip Y axis and center on canvas
             headingDegrees: state.heading, // Keep actual heading in degrees

@@ -35,7 +35,7 @@ function chain(...blocks: MockBlock[]): MockBlock {
   return blocks[0];
 }
 
-function workspace(...top: MockBlock[]): any {
+function workspace(...top: MockBlock[]): { getTopBlocks: () => MockBlock[] } {
   return { getTopBlocks: () => top };
 }
 

@@ -6,16 +6,19 @@ import {
   ROVER_TOOLBOX,
   workspaceToPython,
   workspaceToCommands,
+  type SimulationCommand,
 } from './roverBlockly';
 
 interface BlocklyEditorProps {
-  onGenerateCommands: (commands: any[]) => void;
+  onGenerateCommands: (commands: SimulationCommand[]) => void;
   onCodeChange?: (code: string) => void;
   onBlocklyStateChange?: (state: string) => void;
 }
 
 declare global {
   interface Window {
+    // Blockly is loaded from a CDN <script> and ships no type definitions.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Blockly: any;
   }
 }
@@ -27,6 +30,8 @@ const STORAGE_KEY = 'roverWorkspace';
 export function BlocklyEditor({ onGenerateCommands, onCodeChange, onBlocklyStateChange }: BlocklyEditorProps) {
   const blocklyDivRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Holds the Blockly workspace instance (untyped CDN global).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const workspaceRef = useRef<any>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [blocklyLoaded, setBlocklyLoaded] = useState(false);
@@ -38,6 +43,7 @@ export function BlocklyEditor({ onGenerateCommands, onCodeChange, onBlocklyState
 
     // Check if already loaded
     if (window.Blockly) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time sync that the CDN script is already present
       setBlocklyLoaded(true);
       scriptLoadedRef.current = true;
       return;

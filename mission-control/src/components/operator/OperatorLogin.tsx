@@ -82,21 +82,22 @@ export function OperatorLogin() {
         // Don't set loading to false - let the useEffect handle redirect
         // The loading spinner will stay visible until redirect completes
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('❌ Login error:', err);
+      const e = err as { code?: string; message?: string };
 
       let errorMessage = 'Login failed';
 
-      if (err.code === 'auth/invalid-credential') {
+      if (e.code === 'auth/invalid-credential') {
         errorMessage = 'Invalid email or password';
-      } else if (err.code === 'auth/user-not-found') {
+      } else if (e.code === 'auth/user-not-found') {
         errorMessage = 'User not found';
-      } else if (err.code === 'auth/wrong-password') {
+      } else if (e.code === 'auth/wrong-password') {
         errorMessage = 'Incorrect password';
-      } else if (err.code === 'auth/too-many-requests') {
+      } else if (e.code === 'auth/too-many-requests') {
         errorMessage = 'Too many attempts. Please try again later';
-      } else if (err.message) {
-        errorMessage = err.message;
+      } else if (e.message) {
+        errorMessage = e.message;
       }
 
       setError(errorMessage);

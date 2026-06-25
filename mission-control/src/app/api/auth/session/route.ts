@@ -50,17 +50,18 @@ export async function POST(request: NextRequest) {
     });
 
     return response;
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Session establishment failed:', error);
+    const code = (error as { code?: string }).code;
 
-    if (error.code === 'auth/id-token-expired') {
+    if (code === 'auth/id-token-expired') {
       return NextResponse.json(
         { error: 'Token expired' },
         { status: 401 }
       );
     }
 
-    if (error.code === 'auth/id-token-revoked') {
+    if (code === 'auth/id-token-revoked') {
       return NextResponse.json(
         { error: 'Token revoked' },
         { status: 401 }

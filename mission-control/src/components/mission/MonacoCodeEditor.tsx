@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useRef } from 'react';
 import Editor from '@monaco-editor/react';
+import { type SimulationCommand } from './roverBlockly';
 
 interface MonacoCodeEditorProps {
-  onGenerateCommands: (commands: any[]) => void;
+  onGenerateCommands: (commands: SimulationCommand[]) => void;
   onCodeChange?: (code: string) => void;
 }
 
@@ -20,20 +21,26 @@ export function MonacoCodeEditor({ onGenerateCommands, onCodeChange }: MonacoCod
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Array<{ line: number; message: string }>>([]);
+  // Monaco editor + namespace instances (provided untyped by the editor lib).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editorRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const monacoRef = useRef<any>(null);
 
   useEffect(() => {
     // Load saved code from localStorage
     const saved = localStorage.getItem('rover_monaco_code');
     const initialCode = saved || DEFAULT_CODE;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydration of editor contents from localStorage
     setCode(initialCode);
 
     if (onCodeChange) {
       onCodeChange(initialCode);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount to hydrate from storage
   }, []);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Monaco editor/namespace instances from @monaco-editor/react onMount
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
@@ -206,8 +213,8 @@ export function MonacoCodeEditor({ onGenerateCommands, onCodeChange }: MonacoCod
   );
 }
 
-function parseRoverCode(code: string): any[] {
-  const commands: any[] = [];
+function parseRoverCode(code: string): SimulationCommand[] {
+  const commands: SimulationCommand[] = [];
   const lines = code.split('\n');
 
   for (const line of lines) {

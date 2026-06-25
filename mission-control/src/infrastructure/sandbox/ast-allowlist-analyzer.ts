@@ -82,7 +82,7 @@ function checkDisallowedImports(line: string, lineNumber: number): AllowlistFind
   const importMatch = line.match(/^\s*import\s+(\w+)/);
   if (importMatch) {
     const moduleName = importMatch[1];
-    if (DISALLOWED_IMPORTS.includes(moduleName as any)) {
+    if ((DISALLOWED_IMPORTS as readonly string[]).includes(moduleName)) {
       findings.push({
         ruleId: 'disallowed-import',
         message: ALLOWLIST_ERROR_MESSAGES.DISALLOWED_IMPORT(moduleName),
@@ -95,7 +95,7 @@ function checkDisallowedImports(line: string, lineNumber: number): AllowlistFind
   const fromImportMatch = line.match(/^\s*from\s+(\w+)\s+import/);
   if (fromImportMatch) {
     const moduleName = fromImportMatch[1];
-    if (DISALLOWED_IMPORTS.includes(moduleName as any)) {
+    if ((DISALLOWED_IMPORTS as readonly string[]).includes(moduleName)) {
       findings.push({
         ruleId: 'disallowed-import',
         message: ALLOWLIST_ERROR_MESSAGES.DISALLOWED_IMPORT(moduleName),
@@ -135,7 +135,7 @@ function checkFunctionCalls(line: string, lineNumber: number): AllowlistFinding[
     const functionName = `rover.${match[1]}`;
 
     // Check if this rover command is in allowlist
-    if (!ROVER_COMMAND_ALLOWLIST.includes(functionName as any)) {
+    if (!(ROVER_COMMAND_ALLOWLIST as readonly string[]).includes(functionName)) {
       findings.push({
         ruleId: 'disallowed-function',
         message: ALLOWLIST_ERROR_MESSAGES.DISALLOWED_FUNCTION(functionName),
