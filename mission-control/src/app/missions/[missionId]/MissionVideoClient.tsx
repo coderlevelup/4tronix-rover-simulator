@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Mission } from '@/core/domain/entities/Mission';
 import Link from 'next/link';
 import { getFirestoreClient } from '@/lib/firebase';
 import { FirestoreMissionRepository } from '@/infrastructure/persistence/FirestoreMissionRepository';
+import { RoverSimulatorScaffold } from '@/components/mission/RoverSimulatorScaffold';
+import { parseRoverCode } from '@/lib/parseRoverCode';
+import { simulateCommands } from '@/lib/simulateCommands';
 import {
   getDiscoveryStatus,
   DISCOVERY_BADGE_CLASS,
@@ -22,6 +25,14 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
   const [mission, setMission] = useState<Mission | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [videoTab, setVideoTab] = useState<'sim' | 'real'>('sim');
+
+  // The simulated run is reproducible from the mission's code, so it is computed
+  // on demand rather than stored. Keeps hosting cheap and always in sync.
+  const simTrajectory = useMemo(
+    () => (mission ? simulateCommands(parseRoverCode(mission.code)) : []),
+    [mission]
+  );
 
   useEffect(() => {
     const fetchMission = async () => {
@@ -104,8 +115,33 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-4">
-            <div className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 shadow-xl">
-              {youtubeId ? (
+            <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-xl">
+              {/* Tabs: compare the simulated run with the real yard run */}
+              <div className="flex border-b border-slate-800">
+                <button
+                  onClick={() => setVideoTab('sim')}
+                  className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+                    videoTab === 'sim'
+                      ? 'border-b-2 border-orange-400 text-orange-300'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Simulated
+                </button>
+                <button
+                  onClick={() => setVideoTab('real')}
+                  disabled={!youtubeId}
+                  className={`px-4 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    videoTab === 'real'
+                      ? 'border-b-2 border-orange-400 text-orange-300'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Real run{youtubeId ? '' : ' (pending)'}
+                </button>
+              </div>
+
+              {videoTab === 'real' && youtubeId ? (
                 <div className="relative aspect-video w-full bg-black">
                   <iframe
                     src={`https://www.youtube.com/embed/${youtubeId}?rel=0`}
@@ -116,11 +152,8 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
                   />
                 </div>
               ) : (
-                <div className="relative aspect-video w-full bg-slate-800 flex flex-col items-center justify-center text-slate-500">
-                  <svg className="h-16 w-16 text-slate-600 mb-3" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                  <p>Video not available</p>
+                <div className="p-3">
+                  <RoverSimulatorScaffold trajectory={simTrajectory} isPlaying editorMode="code" />
                 </div>
               )}
             </div>
