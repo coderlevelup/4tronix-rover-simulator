@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import styles from './ManualControlRealtime.module.css';
 import { RoverPhysics, RoverState } from '@/lib/rover-physics';
 
 interface ManualControlRealtimeProps {
@@ -10,19 +9,51 @@ interface ManualControlRealtimeProps {
   resetVersion?: number;
 }
 
+/**
+ * The manual palette mirrors the Blockly movement blocks: tap one and the rover
+ * runs that instruction for a beat. It is the on-ramp David asked for, so a
+ * learner who has never coded sees that blocks drive the rover before they open
+ * the full Blockly editor.
+ */
+type DriveBlock = { command: string; label: string; speed: number; ms: number; icon: string; className: string };
+
+const BLOCKS: DriveBlock[] = [
+  { command: 'forward', label: 'Drive forward', speed: 80, ms: 900, icon: '↑', className: 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700' },
+  { command: 'reverse', label: 'Drive backward', speed: 80, ms: 900, icon: '↓', className: 'bg-orange-600 hover:bg-orange-500 active:bg-orange-700' },
+  { command: 'spinLeft', label: 'Spin left', speed: 60, ms: 650, icon: '↺', className: 'bg-purple-600 hover:bg-purple-500 active:bg-purple-700' },
+  { command: 'spinRight', label: 'Spin right', speed: 60, ms: 650, icon: '↻', className: 'bg-purple-600 hover:bg-purple-500 active:bg-purple-700' },
+  { command: 'steerLeft', label: 'Steer left', speed: 60, ms: 800, icon: '↰', className: 'bg-blue-600 hover:bg-blue-500 active:bg-blue-700' },
+  { command: 'steerRight', label: 'Steer right', speed: 60, ms: 800, icon: '↱', className: 'bg-blue-600 hover:bg-blue-500 active:bg-blue-700' },
+];
+
+const KEY_MAP: Record<string, DriveBlock> = {
+  w: BLOCKS[0],
+  s: BLOCKS[1],
+  a: BLOCKS[2],
+  d: BLOCKS[3],
+  q: BLOCKS[4],
+  e: BLOCKS[5],
+};
+
 export function ManualControlRealtime({ onTrajectoryUpdate, onReset, resetVersion = 0 }: ManualControlRealtimeProps) {
   const roverRef = useRef<RoverPhysics>(new RoverPhysics());
   const trajectoryRef = useRef<RoverState[]>([]);
   const animationFrameRef = useRef<number | null>(null);
+  const runTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isActive, setIsActive] = useState(false);
+  const [activeCommand, setActiveCommand] = useState<string | null>(null);
 
   const resetController = useCallback(() => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
-
+    if (runTimeoutRef.current) {
+      clearTimeout(runTimeoutRef.current);
+      runTimeoutRef.current = null;
+    }
     setIsActive(false);
+    setActiveCommand(null);
     roverRef.current.reset();
     trajectoryRef.current = [];
   }, []);
@@ -35,12 +66,10 @@ export function ManualControlRealtime({ onTrajectoryUpdate, onReset, resetVersio
   }, [resetVersion, resetController]);
 
   useEffect(() => {
-    // Start real-time physics loop
     const updateLoop = () => {
       const newState = roverRef.current.update();
       trajectoryRef.current.push(newState);
 
-      // Keep only last 1000 points to prevent memory issues
       if (trajectoryRef.current.length > 1000) {
         trajectoryRef.current = trajectoryRef.current.slice(-1000);
       }
@@ -60,52 +89,49 @@ export function ManualControlRealtime({ onTrajectoryUpdate, onReset, resetVersio
     };
   }, [isActive, onTrajectoryUpdate]);
 
-  const handleCommand = useCallback((command: string, speed?: number) => {
+  // Tap a block: run that instruction for a beat, then stop. Tapping more blocks
+  // extends the path, one block at a time.
+  const runBlock = useCallback((block: DriveBlock) => {
     if (!isActive) {
-      // First command - start the loop
       setIsActive(true);
       trajectoryRef.current = [roverRef.current.getState()];
     }
-    roverRef.current.setCommand(command, speed || 80);
+    if (runTimeoutRef.current) clearTimeout(runTimeoutRef.current);
+    roverRef.current.setCommand(block.command, block.speed);
+    setActiveCommand(block.command);
+    runTimeoutRef.current = setTimeout(() => {
+      roverRef.current.setCommand('stop');
+      setActiveCommand(null);
+      runTimeoutRef.current = null;
+    }, block.ms);
   }, [isActive]);
+
+  const stopNow = useCallback(() => {
+    if (runTimeoutRef.current) {
+      clearTimeout(runTimeoutRef.current);
+      runTimeoutRef.current = null;
+    }
+    roverRef.current.setCommand('stop');
+    setActiveCommand(null);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.repeat) return;
-
-      switch (e.key.toLowerCase()) {
-        case 'w': handleCommand('forward', 80); break;
-        case 's': handleCommand('reverse', 80); break;
-        case 'a': handleCommand('spinLeft', 60); break;
-        case 'd': handleCommand('spinRight', 60); break;
-        case 'q': handleCommand('steerLeft', 60); break;
-        case 'e': handleCommand('steerRight', 60); break;
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      switch (e.key.toLowerCase()) {
-        case 'w':
-        case 's':
-        case 'a':
-        case 'd':
-        case 'q':
-        case 'e':
-          handleCommand('stop');
-          break;
+      const block = KEY_MAP[e.key.toLowerCase()];
+      if (block) {
+        e.preventDefault();
+        runBlock(block);
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        stopNow();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [handleCommand]);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [runBlock, stopNow]);
 
   const handleReset = () => {
     resetController();
@@ -113,96 +139,43 @@ export function ManualControlRealtime({ onTrajectoryUpdate, onReset, resetVersio
   };
 
   return (
-    <div className="flex flex-col items-center gap-3 p-4 h-full w-full relative">
-      <h3 className="text-lg font-semibold text-slate-200">Manual Controls (Real-time)</h3>
-
-      {/* Direction Controls Grid */}
-      <div className={`grid w-full grid-cols-3 gap-3 flex-1 ${styles.autoRowsFr}`}>
-        {/* Row 1 */}
-        <button
-          onMouseDown={() => handleCommand('steerLeft', 60)}
-          onMouseUp={() => handleCommand('stop')}
-          onMouseLeave={() => handleCommand('stop')}
-          className="w-full h-full rounded-xl bg-blue-600 px-3 text-lg font-semibold text-white hover:bg-blue-500 active:bg-blue-700"
-        >
-          ↰ Steer Left
-        </button>
-        <button
-          onMouseDown={() => handleCommand('forward', 80)}
-          onMouseUp={() => handleCommand('stop')}
-          onMouseLeave={() => handleCommand('stop')}
-          className="w-full h-full rounded-xl bg-emerald-600 px-3 text-lg font-semibold text-white hover:bg-emerald-500 active:bg-emerald-700"
-        >
-          ↑ Forward
-        </button>
-        <button
-          onMouseDown={() => handleCommand('steerRight', 60)}
-          onMouseUp={() => handleCommand('stop')}
-          onMouseLeave={() => handleCommand('stop')}
-          className="w-full h-full rounded-xl bg-blue-600 px-3 text-lg font-semibold text-white hover:bg-blue-500 active:bg-blue-700"
-        >
-          ↱ Steer Right
-        </button>
-
-        {/* Row 2 */}
-        <button
-          onMouseDown={() => handleCommand('spinLeft', 60)}
-          onMouseUp={() => handleCommand('stop')}
-          onMouseLeave={() => handleCommand('stop')}
-          className="w-full h-full rounded-xl bg-purple-600 px-3 text-lg font-semibold text-white hover:bg-purple-500 active:bg-purple-700"
-        >
-          ↺ Spin Left
-        </button>
-        <button
-          onClick={() => handleCommand('stop', 0)}
-          className="w-full h-full rounded-xl bg-red-600 px-3 text-lg font-semibold text-white hover:bg-red-500"
-        >
-          ■ Stop
-        </button>
-        <button
-          onMouseDown={() => handleCommand('spinRight', 60)}
-          onMouseUp={() => handleCommand('stop')}
-          onMouseLeave={() => handleCommand('stop')}
-          className="w-full h-full rounded-xl bg-purple-600 px-3 text-lg font-semibold text-white hover:bg-purple-500 active:bg-purple-700"
-        >
-          ↻ Spin Right
-        </button>
-
-        {/* Row 3 */}
-        <div />
-        <button
-          onMouseDown={() => handleCommand('reverse', 80)}
-          onMouseUp={() => handleCommand('stop')}
-          onMouseLeave={() => handleCommand('stop')}
-          className="w-full h-full rounded-xl bg-orange-600 px-3 text-lg font-semibold text-white hover:bg-orange-500 active:bg-orange-700"
-        >
-          ↓ Reverse
-        </button>
-        <div />
+    <div className="flex h-full w-full flex-col gap-3 p-4">
+      <div>
+        <h3 className="font-display text-base font-bold text-foreground">Tap a block to drive</h3>
+        <p className="text-xs text-muted-foreground">
+          These are the same blocks you code with. Tap one to run it.
+        </p>
       </div>
 
-      <div className="flex gap-2 mt-3">
+      <div className="grid flex-1 content-start grid-cols-2 gap-2">
+        {BLOCKS.map((block) => (
+          <button
+            key={block.command}
+            onClick={() => runBlock(block)}
+            className={`flex items-center gap-2 rounded-lg border-l-4 border-black/20 px-3 py-3 text-left text-sm font-bold text-white shadow transition-transform active:scale-[0.98] ${block.className} ${
+              activeCommand === block.command ? 'ring-2 ring-white/70' : ''
+            }`}
+          >
+            <span className="text-lg leading-none">{block.icon}</span>
+            {block.label}
+          </button>
+        ))}
+        <button
+          onClick={stopNow}
+          className="col-span-2 flex items-center justify-center gap-2 rounded-lg border-l-4 border-black/20 bg-red-600 px-3 py-2.5 text-sm font-bold text-white shadow transition-transform hover:bg-red-500 active:scale-[0.98] active:bg-red-700"
+        >
+          <span className="text-lg leading-none">■</span> Stop
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
         <button
           onClick={handleReset}
-          className="rounded-lg bg-slate-700 px-6 py-3 text-base font-medium text-white hover:bg-slate-600"
+          className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:border-primary"
         >
-          Reset Position
+          Reset position
         </button>
-      </div>
-
-      <p className="px-2 text-center text-sm text-slate-400">Hold buttons to drive, release to stop.</p>
-
-      {/* Keyboard Tooltip */}
-      <div className="absolute bottom-4 left-4 text-xs text-slate-400 bg-slate-800/80 p-2 rounded-lg border border-slate-700 pointer-events-none hidden md:block z-10">
-        <div className="font-semibold mb-1 text-slate-300">Keyboard Controls</div>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-          <div><kbd className="bg-slate-700 px-1 rounded text-slate-200">W</kbd> Forward</div>
-          <div><kbd className="bg-slate-700 px-1 rounded text-slate-200">S</kbd> Reverse</div>
-          <div><kbd className="bg-slate-700 px-1 rounded text-slate-200">A</kbd> Spin Left</div>
-          <div><kbd className="bg-slate-700 px-1 rounded text-slate-200">D</kbd> Spin Right</div>
-          <div><kbd className="bg-slate-700 px-1 rounded text-slate-200">Q</kbd> Turn Left</div>
-          <div><kbd className="bg-slate-700 px-1 rounded text-slate-200">E</kbd> Turn Right</div>
-        </div>
+        <span className="text-[11px] text-muted-foreground">Keys: W A S D, Q E, space to stop</span>
       </div>
     </div>
   );
