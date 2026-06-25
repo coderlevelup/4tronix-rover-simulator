@@ -4,9 +4,10 @@ import React, { useEffect, useState } from 'react';
 import { useLearner } from '@/contexts/LearnerContext';
 
 /**
- * Non-blocking email capture prompt. Shown on first visit (no stored email) and
- * whenever the learner chooses "Edit email". Saving persists via LearnerContext
- * (localStorage + Firestore). Skipping just closes it - email is optional.
+ * Non-blocking email capture prompt, opened after a mission is submitted (to
+ * offer notifications) and from the history page - never on landing. Saving
+ * persists via LearnerContext (localStorage + Firestore); skipping just closes
+ * it, email is optional.
  */
 export function EmailPrompt() {
   const { learnerEmail, setLearnerEmail, showEmailPrompt, closeEmailPrompt } = useLearner();

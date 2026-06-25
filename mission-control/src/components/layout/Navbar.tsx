@@ -17,12 +17,10 @@ import {
   Home,
   Clock,
   Plus,
-  Mail,
   Shield,
 } from 'lucide-react';
 import { useState, type ComponentProps } from 'react';
 import { NotificationModal } from './NotificationModal';
-import { useLearner } from '@/contexts/LearnerContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { EmailPrompt } from '@/components/learner/EmailPrompt';
 
@@ -39,7 +37,6 @@ const NAV_ITEMS = [
 export function Navbar() {
   const pathname = usePathname();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const { openEmailPrompt } = useLearner();
   const { isOperator } = useAuth();
 
   // Real notifications will be wired to the backend later - no placeholder data.
@@ -121,16 +118,6 @@ export function Navbar() {
                   Create Mission
                 </Link>
               </div>
-
-              {/* Edit email (always visible) */}
-              <button
-                onClick={openEmailPrompt}
-                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-card/50 hover:text-foreground"
-                aria-label="Edit email"
-                title="Edit email"
-              >
-                <Mail className="h-5 w-5" />
-              </button>
 
               {/* Notification bell (always visible) */}
               <button

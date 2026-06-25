@@ -31,7 +31,7 @@ type SimulationCommand = {
 };
 
 export function MissionWorkspace() {
-  const { learnerEmail } = useLearner();
+  const { learnerEmail, openEmailPrompt } = useLearner();
   const searchParams = useSearchParams();
   const initialMode = (searchParams.get('mode') as EditorMode) || 'manual';
   const initialCode = searchParams.get('code') ?? '';
@@ -188,6 +188,9 @@ export function MissionWorkspace() {
 
       setSubmitSuccess(true);
       setMissionName('');
+      // Offer notifications once the mission is in (never on landing), and only
+      // if the learner has not already saved an email.
+      if (!learnerEmail) openEmailPrompt();
       console.log('✅ Mission submitted to Firebase:', result.mission);
       setTimeout(() => setSubmitSuccess(false), 5000);
     } catch (err) {

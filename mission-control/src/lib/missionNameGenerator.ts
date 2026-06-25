@@ -1,12 +1,9 @@
 /**
  * Mission Name Generator
  *
- * Generates random mission names by combining:
- * - Part 1: Adjectives (e.g., Brave, Swift, Silent)
- * - Part 2: Nouns (e.g., Explorer, Guardian, Scout)
- * - Number: Random 3-digit number (100-999)
- *
- * Examples: BraveExplorer451, SwiftGuardian789, SilentScout123
+ * Generates friendly mission names by pairing two words, e.g. "Helios Explorer",
+ * "Red Pathfinder". No numeric suffix and no dashes (per David's feedback):
+ * names are for humans to recognise and re-roll, and they need not be unique.
  */
 
 const PART1_WORDS = [
@@ -58,15 +55,13 @@ const PART2_WORDS = [
 /**
  * Generate a random mission name
  *
- * @returns Random mission name in format: Part1-Part2-3DigitNumber
- * @example "Red-Pathfinder-234"
+ * @returns A two-word name like "Helios Explorer" (no number, no dashes)
  */
 export function generateRandomMissionName(): string {
   const part1 = PART1_WORDS[Math.floor(Math.random() * PART1_WORDS.length)];
   const part2 = PART2_WORDS[Math.floor(Math.random() * PART2_WORDS.length)];
-  const number = Math.floor(Math.random() * 900) + 100; // 100-999
 
-  return `${part1}-${part2}-${number}`;
+  return `${part1} ${part2}`;
 }
 
 /**

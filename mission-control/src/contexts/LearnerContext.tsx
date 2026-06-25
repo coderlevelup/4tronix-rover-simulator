@@ -40,12 +40,12 @@ export function LearnerProvider({ children }: { children: ReactNode }) {
     initializeLearnerSession();
   }, []);
 
-  // Load any saved email; prompt on first visit if none is stored.
+  // Load any saved email. We never prompt for it on landing (per David); the
+  // email ask happens after a mission is submitted, and on the history page.
   useEffect(() => {
     try {
       const stored = localStorage.getItem('learnerEmail');
       if (stored) setLearnerEmailState(stored);
-      else setShowEmailPrompt(true);
     } catch {
       // localStorage unavailable - skip
     }
