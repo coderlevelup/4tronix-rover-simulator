@@ -2,10 +2,10 @@
   "name": "sapient-rocks-mission-control",
   "private": true,
   "scripts": {
-    "dev:authoring": "npm run dev --prefix mission-authoring -- -p 3000",
+    "dev:control": "npm run dev --prefix mission-control -- -p 3000",
     "dev:satellite": "node scripts/dev-satellite.js",
     "dev:yard": "node scripts/dev-yard.js",
-    "dev": "concurrently --names \"authoring,satellite,yard\" --prefix-colors \"cyan,green,yellow\" \"npm run dev:authoring\" \"npm run dev:satellite\" \"npm run dev:yard\""
+    "dev": "concurrently --names \"control,satellite,yard\" --prefix-colors \"cyan,green,yellow\" \"npm run dev:control\" \"npm run dev:satellite\" \"npm run dev:yard\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

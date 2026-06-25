@@ -9,7 +9,7 @@ From the repo root, `npm run dev` brings the services up on fixed ports:
 
 | Service | URL | What it is |
 |---------|-----|------------|
-| Hub (`mission-authoring`) | http://localhost:3000 | Learner-facing Mission Control app |
+| Hub (`mission-control`) | http://localhost:3000 | Learner-facing Mission Control app |
 | Yard satellite UI | http://localhost:3001 | Operator/run surface — Blockly editor + TV monitor |
 | Rover backend | http://localhost:8523 | Yard rover server (`yard/rover`) |
 
@@ -18,7 +18,7 @@ npm install      # first time only
 npm run dev      # hub:3000 + yard satellite:3001 + rover:8523
 ```
 
-Run a single service with `npm run dev:authoring`, `npm run dev:satellite`, or
+Run a single service with `npm run dev:control`, `npm run dev:satellite`, or
 `npm run dev:yard`. The satellite port can be overridden with the `SATELLITE_PORT`
 env var.
 

@@ -9,7 +9,7 @@ This is a faithful port of the SAME 4-wheel steering model used by:
 
 so that the headless sim-video produced by sim_recorder.py moves identically to
 manual control and the visual simulator. Keep this in sync with rover-physics.ts
-(mission-authoring/src/lib/rover-physics.ts) — the two are line-for-line
+(mission-control/src/lib/rover-physics.ts) — the two are line-for-line
 equivalent and the constants + command→servo mapping must match exactly.
 """
 

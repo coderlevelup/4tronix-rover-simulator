@@ -15,7 +15,7 @@ downloads/
 eggs/
 .eggs/
 # Anchored to repo root so these Python build dirs do NOT match the Next apps'
-# source dirs (e.g. mission-authoring/src/lib/).
+# source dirs (e.g. mission-control/src/lib/).
 /lib/
 /lib64/
 parts/

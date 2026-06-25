@@ -13,7 +13,7 @@ A learner-focused platform for authoring and testing Mars rover missions using v
 1. Clone the repository:
 ```
 Fastest way is to use Azure's cloning to your IDE, you can use git clone but you have to generate credentials in Azure when cloning.
-cd mars-rover-mission-authoring
+cd mars-rover-mission-control
 ```
 
 2. Install dependencies:
