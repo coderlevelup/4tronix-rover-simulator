@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { getFirestoreClient } from '@/lib/firebase';
 import { FirestoreMissionRepository } from '@/infrastructure/persistence/FirestoreMissionRepository';
 import { RoverSimulatorScaffold } from '@/components/mission/RoverSimulatorScaffold';
+import { BlocklyViewer } from '@/components/mission/BlocklyViewer';
 import { parseRoverCode } from '@/lib/parseRoverCode';
 import { simulateCommands } from '@/lib/simulateCommands';
 import { getDiscoveryStatus, DISCOVERY_BADGE_CLASS } from '@/lib/discoveryStatus';
@@ -24,6 +25,7 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedRunId, setSelectedRunId] = useState('sim');
+  const [codeView, setCodeView] = useState<'blocks' | 'python'>('blocks');
   const [copied, setCopied] = useState(false);
 
   // The simulated run is reproducible from the mission's code, so it is computed
@@ -94,6 +96,8 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
       ? 'Failed'
       : 'Not run';
   const dateLabel = new Date(mission.completedAt || mission.submittedAt).toLocaleDateString();
+  const hasBlocks = !!mission.blocklyState;
+  const showBlocks = hasBlocks && codeView === 'blocks';
 
   const copyCode = async () => {
     try {
@@ -175,25 +179,48 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
           {/* Code (scrolls internally) + remix */}
           <div className="flex min-h-0 flex-col gap-2 lg:col-span-3">
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/60 bg-background/60">
-              <div className="flex shrink-0 items-center justify-between border-b border-border/50 px-4 py-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-red-400/70" />
-                  <span className="h-2 w-2 rounded-full bg-amber-400/70" />
-                  <span className="h-2 w-2 rounded-full bg-green-400/70" />
-                  <span className="ml-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                    mission.py
-                  </span>
-                </div>
+              <div className="flex shrink-0 items-center justify-between border-b border-border/50 px-3 py-2">
+                {hasBlocks ? (
+                  <div className="inline-flex rounded-lg border border-border bg-card p-0.5 text-xs font-semibold">
+                    <button
+                      onClick={() => setCodeView('blocks')}
+                      className={`rounded-md px-3 py-1 transition-colors ${showBlocks ? 'bg-gradient-mars text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      Blocks
+                    </button>
+                    <button
+                      onClick={() => setCodeView('python')}
+                      className={`rounded-md px-3 py-1 transition-colors ${showBlocks ? 'text-muted-foreground hover:text-foreground' : 'bg-gradient-mars text-primary-foreground'}`}
+                    >
+                      Python
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-red-400/70" />
+                    <span className="h-2 w-2 rounded-full bg-amber-400/70" />
+                    <span className="h-2 w-2 rounded-full bg-green-400/70" />
+                    <span className="ml-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                      mission.py
+                    </span>
+                  </div>
+                )}
                 <button
                   onClick={copyCode}
                   className="rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  {copied ? 'Copied' : 'Copy'}
+                  {copied ? 'Copied' : 'Copy Python'}
                 </button>
               </div>
-              <pre className="min-h-0 flex-1 overflow-auto p-4 text-xs leading-relaxed text-foreground">
-                <code>{mission.code.trim() || '# No code'}</code>
-              </pre>
+              {showBlocks ? (
+                <div className="min-h-0 flex-1">
+                  <BlocklyViewer state={mission.blocklyState!} />
+                </div>
+              ) : (
+                <pre className="min-h-0 flex-1 overflow-auto p-4 text-xs leading-relaxed text-foreground">
+                  <code>{mission.code.trim() || '# No code'}</code>
+                </pre>
+              )}
             </div>
 
             <div className="flex shrink-0 items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 to-transparent px-4 py-3">
@@ -203,8 +230,15 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
               </div>
               <button
                 onClick={() => {
-                  localStorage.setItem('rover_monaco_code', mission.code);
-                  window.location.href = '/mission?mode=code';
+                  // Remix into the workspace: carry blocks for block-built missions,
+                  // otherwise the Python, and open the matching editor mode.
+                  if (mission.blocklyState) {
+                    localStorage.setItem('roverWorkspace', mission.blocklyState);
+                    window.location.href = '/mission?mode=blockly';
+                  } else {
+                    localStorage.setItem('rover_monaco_code', mission.code);
+                    window.location.href = '/mission?mode=code';
+                  }
                 }}
                 className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-gradient-mars px-4 py-2 font-display text-sm font-bold text-primary-foreground transition-transform hover:-translate-y-0.5"
               >
