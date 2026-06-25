@@ -1,0 +1,47 @@
+/* Tap buttons styled to read as Blockly blocks: real category colour, chunky
+   rounded body, a connector tab on the bottom edge, and bottom shading for
+   depth. Colour comes from --c set per block. */
+.block {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  background: var(--c);
+  padding: 13px 16px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.22);
+  transition: transform 0.08s ease, filter 0.12s ease;
+}
+
+.block:hover {
+  filter: brightness(1.08);
+}
+
+.block:active {
+  transform: translateY(1px);
+}
+
+/* Blockly-style next-connector tab on the bottom edge. */
+.block::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 18px;
+  width: 26px;
+  height: 6px;
+  border-radius: 0 0 7px 7px;
+  background: var(--c);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.22);
+}
+
+.active {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 1px;
+}

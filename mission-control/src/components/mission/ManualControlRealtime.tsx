@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, type CSSProperties } from 'react';
+import styles from './ManualControlRealtime.module.css';
 import { RoverPhysics, RoverState } from '@/lib/rover-physics';
 
 interface ManualControlRealtimeProps {
@@ -15,15 +16,18 @@ interface ManualControlRealtimeProps {
  * learner who has never coded sees that blocks drive the rover before they open
  * the full Blockly editor.
  */
-type DriveBlock = { command: string; label: string; speed: number; ms: number; icon: string; className: string };
+type DriveBlock = { command: string; label: string; speed: number; ms: number; colour: string };
 
+// Labels and colours mirror the real Blockly movement blocks, so a learner sees
+// the same Lego pieces here as in the editor (movement blue, spin purple,
+// steer cyan, stop red).
 const BLOCKS: DriveBlock[] = [
-  { command: 'forward', label: 'Drive forward', speed: 80, ms: 900, icon: '↑', className: 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700' },
-  { command: 'reverse', label: 'Drive backward', speed: 80, ms: 900, icon: '↓', className: 'bg-orange-600 hover:bg-orange-500 active:bg-orange-700' },
-  { command: 'spinLeft', label: 'Spin left', speed: 60, ms: 650, icon: '↺', className: 'bg-purple-600 hover:bg-purple-500 active:bg-purple-700' },
-  { command: 'spinRight', label: 'Spin right', speed: 60, ms: 650, icon: '↻', className: 'bg-purple-600 hover:bg-purple-500 active:bg-purple-700' },
-  { command: 'steerLeft', label: 'Steer left', speed: 60, ms: 800, icon: '↰', className: 'bg-blue-600 hover:bg-blue-500 active:bg-blue-700' },
-  { command: 'steerRight', label: 'Steer right', speed: 60, ms: 800, icon: '↱', className: 'bg-blue-600 hover:bg-blue-500 active:bg-blue-700' },
+  { command: 'forward', label: 'Move Forward', speed: 80, ms: 1000, colour: '#2196F3' },
+  { command: 'reverse', label: 'Move Backward', speed: 80, ms: 1000, colour: '#2196F3' },
+  { command: 'spinLeft', label: 'Spin Left', speed: 60, ms: 500, colour: '#9C27B0' },
+  { command: 'spinRight', label: 'Spin Right', speed: 60, ms: 500, colour: '#9C27B0' },
+  { command: 'steerLeft', label: 'Steer Left', speed: 60, ms: 1000, colour: '#00BCD4' },
+  { command: 'steerRight', label: 'Steer Right', speed: 60, ms: 1000, colour: '#00BCD4' },
 ];
 
 const KEY_MAP: Record<string, DriveBlock> = {
@@ -147,24 +151,23 @@ export function ManualControlRealtime({ onTrajectoryUpdate, onReset, resetVersio
         </p>
       </div>
 
-      <div className="grid flex-1 content-start grid-cols-2 gap-2">
+      <div className="grid flex-1 content-start grid-cols-2 gap-x-3 gap-y-4">
         {BLOCKS.map((block) => (
           <button
             key={block.command}
             onClick={() => runBlock(block)}
-            className={`flex items-center gap-2 rounded-lg border-l-4 border-black/20 px-3 py-3 text-left text-sm font-bold text-white shadow transition-transform active:scale-[0.98] ${block.className} ${
-              activeCommand === block.command ? 'ring-2 ring-white/70' : ''
-            }`}
+            className={`${styles.block} ${activeCommand === block.command ? styles.active : ''}`}
+            style={{ ['--c']: block.colour } as CSSProperties}
           >
-            <span className="text-lg leading-none">{block.icon}</span>
             {block.label}
           </button>
         ))}
         <button
           onClick={stopNow}
-          className="col-span-2 flex items-center justify-center gap-2 rounded-lg border-l-4 border-black/20 bg-red-600 px-3 py-2.5 text-sm font-bold text-white shadow transition-transform hover:bg-red-500 active:scale-[0.98] active:bg-red-700"
+          className={`${styles.block} col-span-2 justify-center`}
+          style={{ ['--c']: '#f44336' } as CSSProperties}
         >
-          <span className="text-lg leading-none">■</span> Stop
+          Stop
         </button>
       </div>
 
