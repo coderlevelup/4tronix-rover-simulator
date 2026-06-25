@@ -8,11 +8,7 @@ import { FirestoreMissionRepository } from '@/infrastructure/persistence/Firesto
 import { RoverSimulatorScaffold } from '@/components/mission/RoverSimulatorScaffold';
 import { parseRoverCode } from '@/lib/parseRoverCode';
 import { simulateCommands } from '@/lib/simulateCommands';
-import {
-  getDiscoveryStatus,
-  DISCOVERY_BADGE_CLASS,
-  DISCOVERY_TEXT_CLASS,
-} from '@/lib/discoveryStatus';
+import { getDiscoveryStatus, DISCOVERY_BADGE_CLASS } from '@/lib/discoveryStatus';
 
 function getYouTubeId(url: string | undefined): string | null {
   if (!url) return null;
@@ -21,11 +17,14 @@ function getYouTubeId(url: string | undefined): string | null {
   return (match && match[2].length === 11) ? match[2] : null;
 }
 
+type RunOption = { id: string; label: string; kind: 'sim' | 'real'; youtubeId?: string };
+
 export default function MissionVideoClient({ missionId }: { missionId: string }) {
   const [mission, setMission] = useState<Mission | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [videoTab, setVideoTab] = useState<'sim' | 'real'>('sim');
+  const [selectedRunId, setSelectedRunId] = useState('sim');
+  const [copied, setCopied] = useState(false);
 
   // The simulated run is reproducible from the mission's code, so it is computed
   // on demand rather than stored. Keeps hosting cheap and always in sync.
@@ -34,17 +33,22 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
     [mission]
   );
 
+  // Run selector entries: the simulated run is always present; real yard runs
+  // are added as they are attached. A dropdown handles any number of runs.
+  const runs = useMemo<RunOption[]>(() => {
+    const list: RunOption[] = [{ id: 'sim', label: 'Simulated run', kind: 'sim' }];
+    const realId = getYouTubeId(mission?.youtubeUrl || mission?.videoUrl);
+    if (realId) list.push({ id: 'real-1', label: 'Real run', kind: 'real', youtubeId: realId });
+    return list;
+  }, [mission]);
+
   useEffect(() => {
     const fetchMission = async () => {
       try {
         const repository = new FirestoreMissionRepository(getFirestoreClient());
         const loadedMission = await repository.findById(missionId);
-
-        if (loadedMission) {
-          setMission(loadedMission);
-        } else {
-          setError('Mission not found');
-        }
+        if (loadedMission) setMission(loadedMission);
+        else setError('Mission not found');
       } catch (err) {
         console.error('Fetch mission error:', err);
         setError('Failed to load mission');
@@ -57,191 +61,181 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-100 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="relative mx-auto h-12 w-12">
-            <div className="absolute inset-0 animate-spin rounded-full border-4 border-orange-500/25 border-t-orange-400"></div>
-          </div>
-          <p className="text-slate-300">Loading mission details...</p>
-        </div>
+      <main className="flex min-h-screen items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-border border-t-primary" />
       </main>
     );
   }
 
   if (error || !mission) {
     return (
-      <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6">
-        <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-8 max-w-md w-full text-center shadow-xl">
-          <span className="text-4xl block mb-4">⚠️</span>
-          <h2 className="text-xl font-bold text-slate-200 mb-2">Error Loading Mission</h2>
-          <p className="text-slate-400 mb-6">{error || 'Mission not found'}</p>
-          <Link href="/" className="inline-block px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition-colors font-medium">
-            Return to Mission Feed
-          </Link>
-        </div>
+      <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6 text-center">
+        <span className="text-4xl">⚠️</span>
+        <h1 className="mt-4 font-display text-2xl font-bold text-foreground">Mission not found</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{error || 'We could not load this mission.'}</p>
+        <Link
+          href="/"
+          className="mt-6 rounded-xl bg-gradient-mars px-5 py-2.5 font-display text-sm font-bold text-primary-foreground transition-transform hover:-translate-y-0.5"
+        >
+          Back to the feed
+        </Link>
       </main>
     );
   }
 
-  const youtubeId = getYouTubeId(mission.youtubeUrl || mission.videoUrl);
   const missionName = mission.name || `Mission ${mission.id.slice(0, 8)}`;
   const discoveryStatus = getDiscoveryStatus(mission.status);
+  const selectedRun = runs.find((r) => r.id === selectedRunId) ?? runs[0];
+  const durationMs = mission.executionMetadata?.duration_ms;
+  const durationLabel = durationMs ? `${Math.round(durationMs / 1000)}s` : '—';
+  const executionLabel = mission.executionResult?.isSuccessful
+    ? 'Successful'
+    : mission.executionResult
+      ? 'Failed'
+      : 'Not run';
+
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(mission.code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-100">
-      <div className="border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center gap-3 mb-2">
-            <Link href="/" className="text-slate-400 hover:text-orange-400 transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-            </Link>
-            <h1 className="text-2xl font-bold text-slate-100">{missionName}</h1>
-            <span
-              className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${DISCOVERY_BADGE_CLASS[discoveryStatus]}`}
-            >
-              {discoveryStatus}
-            </span>
+    <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-primary"
+      >
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+        Back to the feed
+      </Link>
+
+      <header className="mt-4 flex flex-wrap items-center gap-3">
+        <h1 className="font-display text-2xl font-bold text-foreground md:text-3xl">{missionName}</h1>
+        <span
+          className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${DISCOVERY_BADGE_CLASS[discoveryStatus]}`}
+        >
+          {discoveryStatus}
+        </span>
+      </header>
+      <p className="mt-1.5 flex items-center gap-2 text-sm text-muted-foreground">
+        <span className="font-mono">{mission.yardId}</span>
+        <span aria-hidden>·</span>
+        <span>{new Date(mission.completedAt || mission.submittedAt).toLocaleDateString()}</span>
+      </p>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-5">
+        {/* Footage + details */}
+        <div className="space-y-4 lg:col-span-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-sm font-bold text-foreground">Footage</h2>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              Run
+              <select
+                value={selectedRunId}
+                onChange={(e) => setSelectedRunId(e.target.value)}
+                className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground outline-none transition-colors focus:border-primary"
+              >
+                {runs.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-          <div className="flex items-center gap-3 text-sm text-slate-400">
-            <span className="font-mono">{mission.yardId}</span>
-            <span>•</span>
-            <span>{new Date(mission.completedAt || mission.submittedAt).toLocaleDateString()}</span>
+
+          {selectedRun.kind === 'real' && selectedRun.youtubeId ? (
+            <div className="overflow-hidden rounded-2xl border border-border/60 bg-black">
+              <div className="relative aspect-video w-full">
+                <iframe
+                  src={`https://www.youtube.com/embed/${selectedRun.youtubeId}?rel=0`}
+                  title={missionName}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="absolute inset-0 h-full w-full border-0"
+                />
+              </div>
+            </div>
+          ) : (
+            <RoverSimulatorScaffold trajectory={simTrajectory} isPlaying editorMode="code" />
+          )}
+
+          <div className="grid grid-cols-3 gap-3">
+            <Stat label="Status" value={discoveryStatus} />
+            <Stat label="Duration" value={durationLabel} mono />
+            <Stat label="Execution" value={executionLabel} />
           </div>
+
+          {mission.executionResult?.consoleOutput && (
+            <div className="rounded-2xl border border-border/60 bg-card/50 p-4">
+              <h2 className="mb-2 font-display text-sm font-bold text-foreground">Run output</h2>
+              <pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-muted-foreground">
+                {mission.executionResult.consoleOutput}
+              </pre>
+            </div>
+          )}
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-xl">
-              {/* Tabs: compare the simulated run with the real yard run */}
-              <div className="flex border-b border-slate-800">
-                <button
-                  onClick={() => setVideoTab('sim')}
-                  className={`px-4 py-2.5 text-sm font-medium transition-colors ${
-                    videoTab === 'sim'
-                      ? 'border-b-2 border-orange-400 text-orange-300'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  Simulated
-                </button>
-                <button
-                  onClick={() => setVideoTab('real')}
-                  disabled={!youtubeId}
-                  className={`px-4 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-                    videoTab === 'real'
-                      ? 'border-b-2 border-orange-400 text-orange-300'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  Real run{youtubeId ? '' : ' (pending)'}
-                </button>
+        {/* Code + remix */}
+        <div className="space-y-4 lg:col-span-2">
+          <div className="overflow-hidden rounded-2xl border border-border/60 bg-background/60">
+            <div className="flex items-center justify-between border-b border-border/50 px-4 py-2.5">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-red-400/70" />
+                <span className="h-2 w-2 rounded-full bg-amber-400/70" />
+                <span className="h-2 w-2 rounded-full bg-green-400/70" />
+                <span className="ml-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  mission.py
+                </span>
               </div>
-
-              {videoTab === 'real' && youtubeId ? (
-                <div className="relative aspect-video w-full bg-black">
-                  <iframe
-                    src={`https://www.youtube.com/embed/${youtubeId}?rel=0`}
-                    title={missionName}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    className="absolute inset-0 w-full h-full border-0"
-                  />
-                </div>
-              ) : (
-                <div className="p-3">
-                  <RoverSimulatorScaffold trajectory={simTrajectory} isPlaying editorMode="code" />
-                </div>
-              )}
+              <button
+                onClick={copyCode}
+                className="rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </button>
             </div>
-
-            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
-              <h2 className="text-sm font-semibold text-slate-300 mb-3">Mission Details</h2>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-slate-500 text-xs mb-1">Status</p>
-                  <p className={`font-semibold ${DISCOVERY_TEXT_CLASS[discoveryStatus]}`}>
-                    {discoveryStatus}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-slate-500 text-xs mb-1">Duration</p>
-                  <p className="text-slate-200 font-mono">
-                    {mission.executionMetadata?.duration_ms ? `${Math.round(mission.executionMetadata.duration_ms / 1000)}s` : '-'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-slate-500 text-xs mb-1">Execution</p>
-                  <p className={`font-semibold ${mission.executionResult?.isSuccessful ? 'text-green-400' : 'text-red-400'}`}>
-                    {mission.executionResult?.isSuccessful ? 'Successful' : mission.executionResult ? 'Failed' : 'N/A'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {mission.executionResult?.consoleOutput && (
-              <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
-                <h2 className="text-sm font-semibold text-slate-300 mb-2">Run output</h2>
-                <pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-slate-300">
-                  {mission.executionResult.consoleOutput}
-                </pre>
-              </div>
-            )}
+            <pre className="max-h-[420px] overflow-auto p-4 text-xs leading-relaxed text-foreground">
+              <code>{mission.code.trim() || '# No code'}</code>
+            </pre>
           </div>
 
-          <div className="space-y-4">
-            <div className="bg-[#0d1117] rounded-xl border border-slate-800 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
-                <h3 className="text-sm font-semibold text-slate-300">Mission Code</h3>
-                <button
-                  className="text-xs text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1"
-                  onClick={() => navigator.clipboard.writeText(mission.code)}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  Copy
-                </button>
-              </div>
-              <div className="p-4 overflow-auto max-h-[500px]">
-                <pre className="text-xs font-mono text-slate-200 whitespace-pre-wrap">{mission.code}</pre>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-orange-900/20 to-rose-900/20 rounded-xl border border-orange-700/30 p-6">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-orange-600/20 flex items-center justify-center">
-                  <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-slate-100 mb-2">Like this mission?</h3>
-                  <p className="text-sm text-slate-300 mb-4">
-                    Try running this code in the simulator. Copy the code above and launch it from the mission workspace.
-                  </p>
-                  <button
-                    onClick={() => {
-                      localStorage.setItem('rover_monaco_code', mission.code);
-                      window.location.href = '/mission?mode=code';
-                    }}
-                    className="w-full px-4 py-3 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    Try it Yourself
-                  </button>
-                </div>
-              </div>
-            </div>
+          <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 to-transparent p-5">
+            <h3 className="font-display text-base font-bold text-foreground">Like this mission?</h3>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Remix it: open this code in the workspace, tweak it, and run your own version.
+            </p>
+            <button
+              onClick={() => {
+                localStorage.setItem('rover_monaco_code', mission.code);
+                window.location.href = '/mission?mode=code';
+              }}
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-mars px-4 py-2.5 font-display text-sm font-bold text-primary-foreground transition-transform hover:-translate-y-0.5"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Try it yourself
+            </button>
           </div>
         </div>
       </div>
     </main>
+  );
+}
+
+function Stat({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card/50 px-3 py-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={`mt-0.5 text-sm font-bold text-foreground ${mono ? 'font-mono' : ''}`}>{value}</p>
+    </div>
   );
 }
