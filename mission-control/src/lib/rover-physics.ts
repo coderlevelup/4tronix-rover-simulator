@@ -104,9 +104,11 @@ export class RoverPhysics {
     }
   }
 
-  update(): RoverState {
+  update(dtOverride?: number): RoverState {
     const currentTime = Date.now();
-    const dt = (currentTime - this.lastUpdate) / 1000; // Convert to seconds
+    // Real-time callers pass nothing (wall-clock dt); the batch simulator passes
+    // a fixed dt so a trajectory can be computed deterministically off-clock.
+    const dt = dtOverride !== undefined ? dtOverride : (currentTime - this.lastUpdate) / 1000;
     this.lastUpdate = currentTime;
 
     // Calculate new position based on current speeds and servo angles

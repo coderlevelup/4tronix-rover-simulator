@@ -11,6 +11,8 @@ import { MissionService } from '@/core/application/services/MissionService';
 import { validateMission } from '@/infrastructure/validation/schemas';
 import { EditorPanel, type EditorMode } from '@/components/mission/EditorPanel';
 import { SimulationPanel } from '@/components/mission/SimulationPanel';
+import { simulateCommands } from '@/lib/simulateCommands';
+import { recordSimVideo } from '@/lib/recordSimVideo';
 
 interface TrajectoryPoint {
   x: number;
@@ -63,31 +65,25 @@ export function MissionWorkspace() {
   }, [panelSplit]);
 
   const runSimulationVideo = async (commands: SimulationCommand[]) => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
     setError(null);
     setSimVideoUrl(null);
+
+    // Run the commands through the client-side physics model and show the
+    // trajectory animating right away. This also serves as the fallback view if
+    // video capture is unavailable.
+    const simulated = simulateCommands(commands);
+    setTrajectory(simulated);
+    setIsPlaying(true);
+
+    // Best-effort: capture that animation to a video so a sim run produces a
+    // shareable clip, the same as a real rover run. If the browser cannot
+    // capture canvas streams, the live animation above still plays.
     setSimVideoLoading(true);
-
     try {
-      const response = await fetch('/api/simulate/video', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ commands }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-        const message = err.error || err.details || `Simulation failed (${response.status})`;
-        throw new Error(message);
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setSimVideoUrl(url);
+      const blob = await recordSimVideo(simulated);
+      setSimVideoUrl(URL.createObjectURL(blob));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Simulation failed');
+      console.warn('Sim video capture unavailable; showing live animation only', err);
     } finally {
       setSimVideoLoading(false);
     }
