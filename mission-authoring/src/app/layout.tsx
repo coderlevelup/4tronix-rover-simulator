@@ -18,7 +18,7 @@ const fredoka = Fredoka({
 });
 
 export const metadata: Metadata = {
-  title: "Rover Cadets · Mars Mission Platform",
+  title: "Mission Control · Mars Mission Platform",
   description: "Pilot Sparky across Mars, code with blocks, and earn mission patches on the Red Planet",
 };
 

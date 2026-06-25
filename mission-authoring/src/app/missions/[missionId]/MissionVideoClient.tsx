@@ -5,6 +5,11 @@ import { Mission } from '@/core/domain/entities/Mission';
 import Link from 'next/link';
 import { getFirestoreClient } from '@/lib/firebase';
 import { FirestoreMissionRepository } from '@/infrastructure/persistence/FirestoreMissionRepository';
+import {
+  getDiscoveryStatus,
+  DISCOVERY_BADGE_CLASS,
+  DISCOVERY_TEXT_CLASS,
+} from '@/lib/discoveryStatus';
 
 function getYouTubeId(url: string | undefined): string | null {
   if (!url) return null;
@@ -59,8 +64,8 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
           <span className="text-4xl block mb-4">⚠️</span>
           <h2 className="text-xl font-bold text-slate-200 mb-2">Error Loading Mission</h2>
           <p className="text-slate-400 mb-6">{error || 'Mission not found'}</p>
-          <Link href="/missions" className="inline-block px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition-colors font-medium">
-            Return to Catalogue
+          <Link href="/" className="inline-block px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition-colors font-medium">
+            Return to Mission Feed
           </Link>
         </div>
       </main>
@@ -69,18 +74,24 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
 
   const youtubeId = getYouTubeId(mission.youtubeUrl || mission.videoUrl);
   const missionName = mission.name || `Mission ${mission.id.slice(0, 8)}`;
+  const discoveryStatus = getDiscoveryStatus(mission.status);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-100">
       <div className="border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center gap-3 mb-2">
-            <Link href="/missions" className="text-slate-400 hover:text-orange-400 transition-colors">
+            <Link href="/" className="text-slate-400 hover:text-orange-400 transition-colors">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </Link>
             <h1 className="text-2xl font-bold text-slate-100">{missionName}</h1>
+            <span
+              className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${DISCOVERY_BADGE_CLASS[discoveryStatus]}`}
+            >
+              {discoveryStatus}
+            </span>
           </div>
           <div className="flex items-center gap-3 text-sm text-slate-400">
             <span className="font-mono">{mission.yardId}</span>
@@ -119,7 +130,9 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-slate-500 text-xs mb-1">Status</p>
-                  <p className="text-green-400 font-semibold">Completed</p>
+                  <p className={`font-semibold ${DISCOVERY_TEXT_CLASS[discoveryStatus]}`}>
+                    {discoveryStatus}
+                  </p>
                 </div>
                 <div>
                   <p className="text-slate-500 text-xs mb-1">Duration</p>
@@ -135,6 +148,15 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
                 </div>
               </div>
             </div>
+
+            {mission.executionResult?.consoleOutput && (
+              <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+                <h2 className="text-sm font-semibold text-slate-300 mb-2">Run output</h2>
+                <pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-slate-300">
+                  {mission.executionResult.consoleOutput}
+                </pre>
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -167,7 +189,7 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-slate-100 mb-2">Like this mission?</h3>
                   <p className="text-sm text-slate-300 mb-4">
-                    Try running this code yourself on your own rover. Copy the code above and execute it in the operator console.
+                    Try running this code in the simulator. Copy the code above and launch it from the mission workspace.
                   </p>
                   <button
                     onClick={() => {

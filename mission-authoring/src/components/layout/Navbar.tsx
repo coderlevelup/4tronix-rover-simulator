@@ -82,7 +82,7 @@ export function Navbar() {
               </div>
               <div className="leading-tight">
                 <p className="font-display text-lg font-bold text-foreground">
-                  Rover Cadets
+                  Mission Control
                 </p>
                 <p className="text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
                   Sapient.rocks
