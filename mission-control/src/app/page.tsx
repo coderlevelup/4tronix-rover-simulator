@@ -3,10 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { Search, X, Plus, Play, Rocket } from 'lucide-react';
 import { Mission } from '@/core/domain/entities/Mission';
 import { getFirestoreClient } from '@/lib/firebase';
 import { FirestoreMissionRepository } from '@/infrastructure/persistence/FirestoreMissionRepository';
-import { getDiscoveryStatus, DISCOVERY_BADGE_CLASS } from '@/lib/discoveryStatus';
+import {
+  getDiscoveryStatus,
+  DISCOVERY_BADGE_CLASS,
+  type DiscoveryStatus,
+} from '@/lib/discoveryStatus';
 
 function getYouTubeId(url: string | undefined): string | null {
   if (!url) return null;
@@ -31,11 +36,14 @@ function formatDuration(ms: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+type StatusFilter = 'all' | DiscoveryStatus;
+
 export default function LandingPage() {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   useEffect(() => {
     const loadMissions = async () => {
@@ -80,43 +88,52 @@ export default function LandingPage() {
     loadMissions();
   }, []);
 
+  const counts = useMemo(() => {
+    let completed = 0;
+    for (const m of missions) {
+      if (getDiscoveryStatus(m.status) === 'Completed') completed += 1;
+    }
+    return { all: missions.length, Completed: completed, Pending: missions.length - completed };
+  }, [missions]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return missions;
-    return missions.filter(
-      (m) =>
-        (m.name ?? '').toLowerCase().includes(q) ||
-        m.code.toLowerCase().includes(q)
-    );
-  }, [missions, query]);
+    return missions.filter((m) => {
+      if (statusFilter !== 'all' && getDiscoveryStatus(m.status) !== statusFilter) return false;
+      if (!q) return true;
+      return (m.name ?? '').toLowerCase().includes(q) || m.code.toLowerCase().includes(q);
+    });
+  }, [missions, query, statusFilter]);
+
+  const filters: { key: StatusFilter; label: string; count: number }[] = [
+    { key: 'all', label: 'All', count: counts.all },
+    { key: 'Completed', label: 'Completed', count: counts.Completed },
+    { key: 'Pending', label: 'Pending', count: counts.Pending },
+  ];
 
   return (
-    <main className="relative min-h-screen pb-28">
-      {/* Hero */}
-      <section className="mx-auto max-w-6xl px-6 pt-8 pb-4 text-center">
+    <main className="relative flex h-[calc(100vh-64px)] flex-col overflow-hidden px-4 sm:px-6">
+      {/* Header (the Create Mission action lives in the navbar) */}
+      <header className="mx-auto w-full max-w-6xl shrink-0 pt-4 pb-3">
         <h1 className="font-display text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-          Mars Mission <span className="text-gradient-mars">Feed</span>
+          Mission <span className="text-gradient-mars">Feed</span>
         </h1>
-      </section>
+        <p className="mt-0.5 hidden text-sm text-muted-foreground sm:block">
+          Watch real rovers run the code kids wrote on Mars.
+        </p>
+      </header>
 
-      {/* Search toolbar */}
-      <section className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="relative">
-          <svg
-            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
-          </svg>
+      {/* Toolbar: search + status filters */}
+      <div className="mx-auto flex w-full max-w-6xl shrink-0 flex-col gap-2.5 pb-3 md:flex-row md:items-center">
+        <div className="relative md:max-w-xs md:flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search missions by name or code"
-            aria-label="Search missions"
-            className="w-full rounded-full border border-border/60 bg-card/50 py-2.5 pl-10 pr-10 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary"
+            placeholder="Search missions"
+            aria-label="Search missions by name or code"
+            className="w-full rounded-full border border-border/60 bg-card/60 py-2.5 pl-10 pr-10 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary"
           />
           {query && (
             <button
@@ -124,56 +141,73 @@ export default function LandingPage() {
               aria-label="Clear search"
               className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="h-4 w-4" />
             </button>
           )}
         </div>
-        {!loading && !error && missions.length > 0 && (
-          <p className="mt-2 px-1 text-xs text-muted-foreground">
-            {query
-              ? `${filtered.length} of ${missions.length} missions`
-              : `${missions.length} mission${missions.length === 1 ? '' : 's'}`}
-          </p>
-        )}
-      </section>
 
-      {/* Feed */}
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-12 pt-4">
+        <div className="flex items-center gap-2" role="group" aria-label="Filter missions by status">
+          {filters.map((f) => {
+            const active = statusFilter === f.key;
+            return (
+              <button
+                key={f.key}
+                onClick={() => setStatusFilter(f.key)}
+                aria-pressed={active}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-bold transition-colors ${
+                  active
+                    ? 'bg-gradient-mars text-primary-foreground'
+                    : 'border border-border/70 bg-card/50 text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {f.label}
+                <span
+                  className={`rounded-full px-1.5 text-xs tabular-nums ${
+                    active ? 'bg-black/20 text-primary-foreground' : 'bg-background/60 text-muted-foreground'
+                  }`}
+                >
+                  {f.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Feed: the only thing that scrolls */}
+      <section className="mx-auto min-h-0 w-full max-w-6xl flex-1 overflow-y-auto scroll-panel pb-5">
         {loading ? (
           <div className="flex justify-center py-24">
             <div className="h-12 w-12 animate-spin rounded-full border-4 border-border border-t-primary" />
           </div>
         ) : error ? (
-          <div className="mx-auto max-w-2xl rounded-2xl border border-destructive/40 bg-destructive/10 p-8 text-center">
+          <div className="mx-auto mt-10 max-w-2xl rounded-3xl border border-destructive/40 bg-destructive/10 p-8 text-center clay">
             <h3 className="font-display text-lg font-bold text-destructive">Unable to load missions</h3>
             <p className="mt-2 text-sm text-muted-foreground">{error}</p>
             <button
               onClick={() => window.location.reload()}
-              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-display text-sm font-bold text-primary-foreground transition-transform hover:-translate-y-0.5"
+              className="clay clay-press mt-6 inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-2.5 font-display text-sm font-bold text-primary-foreground"
             >
               Retry
             </button>
           </div>
         ) : missions.length === 0 ? (
-          <div className="py-24 text-center">
-            <p className="text-xl font-bold text-foreground">No missions yet</p>
-            <p className="mt-2 text-muted-foreground">Missions will appear here soon.</p>
-          </div>
+          <EmptyState
+            title="No missions yet"
+            subtitle="Be the first to send a rover across Mars."
+            cta
+          />
         ) : filtered.length === 0 ? (
-          <div className="py-24 text-center">
-            <p className="text-lg font-bold text-foreground">No missions match your search</p>
-            <p className="mt-2 text-sm text-muted-foreground">Try a different name or command.</p>
-            <button
-              onClick={() => setQuery('')}
-              className="mt-6 rounded-xl border border-border bg-card/50 px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:border-primary"
-            >
-              Clear search
-            </button>
-          </div>
+          <EmptyState
+            title="No missions match"
+            subtitle="Try a different name, code, or filter."
+            onClear={() => {
+              setQuery('');
+              setStatusFilter('all');
+            }}
+          />
         ) : (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 pt-1 sm:grid-cols-2 xl:grid-cols-3">
             {filtered.map((mission) => {
               const videoUrl = mission.youtubeUrl || mission.videoUrl;
               const youtubeId = getYouTubeId(videoUrl);
@@ -185,7 +219,7 @@ export default function LandingPage() {
                 <Link
                   key={mission.id}
                   href={`/missions/${mission.id}`}
-                  className="group flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/50 transition-all duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5"
+                  className="group flex flex-col overflow-hidden rounded-3xl border border-border/60 bg-card/50 transition-[transform,border-color] duration-200 hover:-translate-y-1 hover:border-primary/50 hover:clay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   {/* Thumbnail */}
                   <div className="relative aspect-video w-full overflow-hidden bg-black">
@@ -196,11 +230,9 @@ export default function LandingPage() {
                         className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                     ) : (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-950 text-muted-foreground/40">
-                        <svg className="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                        <p className="mt-2 text-xs font-medium">No video yet</p>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-secondary to-background text-muted-foreground/50">
+                        <Rocket className="h-10 w-10" />
+                        <p className="mt-2 text-xs font-semibold">Run on its way</p>
                       </div>
                     )}
 
@@ -216,7 +248,7 @@ export default function LandingPage() {
 
                     {/* Run time */}
                     {durationMs ? (
-                      <span className="absolute bottom-3 right-3 z-10 rounded-md bg-black/80 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-white">
+                      <span className="absolute bottom-3 right-3 z-10 rounded-md bg-black/80 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-white tabular-nums">
                         {formatDuration(durationMs)}
                       </span>
                     ) : null}
@@ -224,10 +256,8 @@ export default function LandingPage() {
                     {/* Play affordance on hover */}
                     {thumbnailUrl ? (
                       <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/90 shadow-lg ring-4 ring-white/10">
-                          <svg className="ml-0.5 h-6 w-6 text-primary-foreground" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M8 5v14l11-7z" />
-                          </svg>
+                        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/95 shadow-lg ring-4 ring-white/15">
+                          <Play className="ml-0.5 h-6 w-6 text-primary-foreground" fill="currentColor" />
                         </span>
                       </div>
                     ) : null}
@@ -238,7 +268,7 @@ export default function LandingPage() {
                     <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full ring-1 ring-border/60">
                       <Image
                         src="/rover-hero.jpg"
-                        alt="Rover avatar"
+                        alt=""
                         width={72}
                         height={72}
                         className="h-full w-full object-cover"
@@ -257,19 +287,19 @@ export default function LandingPage() {
                   </div>
 
                   {/* Code peek */}
-                  <div className="relative mx-4 mb-4 overflow-hidden rounded-lg border border-border/50 bg-background/50">
+                  <div className="relative mx-4 mb-4 overflow-hidden rounded-xl border border-border/50 bg-background/60">
                     <div className="flex items-center gap-1.5 border-b border-border/40 px-3 py-1.5">
-                      <span className="h-2 w-2 rounded-full bg-red-400/70" />
-                      <span className="h-2 w-2 rounded-full bg-amber-400/70" />
-                      <span className="h-2 w-2 rounded-full bg-green-400/70" />
+                      <span className="h-2 w-2 rounded-full bg-block-stop/70" />
+                      <span className="h-2 w-2 rounded-full bg-block-hat/70" />
+                      <span className="h-2 w-2 rounded-full bg-buzz/70" />
                       <span className="ml-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                         mission.py
                       </span>
                     </div>
-                    <pre className="max-h-24 overflow-hidden px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+                    <pre className="max-h-20 overflow-hidden px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
                       <code>{mission.code.trim() || '# No code'}</code>
                     </pre>
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background/95 to-transparent" />
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-card/95 to-transparent" />
                   </div>
                 </Link>
               );
@@ -277,24 +307,45 @@ export default function LandingPage() {
           </div>
         )}
       </section>
-
-      {/* Sticky bottom CTA bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/60 bg-card/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
-          <p className="hidden font-display text-sm font-semibold text-foreground sm:block">
-            Ready to create your own mission?
-          </p>
-          <Link
-            href="/mission"
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-mars px-6 py-2.5 font-display text-sm font-bold text-primary-foreground transition-transform hover:-translate-y-0.5 sm:w-auto"
-          >
-            Create Mission
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
-        </div>
-      </div>
     </main>
+  );
+}
+
+function EmptyState({
+  title,
+  subtitle,
+  cta,
+  onClear,
+}: {
+  title: string;
+  subtitle: string;
+  cta?: boolean;
+  onClear?: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-card/60 clay">
+        <Rocket className="h-8 w-8 text-primary" />
+      </div>
+      <p className="mt-5 font-display text-xl font-bold text-foreground">{title}</p>
+      <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>
+      {cta && (
+        <Link
+          href="/mission"
+          className="clay clay-press mt-6 inline-flex items-center gap-2 rounded-2xl bg-gradient-mars px-5 py-2.5 font-display text-sm font-bold text-primary-foreground"
+        >
+          <Plus className="h-4 w-4" strokeWidth={2.5} />
+          Create Mission
+        </Link>
+      )}
+      {onClear && (
+        <button
+          onClick={onClear}
+          className="clay-press mt-6 rounded-2xl border border-border bg-card/50 px-5 py-2.5 text-sm font-semibold text-foreground"
+        >
+          Clear filters
+        </button>
+      )}
+    </div>
   );
 }
