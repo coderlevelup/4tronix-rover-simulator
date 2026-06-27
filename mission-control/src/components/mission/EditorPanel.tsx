@@ -1,5 +1,6 @@
 'use client';
 
+import { Gamepad2, Blocks, Code2, Rocket, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { ManualControlRealtime } from '@/components/mission/ManualControlRealtime';
 import { BlocklyEditor } from '@/components/mission/BlocklyEditor';
 import { MonacoCodeEditor } from '@/components/mission/MonacoCodeEditor';
@@ -14,6 +15,14 @@ type SimulationCommand = {
   duration?: number;
   degrees?: number;
 };
+
+// Blocks-first ordering: tap-to-drive on-ramp, then the block editor (the hero),
+// then Python for those ready for it.
+const MODES: { mode: EditorMode; label: string; Icon: typeof Gamepad2 }[] = [
+  { mode: 'manual', label: 'Drive', Icon: Gamepad2 },
+  { mode: 'blockly', label: 'Blocks', Icon: Blocks },
+  { mode: 'code', label: 'Python', Icon: Code2 },
+];
 
 interface EditorPanelProps {
   panelSplit: number;
@@ -83,39 +92,32 @@ export function EditorPanel({
       <button
         onClick={onSubmit}
         disabled={submitting || !currentCode.trim() || !isMissionNameValid}
-        className="group relative overflow-hidden rounded-lg bg-gradient-to-r from-orange-600 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-orange-900/20 transition-all duration-300 hover:shadow-xl hover:shadow-orange-900/30 hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-lg active:scale-95"
+        className="clay clay-press flex items-center justify-center gap-2 rounded-2xl bg-gradient-mars px-4 py-2.5 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
       >
-        <span className="relative z-10 flex items-center justify-center gap-2">
-          {submitting ? (
-            <>
-              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              <span>Submitting...</span>
-            </>
-          ) : (
-            <>
-              <span>🚀</span>
-              <span>Send to Rover Queue</span>
-            </>
-          )}
-        </span>
-        <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-orange-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+        {submitting ? (
+          <>
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <span>Sending...</span>
+          </>
+        ) : (
+          <>
+            <Rocket className="h-4 w-4" />
+            <span>Send to Rover Queue</span>
+          </>
+        )}
       </button>
     </div>
   );
 
   return (
-    <div className="flex h-full flex-col gap-1 rounded-xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-2 overflow-hidden">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-orange-400">
-            Mission Control
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <span>Editor {panelSplit}% / Sim {100 - panelSplit}%</span>
+    <div className="flex h-full flex-col gap-1.5 overflow-hidden rounded-2xl border border-border/60 bg-card/40 p-2.5 clay">
+      {/* Panel split control */}
+      <div className="flex items-center justify-end">
+        <label className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
+          <span className="tabular-nums">Build {panelSplit}% · Sim {100 - panelSplit}%</span>
           <input
             type="range"
             min={35}
@@ -123,35 +125,38 @@ export function EditorPanel({
             step={1}
             value={panelSplit}
             onChange={(event) => onPanelSplitChange(Number(event.target.value))}
-            className="h-1.5 w-20 cursor-pointer appearance-none rounded-lg bg-slate-700 accent-emerald-500"
-            aria-label="Adjust editor and simulator panel size"
+            className="h-1.5 w-20 cursor-pointer appearance-none rounded-full bg-secondary accent-primary"
+            aria-label="Adjust build and simulator panel size"
           />
-        </div>
+        </label>
       </div>
 
       {/* Editor mode tabs */}
-      <div className="flex gap-1 flex-shrink-0">
-        {(['manual', 'blockly', 'code'] as EditorMode[]).map((mode) => (
-          <button
-            key={mode}
-            onClick={() => onEditorModeChange(mode)}
-            className={`flex-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
-              editorMode === mode
-                ? 'bg-emerald-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-            }`}
-          >
-            {mode === 'manual' ? 'Manual' : mode === 'blockly' ? 'Blockly' : 'Code'}
-          </button>
-        ))}
+      <div className="flex flex-shrink-0 gap-1.5">
+        {MODES.map(({ mode, label, Icon }) => {
+          const active = editorMode === mode;
+          return (
+            <button
+              key={mode}
+              onClick={() => onEditorModeChange(mode)}
+              aria-pressed={active}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-sm font-bold transition-colors ${
+                active
+                  ? 'bg-gradient-mars text-primary-foreground clay'
+                  : 'border border-border/60 bg-secondary/40 text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {error && (
-        <div className="animate-in slide-in-from-top-2 fade-in duration-300 rounded-lg border border-red-500/20 bg-red-500/10 backdrop-blur-xl p-1.5 text-xs text-red-400 flex-shrink-0">
-          <div className="flex items-start gap-2">
-            <span>⚠️</span>
-            <p className="text-red-300/90">{error}</p>
-          </div>
+        <div className="flex flex-shrink-0 items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-2 text-xs">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+          <p className="text-destructive">{error}</p>
         </div>
       )}
 
@@ -169,36 +174,18 @@ export function EditorPanel({
       </div>
 
       {/* Mission name + submit - Blockly mode */}
-      {editorMode === 'blockly' && <div className="flex gap-2 flex-shrink-0">{submitBar}</div>}
+      {editorMode === 'blockly' && <div className="flex flex-shrink-0 gap-2">{submitBar}</div>}
 
-      {/* Available commands + submit - Code mode */}
-      {editorMode === 'code' && (
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-start flex-shrink-0">
-          <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-3 text-xs text-slate-400 lg:w-[42%]">
-            <p className="mb-2 font-semibold text-slate-300">Available Commands:</p>
-            <ul className="space-y-1 font-mono">
-              <li>rover.forward(speed, duration)</li>
-              <li>rover.reverse(speed, duration)</li>
-              <li>rover.spinLeft(speed, duration)</li>
-              <li>rover.spinRight(speed, duration)</li>
-              <li>rover.steerLeft(degrees, speed, duration)</li>
-              <li>rover.steerRight(degrees, speed, duration)</li>
-              <li>rover.stop()</li>
-            </ul>
-          </div>
-
-          {submitBar}
-        </div>
-      )}
+      {/* Mission name + submit - Code mode (the command reference is the
+          insert-on-click palette inside the editor) */}
+      {editorMode === 'code' && <div className="flex flex-shrink-0 gap-2">{submitBar}</div>}
 
       {submitSuccess && (
-        <div className="animate-in slide-in-from-bottom-2 fade-in duration-500 rounded-lg border border-green-500/30 bg-gradient-to-br from-green-500/10 to-emerald-500/10 backdrop-blur-xl p-1.5 shadow-lg shadow-green-900/10 flex-shrink-0">
-          <div className="flex items-start gap-2">
-            <span className="text-sm">✅</span>
-            <div className="flex-1">
-              <p className="text-xs font-semibold text-green-400">Mission Submitted</p>
-              <p className="text-xs text-green-300/80">In queue for rover execution.</p>
-            </div>
+        <div className="flex flex-shrink-0 items-start gap-2 rounded-xl border border-buzz/40 bg-buzz/10 p-2">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-buzz" />
+          <div className="flex-1">
+            <p className="text-xs font-bold text-buzz">Mission sent!</p>
+            <p className="text-xs text-buzz/80">It is in the queue for the rover to run.</p>
           </div>
         </div>
       )}
