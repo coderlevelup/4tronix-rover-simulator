@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Play } from 'lucide-react';
 import {
   defineRoverBlocks,
   ROVER_TOOLBOX,
@@ -85,8 +86,8 @@ export function BlocklyEditor({ onGenerateCommands, onCodeChange, onBlocklyState
         zoom: {
           controls: true,
           wheel: true,
-          startScale: 0.8,
-          maxScale: 2,
+          startScale: 1.0,
+          maxScale: 2.5,
           minScale: 0.35,
           scaleSpeed: 1.15,
         },
@@ -221,29 +222,31 @@ export function BlocklyEditor({ onGenerateCommands, onCodeChange, onBlocklyState
 
   if (!blocklyLoaded) {
     return (
-      <div className="flex items-center justify-center p-8 text-slate-400">
-        Loading Blockly...
+      <div className="flex h-full items-center justify-center gap-3 p-8 text-sm text-muted-foreground">
+        <span className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-primary" />
+        Loading blocks...
       </div>
     );
   }
 
   return (
-    <div ref={containerRef} className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-400">
-          Stack blocks inside “On uplink”, tune values, and launch a rover run.
+    <div ref={containerRef} className="flex h-full min-h-0 flex-col gap-2.5 overflow-hidden">
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 text-xs text-muted-foreground">
+          Stack blocks inside “On uplink”, tune the numbers, then run it.
         </p>
         <button
           onClick={handleRun}
-          className="rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-1 text-xs font-medium text-white hover:from-emerald-500 hover:to-teal-500"
+          className="clay clay-press flex shrink-0 items-center gap-1.5 rounded-xl bg-buzz px-3.5 py-2 text-xs font-bold text-background"
         >
-          ▶ Run Blockly Code
+          <Play className="h-3.5 w-3.5" fill="currentColor" />
+          Run blocks
         </button>
       </div>
 
       <div
         ref={blocklyDivRef}
-        className="min-h-0 flex-1 rounded-lg border-2 border-slate-300 bg-white"
+        className="min-h-0 flex-1 overflow-hidden rounded-xl border-2 border-border bg-white"
         style={{ width: '100%' }}
       />
     </div>

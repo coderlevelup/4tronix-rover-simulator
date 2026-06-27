@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Dices, Pencil, Check, X, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { generateRandomMissionName, isValidMissionName } from '@/lib/missionNameGenerator';
 
 interface MissionNameInputProps {
@@ -109,18 +110,18 @@ export function MissionNameInput({
   const isEmpty = value.trim().length === 0;
 
   return (
-    <div className="rounded-lg border border-slate-700/80 bg-slate-900/70 p-2.5">
+    <div className="rounded-xl border border-border/70 bg-secondary/30 p-2.5">
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <label className="block text-[11px] font-semibold text-slate-300">
-          Mission Name <span className="text-red-500">*</span>
+        <label className="block text-[11px] font-bold text-foreground">
+          Mission name <span className="text-destructive">*</span>
         </label>
         {!isEditing && (
           <button
             onClick={handleGenerateRandom}
-            className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-slate-800 to-slate-700 px-3 py-1 text-xs font-semibold text-slate-200 transition-all duration-200 hover:from-slate-700 hover:to-slate-600 hover:text-white shadow-md hover:shadow-lg"
+            className="clay-press flex items-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-1 text-xs font-bold text-foreground"
             title="Generate a random mission name"
           >
-            <span className="text-sm">🎲</span>
+            <Dices className="h-3.5 w-3.5 text-primary" />
             <span>Generate</span>
           </button>
         )}
@@ -130,43 +131,40 @@ export function MissionNameInput({
       {!isEditing && (
         <div className="space-y-1">
           <div
-            className={`flex items-center justify-between rounded-lg border px-2 py-1 ${
+            className={`flex items-center justify-between rounded-lg border px-2.5 py-1.5 ${
               hasError
-                ? 'border-red-500/50 bg-red-500/10'
-                : 'border-slate-600 bg-slate-950'
+                ? 'border-destructive/50 bg-destructive/10'
+                : 'border-border bg-background/70'
             }`}
           >
             <span
-              className={`text-xs font-medium truncate ${
-                isEmpty
-                  ? 'text-slate-400'
-                  : 'text-slate-100'
-              }`}
+              className={`truncate text-xs font-medium ${isEmpty ? 'text-muted-foreground' : 'text-foreground'}`}
             >
               {isEmpty ? (
-                <span className="italic text-slate-400">Generate or type...</span>
+                <span className="italic text-muted-foreground">Generate or type a name...</span>
               ) : (
                 value
               )}
             </span>
             <button
               onClick={handleEditStart}
-              className="ml-2 flex-shrink-0 rounded px-1.5 py-0.5 text-xs font-medium text-blue-400 transition-colors hover:bg-slate-800"
+              className="ml-2 flex shrink-0 items-center rounded p-1 text-primary transition-colors hover:bg-card"
+              aria-label="Edit mission name"
               title="Edit mission name"
             >
-              ✏️
+              <Pencil className="h-3.5 w-3.5" />
             </button>
           </div>
 
           {/* Status message */}
-          <div className="text-xs min-h-[1.25rem]">
+          <div className="min-h-[1.25rem] text-xs">
             {hasError ? (
-              <span className="text-red-400 flex items-center gap-1">
-                ⚠️ {error}
+              <span className="flex items-center gap-1 text-destructive">
+                <AlertTriangle className="h-3.5 w-3.5" /> {error}
               </span>
             ) : !isEmpty ? (
-              <span className="text-green-400 flex items-center gap-1">
-                ✅ Set ({value.length}/100)
+              <span className="flex items-center gap-1 text-buzz">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Set ({value.length}/100)
               </span>
             ) : null}
           </div>
@@ -183,11 +181,11 @@ export function MissionNameInput({
             placeholder="Enter mission name..."
             maxLength={100}
             autoFocus
-            className="w-full rounded-lg border border-emerald-500/50 bg-slate-950 px-2 py-1 text-xs text-slate-100 placeholder-slate-500 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+            className="w-full rounded-lg border border-primary/60 bg-background/70 px-2.5 py-1.5 text-xs text-foreground placeholder-muted-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50"
           />
 
           <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-400">{tempValue.length}/100</span>
+            <span className="text-muted-foreground tabular-nums">{tempValue.length}/100</span>
           </div>
 
           {/* Edit Action Buttons */}
@@ -195,22 +193,24 @@ export function MissionNameInput({
             <button
               onClick={handleEditSave}
               disabled={tempValue.trim().length === 0}
-              className="flex-1 rounded-lg bg-green-600 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50"
+              className="clay-press flex flex-1 items-center justify-center gap-1 rounded-lg bg-buzz px-2 py-1.5 text-xs font-bold text-background transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
-              ✓ Save
+              <Check className="h-3.5 w-3.5" /> Save
             </button>
             <button
               onClick={handleEditCancel}
-              className="flex-1 rounded-lg bg-slate-700 px-2 py-1 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-600"
+              className="clay-press flex flex-1 items-center justify-center rounded-lg border border-border/60 bg-card px-2 py-1.5 text-xs font-bold text-foreground"
+              aria-label="Cancel editing"
             >
-              ✕
+              <X className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={handleGenerateRandom}
-              className="flex-1 rounded-lg bg-slate-700 px-2 py-1 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-600"
+              className="clay-press flex flex-1 items-center justify-center rounded-lg border border-border/60 bg-card px-2 py-1.5 text-xs font-bold text-foreground"
+              aria-label="Generate a new random name"
               title="Generate a new random name"
             >
-              🎲
+              <Dices className="h-3.5 w-3.5 text-primary" />
             </button>
           </div>
         </div>

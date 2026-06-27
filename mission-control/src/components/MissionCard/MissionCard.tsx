@@ -1,8 +1,12 @@
 'use client';
 
-import { Mission, MissionStatus } from '@/core/domain/entities/Mission';
+import Link from 'next/link';
+import { Play, Rocket } from 'lucide-react';
+import { Mission } from '@/core/domain/entities/Mission';
+import { getDiscoveryStatus, DISCOVERY_BADGE_CLASS } from '@/lib/discoveryStatus';
 
-function getYouTubeEmbedUrl(url: string): string | null {
+function getYouTubeId(url: string | undefined): string | null {
+  if (!url) return null;
   const patterns = [
     /youtube\.com\/watch\?v=([^&]+)/,
     /youtu\.be\/([^?]+)/,
@@ -10,18 +14,19 @@ function getYouTubeEmbedUrl(url: string): string | null {
   ];
   for (const p of patterns) {
     const m = url.match(p);
-    if (m?.[1]) return `https://www.youtube.com/embed/${m[1]}`;
+    if (m?.[1]) return m[1];
   }
   return null;
 }
 
-const STATUS_STYLES: Record<MissionStatus, { pill: string; label: string }> = {
-  queued:     { pill: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',   label: 'Queued' },
-  processing: { pill: 'bg-orange-500/20 text-orange-400 border border-orange-500/30', label: 'Running' },
-  completed:  { pill: 'bg-green-500/20 text-green-400 border border-green-500/30', label: 'Completed' },
-  failed:     { pill: 'bg-red-500/20 text-red-400 border border-red-500/30',       label: 'Failed' },
-  cancelled:  { pill: 'bg-slate-500/20 text-slate-400 border border-slate-500/30', label: 'Cancelled' },
-};
+/** Human-friendly run time: "8s" or "1:23". */
+function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  if (total < 60) return `${total}s`;
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 interface MissionCardProps {
   mission: Mission;
@@ -29,68 +34,77 @@ interface MissionCardProps {
   showLearnerId?: boolean;
 }
 
+/**
+ * Learner-facing mission card (the history feed). Always uses the discovery
+ * status (Completed / Pending) so a learner never sees their mission as
+ * "Failed"; links through to the full mission detail page.
+ */
 export function MissionCard({ mission, showLearnerId = false }: MissionCardProps) {
-  const status = STATUS_STYLES[mission.status];
+  const discoveryStatus = getDiscoveryStatus(mission.status);
   const videoUrl = mission.youtubeUrl || mission.videoUrl;
-  const embedUrl = videoUrl ? getYouTubeEmbedUrl(videoUrl) : null;
+  const youtubeId = getYouTubeId(videoUrl);
+  const thumbnailUrl = youtubeId ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` : null;
+  const durationMs = mission.executionMetadata?.duration_ms;
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
-      {/* Header row */}
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-800">
-        <div className="flex items-center gap-3 min-w-0">
-          <h3 className="font-semibold text-white truncate">
-            {mission.name ?? `Mission ${mission.id.slice(0, 8)}`}
-          </h3>
-          <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${status.pill}`}>
-            {status.label}
+    <Link
+      href={`/missions/${mission.id}`}
+      className="group flex flex-col overflow-hidden rounded-3xl border border-border/60 bg-card/50 transition-[transform,border-color] duration-200 hover:-translate-y-1 hover:border-primary/50 hover:clay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      {/* Thumbnail */}
+      <div className="relative aspect-video w-full overflow-hidden bg-black">
+        {thumbnailUrl ? (
+          <img
+            src={thumbnailUrl}
+            alt={`${mission.name || 'Mission'} thumbnail`}
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-secondary to-background text-muted-foreground/50">
+            <Rocket className="h-9 w-9" />
+            <p className="mt-2 text-xs font-semibold">Run on its way</p>
+          </div>
+        )}
+
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
+
+        <span
+          className={`absolute left-3 top-3 z-10 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] shadow-sm ${DISCOVERY_BADGE_CLASS[discoveryStatus]}`}
+        >
+          {discoveryStatus}
+        </span>
+
+        {durationMs ? (
+          <span className="absolute bottom-3 right-3 z-10 rounded-md bg-black/80 px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-white">
+            {formatDuration(durationMs)}
           </span>
-        </div>
-        <div className="shrink-0 flex items-center gap-3 font-mono text-xs text-slate-500">
-          {showLearnerId && (
-            <span className="text-slate-400">{mission.learnerId}</span>
-          )}
-          <span>{new Date(mission.submittedAt).toLocaleString()}</span>
-        </div>
+        ) : null}
+
+        {thumbnailUrl ? (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/95 shadow-lg ring-4 ring-white/15">
+              <Play className="ml-0.5 h-6 w-6 text-primary-foreground" fill="currentColor" />
+            </span>
+          </div>
+        ) : null}
       </div>
 
-      {/* Code | Video panels */}
-      <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-800">
-        {/* Code panel */}
-        <div className="p-4">
-          <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-slate-500">Code</p>
-          <pre className="overflow-x-auto rounded-lg bg-slate-950 p-3 text-xs leading-relaxed text-slate-300 max-h-56">
-            <code>{mission.code?.trim() || '// No code'}</code>
-          </pre>
+      {/* Title + meta */}
+      <div className="flex items-start justify-between gap-3 px-4 py-3">
+        <div className="min-w-0">
+          <h3 className="truncate font-display text-base font-bold text-foreground transition-colors group-hover:text-primary">
+            {mission.name ?? `Mission-${mission.id.slice(0, 8)}`}
+          </h3>
+          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="truncate font-mono">{mission.yardId}</span>
+            <span aria-hidden>·</span>
+            <span className="shrink-0">{new Date(mission.submittedAt).toLocaleDateString()}</span>
+          </p>
         </div>
-
-        {/* Video panel */}
-        <div className="p-4 flex flex-col">
-          <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-slate-500">Video</p>
-          {embedUrl ? (
-            <div className="relative aspect-video overflow-hidden rounded-lg bg-black border border-slate-800">
-              <iframe
-                src={embedUrl}
-                title={`Mission ${mission.id} video`}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="absolute inset-0 h-full w-full"
-              />
-            </div>
-          ) : (
-            <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-950/60 py-8 text-center">
-              <div>
-                <svg className="mx-auto h-8 w-8 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                <p className="mt-2 text-xs text-slate-500">
-                  {mission.status === 'completed' ? 'No video yet' : 'Video available after execution'}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+        {showLearnerId && (
+          <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{mission.learnerId}</span>
+        )}
       </div>
-    </article>
+    </Link>
   );
 }

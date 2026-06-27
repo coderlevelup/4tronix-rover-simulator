@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { Rocket, Plus } from 'lucide-react';
 import { getLearnerID } from '@/lib/getLearnerID';
 import {
   subscribeMissionsByLearnerId,
@@ -64,26 +66,26 @@ export function MissionHistoryScaffold() {
 
   // Banner: prompt for an email when none is set, or show which email is in use.
   const emailBanner = learnerEmail ? (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 px-5 py-3 text-sm">
-      <p className="text-slate-400">
+    <div className="flex shrink-0 items-center justify-between gap-4 rounded-2xl border border-border/60 bg-card/50 px-5 py-3 text-sm">
+      <p className="min-w-0 text-muted-foreground">
         Showing missions for{' '}
-        <span className="font-semibold text-slate-200">{learnerEmail}</span> - synced across your devices.
+        <span className="font-semibold text-foreground">{learnerEmail}</span> (synced across your devices).
       </p>
       <button
         onClick={openEmailPrompt}
-        className="shrink-0 rounded-full border border-slate-700 px-3 py-1 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-800"
+        className="clay-press shrink-0 rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-bold text-foreground"
       >
         Change
       </button>
     </div>
   ) : (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-orange-500/30 bg-orange-500/10 px-5 py-3 text-sm">
-      <p className="text-slate-300">
+    <div className="flex shrink-0 items-center justify-between gap-4 rounded-2xl border border-primary/30 bg-primary/10 px-5 py-3 text-sm">
+      <p className="min-w-0 text-foreground">
         Add your email to see your missions on any device.
       </p>
       <button
         onClick={openEmailPrompt}
-        className="shrink-0 rounded-full bg-orange-500 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-orange-400"
+        className="clay clay-press shrink-0 rounded-full bg-gradient-mars px-3.5 py-1.5 text-xs font-bold text-primary-foreground"
       >
         Add email
       </button>
@@ -92,32 +94,43 @@ export function MissionHistoryScaffold() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
         {emailBanner}
-        <div className="rounded-2xl bg-slate-950/60 p-8 text-center">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-600 border-t-orange-500" />
-          <p className="mt-4 text-sm text-slate-400">Loading mission history...</p>
+        <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-border/60 bg-card/30 p-8 text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
+          <p className="mt-4 text-sm text-muted-foreground">Loading your missions...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {emailBanner}
 
       {missions.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 p-8 text-center text-sm text-slate-400">
-          <svg className="mx-auto h-12 w-12 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <p className="mt-4">No missions yet</p>
-          <p className="mt-2 text-xs text-slate-500">Submit your first mission to see it here</p>
+        <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/30 p-8 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-card/60 clay">
+            <Rocket className="h-8 w-8 text-primary" />
+          </div>
+          <p className="mt-5 font-display text-xl font-bold text-foreground">No missions yet</p>
+          <p className="mt-1.5 text-sm text-muted-foreground">Build your first mission and it will show up here.</p>
+          <Link
+            href="/mission"
+            className="clay clay-press mt-6 inline-flex items-center gap-2 rounded-2xl bg-gradient-mars px-5 py-2.5 font-display text-sm font-bold text-primary-foreground"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Create Mission
+          </Link>
         </div>
       ) : (
-        missions.map((mission) => (
-          <MissionCard key={mission.id} mission={mission} />
-        ))
+        <div className="min-h-0 flex-1 overflow-y-auto scroll-panel pb-1">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {missions.map((mission) => (
+              <MissionCard key={mission.id} mission={mission} />
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

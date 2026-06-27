@@ -44,7 +44,7 @@ export function BlocklyViewer({ state }: { state: string }) {
       readOnly: true,
       renderer: 'zelos',
       move: { drag: true, scrollbars: true, wheel: true },
-      zoom: { controls: true, wheel: true, startScale: 0.7, maxScale: 2, minScale: 0.3 },
+      zoom: { controls: true, wheel: true, startScale: 0.9, maxScale: 2.5, minScale: 0.3 },
     });
 
     try {

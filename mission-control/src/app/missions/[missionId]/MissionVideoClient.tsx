@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, Rocket, Zap } from 'lucide-react';
 import { Mission } from '@/core/domain/entities/Mission';
 import Link from 'next/link';
 import { getFirestoreClient } from '@/lib/firebase';
@@ -72,12 +73,14 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
   if (error || !mission) {
     return (
       <main className="mx-auto flex h-[calc(100vh-64px)] max-w-md flex-col items-center justify-center px-6 text-center">
-        <span className="text-4xl">⚠️</span>
-        <h1 className="mt-4 font-display text-2xl font-bold text-foreground">Mission not found</h1>
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-card/60 clay">
+          <Rocket className="h-8 w-8 text-primary" />
+        </div>
+        <h1 className="mt-5 font-display text-2xl font-bold text-foreground">Mission not found</h1>
         <p className="mt-2 text-sm text-muted-foreground">{error || 'We could not load this mission.'}</p>
         <Link
           href="/"
-          className="mt-6 rounded-xl bg-gradient-mars px-5 py-2.5 font-display text-sm font-bold text-primary-foreground transition-transform hover:-translate-y-0.5"
+          className="clay clay-press mt-6 rounded-2xl bg-gradient-mars px-5 py-2.5 font-display text-sm font-bold text-primary-foreground"
         >
           Back to the feed
         </Link>
@@ -89,12 +92,7 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
   const discoveryStatus = getDiscoveryStatus(mission.status);
   const selectedRun = runs.find((r) => r.id === selectedRunId) ?? runs[0];
   const durationMs = mission.executionMetadata?.duration_ms;
-  const durationLabel = durationMs ? `${Math.round(durationMs / 1000)}s` : '—';
-  const executionLabel = mission.executionResult?.isSuccessful
-    ? 'Successful'
-    : mission.executionResult
-      ? 'Failed'
-      : 'Not run';
+  const durationLabel = durationMs ? `${Math.round(durationMs / 1000)}s` : 'Not yet';
   const dateLabel = new Date(mission.completedAt || mission.submittedAt).toLocaleDateString();
   const hasBlocks = !!mission.blocklyState;
   const showBlocks = hasBlocks && codeView === 'blocks';
@@ -116,9 +114,7 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
             <Link href="/" className="shrink-0 text-muted-foreground transition-colors hover:text-primary" aria-label="Back to the feed">
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
+              <ArrowLeft className="h-5 w-5" />
             </Link>
             <h1 className="truncate font-display text-lg font-bold text-foreground md:text-xl">{missionName}</h1>
             <span
@@ -172,7 +168,7 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
             <div className="grid shrink-0 grid-cols-3 gap-2">
               <Stat label="Status" value={discoveryStatus} />
               <Stat label="Duration" value={durationLabel} mono />
-              <Stat label="Execution" value={executionLabel} />
+              <Stat label="Built with" value={hasBlocks ? 'Blocks' : 'Python'} />
             </div>
           </div>
 
@@ -240,11 +236,9 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
                     window.location.href = '/mission?mode=code';
                   }
                 }}
-                className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-gradient-mars px-4 py-2 font-display text-sm font-bold text-primary-foreground transition-transform hover:-translate-y-0.5"
+                className="clay clay-press inline-flex shrink-0 items-center gap-2 rounded-2xl bg-gradient-mars px-4 py-2.5 font-display text-sm font-bold text-primary-foreground"
               >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
+                <Zap className="h-4 w-4" fill="currentColor" />
                 Try it
               </button>
             </div>
