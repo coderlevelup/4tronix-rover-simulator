@@ -97,6 +97,13 @@ html {
   --color-cosmic: var(--cosmic);
   --color-stardust: var(--stardust);
 
+  /* Blockly category colours (echo the real blocks the kids touch) */
+  --color-block-move: #2196f3;   /* movement */
+  --color-block-spin: #9c27b0;   /* spin */
+  --color-block-steer: #00bcd4;  /* steer */
+  --color-block-stop: #f44336;   /* stop */
+  --color-block-hat: #ff6d00;    /* uplink / hat */
+
   --font-display: "Fredoka", "Baloo 2", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-sans: "Inter", system-ui, sans-serif;
@@ -211,6 +218,54 @@ html {
     border-radius: 9999px;
     transform: rotate(-18deg);
     opacity: 0;
+  }
+
+  /* Chunky, toy-like depth for kid-friendly cards and buttons (claymorphic):
+     a soft outer lift plus an inner bottom bevel, no neon glow. */
+  .clay {
+    box-shadow:
+      0 10px 24px -12px rgba(0, 0, 0, 0.55),
+      inset 0 -3px 0 rgba(0, 0, 0, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  .clay-press {
+    transition: transform 120ms ease, filter 150ms ease, box-shadow 150ms ease;
+  }
+  .clay-press:hover { filter: brightness(1.06); }
+  .clay-press:active { transform: translateY(1px); }
+
+  /* Thin, themed scrollbar for panels that scroll internally. */
+  .scroll-panel { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+  .scroll-panel::-webkit-scrollbar { width: 10px; height: 10px; }
+  .scroll-panel::-webkit-scrollbar-track { background: transparent; }
+  .scroll-panel::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--color-border) 90%, transparent);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .scroll-panel::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--primary) 60%, var(--color-border));
+    background-clip: content-box;
+  }
+}
+
+/* Respect users who prefer less motion: drop the ambient space animations and
+   keep transitions near-instant. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-drift,
+  .animate-shoot,
+  .animate-twinkle,
+  .animate-blast,
+  .page-transition-enter {
+    animation: none !important;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

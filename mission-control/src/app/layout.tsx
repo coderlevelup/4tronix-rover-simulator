@@ -34,18 +34,12 @@ export default function RootLayout({
       style={{ colorScheme: 'dark' }}
     >
       <body className="min-h-full flex flex-col relative">
-        {/* Layered galaxy backdrop */}
-        <div className="pointer-events-none fixed inset-0 -z-10 milky-way opacity-60" />
-        <div className="pointer-events-none fixed inset-0 -z-10 nebula opacity-80" />
-        <div className="pointer-events-none fixed -inset-[1200px] -z-10 starfield opacity-90 animate-drift" />
-        <div
-          className="pointer-events-none fixed -inset-[1200px] -z-10 starfield opacity-50"
-          style={{ animation: "drift 420s linear infinite reverse", backgroundSize: "1100px 1100px" }}
-        />
+        {/* Clean starfield backdrop: a single drifting layer of distant stars,
+            kept subtle so the UI reads like a punchy video feed, not a glow. */}
+        <div className="pointer-events-none fixed -inset-[1200px] -z-10 starfield opacity-40 animate-drift" />
 
-        {/* Soft planet glows */}
-        <div className="pointer-events-none fixed -top-40 -left-40 h-[480px] w-[480px] rounded-full bg-cosmic/30 blur-3xl" />
-        <div className="pointer-events-none fixed -bottom-60 -right-40 h-[640px] w-[640px] rounded-full bg-gradient-mars opacity-30 blur-3xl" />
+        {/* One restrained Mars glow anchored in a corner for warmth (no neon). */}
+        <div className="pointer-events-none fixed -bottom-72 -right-52 h-[560px] w-[560px] rounded-full bg-gradient-mars opacity-[0.14] blur-3xl" />
 
         <AuthProvider>
           <LearnerProvider>
