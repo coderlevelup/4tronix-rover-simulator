@@ -54,6 +54,9 @@ export function MissionWorkspace() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const manualTrajectoryLengthRef = useRef(0);
   const [manualResetVersion, setManualResetVersion] = useState(0);
+  // Bumped on every run / mode switch so a slow video capture that finishes
+  // after the learner has moved on can't re-show a stale clip.
+  const runIdRef = useRef(0);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -65,8 +68,12 @@ export function MissionWorkspace() {
   }, [panelSplit]);
 
   const runSimulationVideo = async (commands: SimulationCommand[]) => {
+    const myRun = ++runIdRef.current;
     setError(null);
-    setSimVideoUrl(null);
+    setSimVideoUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
 
     // Run the commands through the client-side physics model and show the
     // trajectory animating right away. This also serves as the fallback view if
@@ -81,13 +88,37 @@ export function MissionWorkspace() {
     setSimVideoLoading(true);
     try {
       const blob = await recordSimVideo(simulated);
+      // A newer run (or a mode switch) happened while we were capturing - drop
+      // this clip instead of flashing it over the current view.
+      if (runIdRef.current !== myRun) return;
       setSimVideoUrl(URL.createObjectURL(blob));
     } catch (err) {
       console.warn('Sim video capture unavailable; showing live animation only', err);
     } finally {
-      setSimVideoLoading(false);
+      if (runIdRef.current === myRun) setSimVideoLoading(false);
     }
   };
+
+  // Switching editor mode starts a clean simulator: clear any captured clip and
+  // the previous run's trajectory so, e.g., Manual shows the live canvas instead
+  // of a leftover video.
+  const handleEditorModeChange = useCallback((mode: EditorMode) => {
+    runIdRef.current++;
+    setEditorMode(mode);
+    setSimVideoUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setSimVideoLoading(false);
+    setTrajectory([]);
+    setIsPlaying(false);
+    setError(null);
+    manualTrajectoryLengthRef.current = 0;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, []);
 
   const handleManualTrajectory = useCallback((realtimeTrajectory: RoverState[]) => {
     const converted: TrajectoryPoint[] = realtimeTrajectory.map((state) => ({
@@ -117,7 +148,11 @@ export function MissionWorkspace() {
 
   const handleResetSimulation = useCallback(() => {
     if (editorMode === 'manual') {
+      // Clear the drawn path and park the rover back at the start. The reset
+      // version bump tells ManualControlRealtime to reset its physics too, so
+      // the next tap drives from the centre again.
       manualTrajectoryLengthRef.current = 0;
+      setTrajectory([]);
       setManualResetVersion((version) => version + 1);
       setIsPlaying(false);
       return;
@@ -208,7 +243,7 @@ export function MissionWorkspace() {
           panelSplit={panelSplit}
           onPanelSplitChange={setPanelSplit}
           editorMode={editorMode}
-          onEditorModeChange={setEditorMode}
+          onEditorModeChange={handleEditorModeChange}
           error={error}
           onManualTrajectory={handleManualTrajectory}
           onResetSimulation={handleResetSimulation}

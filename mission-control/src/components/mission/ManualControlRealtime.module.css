@@ -8,15 +8,15 @@
   gap: 8px;
   width: 100%;
   border: none;
-  border-radius: 10px;
+  border-radius: 16px;
   background: var(--c);
-  padding: 13px 16px;
+  padding: 20px 22px;
   text-align: left;
-  font-weight: 700;
-  font-size: 14px;
+  font-weight: 800;
+  font-size: 18px;
   color: #fff;
   cursor: pointer;
-  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.22);
   transition: transform 0.08s ease, filter 0.12s ease;
 }
 
@@ -32,13 +32,13 @@
 .block::after {
   content: '';
   position: absolute;
-  bottom: -6px;
-  left: 18px;
-  width: 26px;
-  height: 6px;
-  border-radius: 0 0 7px 7px;
+  bottom: -8px;
+  left: 24px;
+  width: 36px;
+  height: 8px;
+  border-radius: 0 0 9px 9px;
   background: var(--c);
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.22);
 }
 
 .active {

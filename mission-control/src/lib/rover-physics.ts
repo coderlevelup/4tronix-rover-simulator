@@ -108,7 +108,13 @@ export class RoverPhysics {
     const currentTime = Date.now();
     // Real-time callers pass nothing (wall-clock dt); the batch simulator passes
     // a fixed dt so a trajectory can be computed deterministically off-clock.
-    const dt = dtOverride !== undefined ? dtOverride : (currentTime - this.lastUpdate) / 1000;
+    // The wall-clock dt is clamped: if the timer is stale (the first tap after
+    // the page sat idle, or returning from a backgrounded tab) an unclamped dt
+    // would teleport the rover across the yard in a single step.
+    const dt =
+      dtOverride !== undefined
+        ? dtOverride
+        : Math.min(Math.max(0, (currentTime - this.lastUpdate) / 1000), 0.1);
     this.lastUpdate = currentTime;
 
     // Calculate new position based on current speeds and servo angles

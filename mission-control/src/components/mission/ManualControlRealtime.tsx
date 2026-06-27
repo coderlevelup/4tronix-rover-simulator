@@ -46,6 +46,9 @@ export function ManualControlRealtime({ onTrajectoryUpdate, onReset, resetVersio
   const runTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isActive, setIsActive] = useState(false);
   const [activeCommand, setActiveCommand] = useState<string | null>(null);
+  // True once a block has been tapped this run, so chaining more blocks keeps
+  // the existing trail. Reset clears it.
+  const startedRef = useRef(false);
 
   const resetController = useCallback(() => {
     if (animationFrameRef.current) {
@@ -60,6 +63,7 @@ export function ManualControlRealtime({ onTrajectoryUpdate, onReset, resetVersio
     setActiveCommand(null);
     roverRef.current.reset();
     trajectoryRef.current = [];
+    startedRef.current = false;
   }, []);
 
   // Listen for external reset from the shared simulator controls.
@@ -96,19 +100,21 @@ export function ManualControlRealtime({ onTrajectoryUpdate, onReset, resetVersio
   // Tap a block: run that instruction for a beat, then stop. Tapping more blocks
   // extends the path, one block at a time.
   const runBlock = useCallback((block: DriveBlock) => {
-    if (!isActive) {
-      setIsActive(true);
+    if (!startedRef.current) {
+      startedRef.current = true;
       trajectoryRef.current = [roverRef.current.getState()];
     }
     if (runTimeoutRef.current) clearTimeout(runTimeoutRef.current);
     roverRef.current.setCommand(block.command, block.speed);
     setActiveCommand(block.command);
+    setIsActive(true); // run the render loop while this instruction plays
     runTimeoutRef.current = setTimeout(() => {
       roverRef.current.setCommand('stop');
       setActiveCommand(null);
       runTimeoutRef.current = null;
+      setIsActive(false); // halt the loop; the rover holds its place and trail
     }, block.ms);
-  }, [isActive]);
+  }, []);
 
   const stopNow = useCallback(() => {
     if (runTimeoutRef.current) {
@@ -117,6 +123,7 @@ export function ManualControlRealtime({ onTrajectoryUpdate, onReset, resetVersio
     }
     roverRef.current.setCommand('stop');
     setActiveCommand(null);
+    setIsActive(false); // halt the loop when the learner stops
   }, []);
 
   useEffect(() => {
@@ -145,13 +152,13 @@ export function ManualControlRealtime({ onTrajectoryUpdate, onReset, resetVersio
   return (
     <div className="flex h-full w-full flex-col gap-3 p-4">
       <div>
-        <h3 className="font-display text-base font-bold text-foreground">Tap a block to drive</h3>
+        <h3 className="font-display text-lg font-bold text-foreground">Tap a block to drive</h3>
         <p className="text-xs text-muted-foreground">
           These are the same blocks you code with. Tap one to run it.
         </p>
       </div>
 
-      <div className="grid flex-1 content-start grid-cols-2 gap-x-3 gap-y-4">
+      <div className="grid flex-1 content-start grid-cols-2 gap-x-4 gap-y-6">
         {BLOCKS.map((block) => (
           <button
             key={block.command}
