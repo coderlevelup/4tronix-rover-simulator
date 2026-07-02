@@ -1,83 +1,88 @@
-# Mars Rover Mission Authoring
+# Mars Rover Mission Control
 
-A learner-focused platform for authoring and testing Mars rover missions using visual block programming and text editing.
+A learner-focused platform for authoring and testing Mars rover missions. Learners drive a simulated rover manually, snap Blockly blocks together, or write Python against the real rover API, preview the run in the built-in 2D simulator, and submit the mission for execution on a physical 4tronix M.A.R.S. rover.
 
 ## Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - npm 9+
-- Firebase project with Firestore enabled
+- A Firebase project with Firestore and Authentication enabled
 
-## Installation
+## Getting Started
 
-1. Clone the repository:
-```
-Fastest way is to use Azure's cloning to your IDE, you can use git clone but you have to generate credentials in Azure when cloning.
-cd mars-rover-mission-control
-```
+1. Install dependencies:
 
-2. Install dependencies:
 ```bash
+cd mission-control
 npm install
 ```
 
-3. Set up environment variables:
-```
-.env file is committed with the firebase App config. so you can skip step 4 unless reconfiguring.
-```
+2. Create your environment file from the template and fill in your Firebase config:
 
-4. Fill in your Firebase configuration in `.env`. **Be careful not to commit real Firebase keys or credentials to the repository:**
-```env
-NEXT_PUBLIC_FIREBASE_API_KEY=your_client_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_client_messaging_sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=your_client_app_id
-NEXT_PUBLIC_SIMULATOR_API_URL=http://localhost:8080
+```bash
+cp .env.example .env
 ```
 
+The client-side `NEXT_PUBLIC_FIREBASE_*` values come from your Firebase project settings. The `FIREBASE_*` admin values (service account) and `ADMIN_API_SECRET` are server-side only. Never commit real credentials; `.env` is gitignored.
 
-## Running Locally
+3. Start the dev server:
 
-Start the development server (runs both web and simulator):
 ```bash
 npm run dev
 ```
 
-The web app will be available at `http://localhost:3000` and the simulator API at `http://localhost:8080`.
+The app runs at `http://localhost:3000`.
+
+## Scripts
+
+- `npm run dev` - development server
+- `npm run build` - production build
+- `npm start` - serve the production build
+- `npm run lint` - ESLint
+- `npm test` - Jest unit and integration tests
+
+## Routes
+
+- `/` - landing page with the mission feed
+- `/mission` - the mission workspace (manual drive, Blockly, and Python editors plus the simulator)
+- `/history` - the learner's own mission history
+- `/missions/[missionId]` - mission detail with run video and code viewer
+- `/login` - operator sign-in
+- `/operator` - operator console (requires the `operator` or `admin` custom claim)
 
 ## Project Structure
 
-- `src/app/` - Next.js pages and routes
-- `src/components/` - React components (editors, mission workspace, simulator)
-- `src/contexts/` - React context providers (authentication, learner tracking)
-- `src/infrastructure/` - Data persistence and external services
-- `src/hooks/` - Custom React hooks for mission submission and learner state
-- `simulator-service/` - Flask-based rover physics simulator
+- `src/app/` - Next.js pages and API routes
+- `src/components/` - React components (editors, simulator, workspace, layout)
+- `src/contexts/` - React context providers (auth, learner session)
+- `src/core/` - domain entities and application services
+- `src/infrastructure/` - Firestore persistence, Firebase auth, and the code-sandbox allowlist
+- `src/lib/` - client utilities (simulation, rendering, learner identity, Firebase client)
+- `src/proxy.ts` - route protection for operator pages and APIs (verifies the Firebase session token)
 
 ## How It Works
 
-1. Learners create missions using the visual block editor (Blockly) or text editor (Monaco)
-2. Missions are submitted to Firebase Firestore with normalized code and auto-generated IDs
-3. Learner mission history is tracked per browser session
-4. When executed, mission code runs against the rover simulator
-5. Results are displayed in the mission workspace
+1. Learners build a mission in the workspace: driving manually records commands, and the Blockly and Python editors generate rover code.
+2. The in-browser 2D simulator previews the trajectory before submission; a simulation video can be captured for the mission record.
+3. Submitted code passes an AST-based allowlist check so only approved rover commands reach the queue.
+4. Missions are stored in Firestore and picked up for execution on the physical rover; learners track status from their history.
+5. Operators review, run, and manage the mission queue from the operator console.
 
-## Learn More
+## Rover Python API
 
-- Check out [docs/](docs/) for guides on mission history, learner tracking, and validation
-- See the mission workspace at `/mission` and mission list at `/missions`
+The Python editor targets the real rover's low-level API, for example:
 
-## Editors
+```python
+import rover
+import time
 
-- **Visual Block Editor:** A Blockly-based drag-and-drop editor for building missions visually inside the mission workspace. Ideal for learners who prefer visual programming.
-- **Text Editor:** A Monaco-based text editor for editing mission code directly (JavaScript/JSON). You can switch between editors when creating or editing a mission.
+rover.init(0)
+rover.forward(50)
+time.sleep(1)
+rover.stop()
+rover.setServo(0, 30)
+```
 
-## Mission Catalogue
+## Testing
 
-- The mission catalogue (available at `/missions`) lists published missions with metadata (difficulty, tags, thumbnail) and actions to run or edit missions. Missions are persisted in Firestore so instructors and learners can browse and reuse authored content.
-
-## Mission History
-
-- Learner mission history tracks submissions, outcomes, and timestamps for each learner or session. History is viewable in the mission history UI and is stored in Firestore to enable replay, review, and export of past attempts.
+`npm test` runs the Jest suite (unit tests for the domain services, parsers, and sandbox plus integration tests for the API routes).

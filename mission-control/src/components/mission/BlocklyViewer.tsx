@@ -21,6 +21,7 @@ export function BlocklyViewer({ state }: { state: string }) {
     if (typeof window === 'undefined' || scriptLoadedRef.current) return;
     if (window.Blockly) {
       scriptLoadedRef.current = true;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time sync that the CDN script is already present
       setLoaded(true);
       return;
     }

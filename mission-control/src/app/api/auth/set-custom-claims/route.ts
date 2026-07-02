@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    console.error('❌ Failed to set custom claims:', error);
+    console.error('Failed to set custom claims:', error);
 
     if ((error as { code?: string }).code === 'auth/user-not-found') {
       return NextResponse.json(

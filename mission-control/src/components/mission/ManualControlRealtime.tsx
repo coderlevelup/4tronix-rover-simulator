@@ -69,6 +69,7 @@ export function ManualControlRealtime({ onTrajectoryUpdate, onReset, resetVersio
   // Listen for external reset from the shared simulator controls.
   useEffect(() => {
     if (resetVersion > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- react to the shared reset signal from the workspace controls
       resetController();
     }
   }, [resetVersion, resetController]);

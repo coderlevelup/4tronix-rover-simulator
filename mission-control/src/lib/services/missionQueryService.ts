@@ -55,7 +55,7 @@ export function subscribeMissionsByLearnerId(
       callback(missions);
     },
     (error) => {
-      console.error('❌ Mission subscription error:', error);
+      console.error('Mission subscription error:', error);
       callback([]);
     }
   );
@@ -93,7 +93,7 @@ export function subscribeMissionsByLearnerEmail(
       callback(missions);
     },
     (error) => {
-      console.error('❌ Mission (by email) subscription error:', error);
+      console.error('Mission (by email) subscription error:', error);
       callback([]);
     }
   );
@@ -126,7 +126,7 @@ export async function getMissionsByLearnerId(
 
     return missions;
   } catch (error) {
-    console.error('❌ Failed to get missions by learnerId:', error);
+    console.error('Failed to get missions by learnerId:', error);
     return [];
   }
 }

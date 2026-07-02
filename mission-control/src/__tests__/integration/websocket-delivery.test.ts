@@ -1,3 +1,3 @@
-describe('websocket delivery scaffold', () => {
+describe('websocket delivery (planned)', () => {
   it.todo('Task 69: mission payload is delivered over the WebSocket connection');
 });

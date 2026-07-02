@@ -33,12 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isOperator, setIsOperator] = useState(false);
 
   useEffect(() => {
-    console.log('🔧 Initializing AuthContext');
     const auth = getFirebaseAuth();
     const db = getFirestoreClient();
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log('👤 Auth state changed:', user ? `User: ${user.email}` : 'No user');
       setUser(user);
 
       if (user) {
@@ -51,14 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!querySnapshot.empty) {
             const userData = querySnapshot.docs[0].data();
             const role = userData.role as string | undefined;
-            console.log('🔑 User role from Firestore:', role);
             setIsOperator(role === 'operator' || role === 'admin');
           } else {
-            console.log('⚠️ User document not found in Firestore for email:', user.email);
             setIsOperator(false);
           }
         } catch (error) {
-          console.error('❌ Error fetching user role:', error);
+          console.error('Error fetching user role:', error);
           setIsOperator(false);
         }
       } else {
@@ -72,15 +68,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    console.log('📧 SignIn called for:', email);
     const auth = getFirebaseAuth();
-    console.log('🔐 Firebase Auth instance:', auth ? 'OK' : 'Missing');
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      console.log('✅ SignIn successful:', result.user.email);
+      await signInWithEmailAndPassword(auth, email, password);
     } catch (err) {
       const e = err as { code?: string; name?: string; message?: string };
-      console.error('❌ Firebase signIn error:', e.code || e.name, e.message || err);
+      console.error('Firebase signIn error:', e.code || e.name, e.message || err);
       throw err;
     }
   };

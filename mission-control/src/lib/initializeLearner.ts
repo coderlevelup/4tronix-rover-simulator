@@ -46,7 +46,6 @@ export async function initializeLearner(): Promise<LearnerRecord> {
     if (learnerSnap.exists()) {
       // Existing learner found
       const data = learnerSnap.data() as LearnerRecord;
-      console.log('👋 Welcome back, learner:', learnerId);
 
       // Update last active timestamp
       await setDoc(
@@ -77,15 +76,13 @@ export async function initializeLearner(): Promise<LearnerRecord> {
         lastActiveAt: serverTimestamp(),
       });
 
-      console.log('✨ Created new learner:', learnerId);
-
       return {
         ...newLearner,
         createdAt: new Date().toISOString(),
       };
     }
   } catch (error) {
-    console.warn('⚠️ Firestore learner initialization failed, using local record fallback:', error);
+    console.warn('Firestore learner initialization failed, using local record fallback:', error);
 
     const learnerId = getLearnerID();
     return {
@@ -128,11 +125,9 @@ export async function incrementMissionsCompleted(learnerId: string): Promise<voi
         },
         { merge: true }
       );
-
-      console.log('✅ Missions completed updated:', current + 1);
     }
   } catch (error) {
-    console.error('❌ Failed to update missions completed:', error);
+    console.error('Failed to update missions completed:', error);
   }
 }
 
@@ -155,9 +150,7 @@ export async function updateProgress(learnerId: string, progress: number): Promi
       },
       { merge: true }
     );
-
-    console.log('✅ Progress updated:', progress);
   } catch (error) {
-    console.error('❌ Failed to update progress:', error);
+    console.error('Failed to update progress:', error);
   }
 }

@@ -57,7 +57,6 @@ export function BlocklyEditor({ onGenerateCommands, onCodeChange, onBlocklyState
     script1.onload = () => {
       scriptLoadedRef.current = true;
       setBlocklyLoaded(true);
-      console.log('Blockly loaded from CDN');
     };
 
     document.body.appendChild(script1);

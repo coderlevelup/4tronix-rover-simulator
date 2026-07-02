@@ -15,6 +15,7 @@ export function EmailPrompt() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the draft field whenever the prompt (re)opens or the saved email changes
     setEmail(learnerEmail ?? '');
   }, [learnerEmail, showEmailPrompt]);
 

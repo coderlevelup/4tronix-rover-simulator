@@ -2,11 +2,6 @@ import { MissionWorkspace } from '@/components/mission/MissionWorkspace';
 import { Suspense } from 'react';
 
 export default function MissionPage() {
-  // TODO: User Story 17 - browser editor experience.
-  // TODO: User Story 21 - allowlist enforcement before submission.
-  // TODO: User Story 27 - simulator workflow.
-  // TODO: User Story 54 - queue confirmation and polling UX.
-  // TODO: User Story 58 - completion notification UX.
   return (
     <main className="relative h-[calc(100vh-64px)] overflow-hidden px-3 py-2">
       <div className="mx-auto max-w-7xl space-y-2">

@@ -10,7 +10,7 @@ export interface TrajectoryPoint {
   servos: Record<string, number>;
 }
 
-// Match the canvas playback rate (RoverSimulatorScaffold advances at 10 fps).
+// Match the canvas playback rate (RoverSimulator advances at 10 fps).
 const STEP_SECONDS = 0.1;
 
 /**

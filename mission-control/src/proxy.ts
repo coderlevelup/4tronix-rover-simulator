@@ -37,7 +37,7 @@ async function getFirebaseCertificates(): Promise<Record<string, string> | null>
     const response = await fetch(jwksUrl);
 
     if (!response.ok) {
-      console.error('❌ Failed to fetch Firebase certificates');
+      console.error('Failed to fetch Firebase certificates');
       return null;
     }
 
@@ -49,7 +49,7 @@ async function getFirebaseCertificates(): Promise<Record<string, string> | null>
     const certMapping = await response.json();
 
     if (!certMapping || typeof certMapping !== 'object') {
-      console.error('❌ Invalid Firebase certificate response');
+      console.error('Invalid Firebase certificate response');
       return null;
     }
 
@@ -59,7 +59,7 @@ async function getFirebaseCertificates(): Promise<Record<string, string> | null>
 
     return certMapping;
   } catch (error) {
-    console.error('❌ Error fetching Firebase certificates:', error);
+    console.error('Error fetching Firebase certificates:', error);
     return null;
   }
 }
@@ -85,7 +85,7 @@ async function decodeSessionTokenV2(token: string): Promise<JWTPayload | null> {
     const firebaseProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
     if (!firebaseProjectId) {
-      console.error('❌ NEXT_PUBLIC_FIREBASE_PROJECT_ID not configured');
+      console.error('NEXT_PUBLIC_FIREBASE_PROJECT_ID not configured');
       return null;
     }
 
@@ -100,14 +100,14 @@ async function decodeSessionTokenV2(token: string): Promise<JWTPayload | null> {
     // decodeProtectedHeader is Edge- and Node-compatible (no Buffer / node:crypto).
     const { kid } = decodeProtectedHeader(token);
     if (!kid) {
-      console.error('❌ Token missing kid header');
+      console.error('Token missing kid header');
       return null;
     }
 
     // Find the matching x509 cert from Google's published certificates
     const cert = certMapping[kid];
     if (!cert || typeof cert !== 'string') {
-      console.error('❌ Token key not found in Firebase certificates');
+      console.error('Token key not found in Firebase certificates');
       return null;
     }
 
@@ -138,7 +138,7 @@ async function decodeSessionTokenV2(token: string): Promise<JWTPayload | null> {
 
     return payload;
   } catch (error) {
-    console.error('❌ Token verification failed:', error);
+    console.error('Token verification failed:', error);
     return null;
   }
 }
@@ -165,7 +165,7 @@ export async function proxy(request: NextRequest) {
   const sessionCookie = request.cookies.get('session')?.value;
 
   if (!sessionCookie) {
-    console.warn('⚠️ No session cookie found');
+    console.warn('No session cookie found');
     return deny();
   }
 
@@ -173,7 +173,7 @@ export async function proxy(request: NextRequest) {
   const decodedToken = await decodeSessionTokenV2(sessionCookie);
 
   if (!decodedToken) {
-    console.error('❌ Failed to verify session token');
+    console.error('Failed to verify session token');
     return deny();
   }
 
@@ -181,7 +181,7 @@ export async function proxy(request: NextRequest) {
   const role = decodedToken.role as string | undefined;
 
   if (!role || (role !== 'operator' && role !== 'admin')) {
-    console.warn('⚠️ User does not have operator access, role:', role);
+    console.warn('User does not have operator access, role:', role);
     return deny();
   }
 

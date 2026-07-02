@@ -224,6 +224,7 @@ export default function LandingPage() {
                   {/* Thumbnail */}
                   <div className="relative aspect-video w-full overflow-hidden bg-black">
                     {thumbnailUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- thumbnail hosts vary per mission record; next/image would need remotePatterns per host
                       <img
                         src={thumbnailUrl}
                         alt={`${mission.name || 'Mission'} thumbnail`}

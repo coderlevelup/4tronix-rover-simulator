@@ -26,9 +26,8 @@ export async function setUserCustomClaims(
   try {
     const auth = getFirebaseAdminAuth();
     await auth.setCustomUserClaims(uid, claims);
-    console.log(`✅ Custom claims set for user ${uid}:`, claims);
   } catch (error) {
-    console.error(`❌ Failed to set custom claims for user ${uid}:`, error);
+    console.error(`Failed to set custom claims for user ${uid}:`, error);
     throw error;
   }
 }
@@ -65,9 +64,8 @@ export async function clearUserCustomClaims(uid: string): Promise<void> {
   try {
     const auth = getFirebaseAdminAuth();
     await auth.setCustomUserClaims(uid, null);
-    console.log(`✅ Custom claims cleared for user ${uid}`);
   } catch (error) {
-    console.error(`❌ Failed to clear custom claims for user ${uid}:`, error);
+    console.error(`Failed to clear custom claims for user ${uid}:`, error);
     throw error;
   }
 }

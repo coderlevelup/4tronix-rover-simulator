@@ -27,7 +27,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   if (!firebaseConfig.projectId) missingVars.push('NEXT_PUBLIC_FIREBASE_PROJECT_ID');
 
   if (missingVars.length > 0) {
-    console.error('❌ Missing Firebase client config:', missingVars.join(', '));
+    console.error('Missing Firebase client config:', missingVars.join(', '));
     console.error('Make sure these are set in your .env file and restart the dev server');
   }
 }

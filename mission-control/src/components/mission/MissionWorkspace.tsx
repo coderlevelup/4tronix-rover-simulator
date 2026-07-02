@@ -226,7 +226,6 @@ export function MissionWorkspace() {
       // Offer notifications once the mission is in (never on landing), and only
       // if the learner has not already saved an email.
       if (!learnerEmail) openEmailPrompt();
-      console.log('✅ Mission submitted to Firebase:', result.mission);
       setTimeout(() => setSubmitSuccess(false), 5000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit mission');

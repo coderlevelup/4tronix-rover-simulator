@@ -37,11 +37,10 @@ export function getOrCreateSession(): LearnerSession {
 
       // Validate session structure
       if (session.sessionId && session.createdAt) {
-        console.log('📋 Retrieved existing session:', session.sessionId);
         return session;
       }
     } catch {
-      console.warn('⚠️ Failed to parse stored session, creating new one');
+      console.warn('Failed to parse stored session, creating new one');
     }
   }
 
@@ -53,7 +52,6 @@ export function getOrCreateSession(): LearnerSession {
   };
 
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(newSession));
-  console.log('✨ Created new session:', newSession.sessionId);
 
   return newSession;
 }
@@ -85,7 +83,6 @@ export function clearSession(): void {
 
   localStorage.removeItem(SESSION_STORAGE_KEY);
   localStorage.removeItem(LEARNER_STORAGE_KEY);
-  console.log('🗑️ Session cleared');
 }
 
 /**

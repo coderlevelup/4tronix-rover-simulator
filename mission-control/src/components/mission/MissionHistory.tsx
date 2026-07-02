@@ -12,7 +12,7 @@ import { Mission } from '@/core/domain/entities/Mission';
 import { MissionCard } from '@/components/MissionCard/MissionCard';
 import { useLearner } from '@/contexts/LearnerContext';
 
-export function MissionHistoryScaffold() {
+export function MissionHistory() {
   const { learnerEmail, openEmailPrompt } = useLearner();
 
   // Missions for this browser (by learner id) and, if an email is set, missions
@@ -34,12 +34,14 @@ export function MissionHistoryScaffold() {
       return () => unsubscribe();
     } catch (error) {
       console.error('Failed to initialize mission history:', error);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- subscription setup failed; mark this source as settled so the page renders
       setIdLoaded(true);
     }
   }, []);
 
   useEffect(() => {
     if (!learnerEmail) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- no email set, so this source is trivially settled
       setByEmail([]);
       setEmailLoaded(true);
       return;

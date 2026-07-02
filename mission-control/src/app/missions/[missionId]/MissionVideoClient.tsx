@@ -6,7 +6,7 @@ import { Mission } from '@/core/domain/entities/Mission';
 import Link from 'next/link';
 import { getFirestoreClient } from '@/lib/firebase';
 import { FirestoreMissionRepository } from '@/infrastructure/persistence/FirestoreMissionRepository';
-import { RoverSimulatorScaffold } from '@/components/mission/RoverSimulatorScaffold';
+import { RoverSimulator } from '@/components/mission/RoverSimulator';
 import { BlocklyViewer } from '@/components/mission/BlocklyViewer';
 import { parseRoverCode } from '@/lib/parseRoverCode';
 import { simulateCommands } from '@/lib/simulateCommands';
@@ -161,7 +161,7 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
                 </div>
               ) : (
                 <div className="h-full w-full p-2">
-                  <RoverSimulatorScaffold trajectory={simTrajectory} isPlaying editorMode="code" />
+                  <RoverSimulator trajectory={simTrajectory} isPlaying editorMode="code" />
                 </div>
               )}
             </div>

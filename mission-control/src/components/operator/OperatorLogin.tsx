@@ -28,8 +28,6 @@ export function OperatorLogin() {
     setError('');
     setLoading(true);
 
-    console.log('🔐 Attempting login with:', email);
-
     try {
       await signIn(email, password);
 
@@ -70,7 +68,7 @@ export function OperatorLogin() {
         setLoading(false);
       }
     } catch (err) {
-      console.error('❌ Login error:', err);
+      console.error('Login error:', err);
       const e = err as { code?: string; message?: string };
 
       let errorMessage = 'Login failed';

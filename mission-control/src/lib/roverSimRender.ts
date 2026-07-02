@@ -2,7 +2,7 @@
  * Shared 2D rover-simulator drawing.
  *
  * One canvas draw routine used by both the live simulator panel
- * (RoverSimulatorScaffold) and the offscreen video recorder (recordSimVideo),
+ * (RoverSimulator) and the offscreen video recorder (recordSimVideo),
  * so a run looks identical whether it is animating on screen or captured to a
  * clip. Inspired by the 4tronix Qt simulator: a top-down yard with a vector
  * rover whose four wheels steer to their servo angles.

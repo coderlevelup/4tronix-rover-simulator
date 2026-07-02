@@ -43,18 +43,21 @@ export function MissionNameInput({
   // Show error when parent component triggers validation (on submit attempt)
   useEffect(() => {
     if (showValidationError && value.trim().length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- surface the error when the parent signals a failed submit attempt
       setShowError(true);
     }
   }, [showValidationError, value]);
 
   // Sync temp value when value changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- keep the edit draft in step with the saved name (e.g. random generation)
     setTempValue(value);
   }, [value]);
 
   // Clear error when user has a valid name
   useEffect(() => {
     if (value.trim().length > 0 && isValidMissionName(value)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the error as soon as the name becomes valid
       setShowError(false);
       onError?.(null);
     }

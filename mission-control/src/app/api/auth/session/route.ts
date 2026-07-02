@@ -27,9 +27,7 @@ export async function POST(request: NextRequest) {
 
     // Verify the Firebase ID token using Admin SDK
     const auth = getFirebaseAdminAuth();
-    const decodedToken = await auth.verifyIdToken(token);
-
-    console.log('✅ Session token verified for user:', decodedToken.email);
+    await auth.verifyIdToken(token);
 
     // Create a response and set the secure session cookie
     const response = NextResponse.json(
@@ -51,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error('❌ Session establishment failed:', error);
+    console.error('Session establishment failed:', error);
     const code = (error as { code?: string }).code;
 
     if (code === 'auth/id-token-expired') {

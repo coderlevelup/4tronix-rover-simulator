@@ -2,15 +2,16 @@
  * Notification Modal Component
  *
  * Shows notifications for:
- * - Completed missions (green background)
- * - New missions to explore (orange background)
- * - Email subscription input
+ * - Completed missions (green)
+ * - New missions to explore (orange)
+ *
+ * Notifications arrive via props; the Navbar currently passes an empty list
+ * until the backend feed is wired up, so learners see the empty state.
  */
 
 'use client';
 
 import { X } from 'lucide-react';
-import { useState } from 'react';
 
 interface CompletedNotification {
   type: 'completed';
@@ -37,20 +38,7 @@ export function NotificationModal({
   onClose,
   notifications = []
 }: NotificationModalProps) {
-  const [email, setEmail] = useState('');
-  const [isSubscribed, setIsSubscribed] = useState(false);
-
   if (!isOpen) return null;
-
-  const handleEmailSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email) {
-      // TODO: Save email to backend/database
-      console.log('Email subscribed:', email);
-      setIsSubscribed(true);
-      setTimeout(() => setIsSubscribed(false), 3000);
-    }
-  };
 
   return (
     <>
@@ -61,80 +49,52 @@ export function NotificationModal({
       />
 
       {/* Modal */}
-      <div className="fixed top-20 right-4 z-50 w-[350px] bg-white rounded-lg shadow-2xl overflow-hidden">
+      <div className="fixed top-20 right-4 z-50 w-[350px] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl clay">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-          <h2 className="text-lg font-bold text-gray-900">Notifications</h2>
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <h2 className="font-display text-lg font-bold text-foreground">Notifications</h2>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded transition-colors"
+            className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             aria-label="Close notifications"
           >
-            <X className="h-5 w-5 text-gray-500" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="max-h-[500px] overflow-y-auto">
-          {/* Email Subscription */}
-          <div className="p-4 border-b border-gray-200 bg-gray-50">
-            <form onSubmit={handleEmailSubmit}>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter email address"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-              <button
-                type="submit"
-                className="mt-2 w-full px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Subscribe to Notifications
-              </button>
-              {isSubscribed && (
-                <p className="mt-2 text-xs text-green-600 text-center">
-                  ✓ Subscribed successfully!
-                </p>
-              )}
-            </form>
-          </div>
+        {/* Notifications List */}
+        <div className="max-h-[500px] divide-y divide-border overflow-y-auto">
+          {notifications.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              No new notifications
+            </div>
+          ) : (
+            notifications.map((notification, index) => (
+              <div key={index}>
+                {notification.type === 'completed' && (
+                  <div className="bg-green-600/90 p-4 text-white">
+                    <p className="mb-1 text-sm font-semibold">
+                      Your mission is complete
+                    </p>
+                    <p className="text-sm opacity-90">
+                      Mission <span className="font-medium">{notification.missionName}</span> was completed {notification.completedAt}
+                    </p>
+                  </div>
+                )}
 
-          {/* Notifications List */}
-          <div className="divide-y divide-gray-200">
-            {notifications.length === 0 ? (
-              <div className="p-6 text-center text-gray-500 text-sm">
-                No new notifications
+                {notification.type === 'new-mission' && (
+                  <div className="bg-orange-500/90 p-4 text-white">
+                    <p className="mb-1 text-sm font-semibold">
+                      New Missions to Explore!
+                    </p>
+                    <p className="text-sm opacity-90">
+                      {notification.message}
+                    </p>
+                  </div>
+                )}
               </div>
-            ) : (
-              notifications.map((notification, index) => (
-                <div key={index}>
-                  {notification.type === 'completed' && (
-                    <div className="p-4 bg-green-500 text-white">
-                      <p className="font-semibold text-sm mb-1">
-                        Your mission is complete
-                      </p>
-                      <p className="text-sm opacity-90">
-                        Mission <span className="font-medium">{notification.missionName}</span> was completed {notification.completedAt}
-                      </p>
-                    </div>
-                  )}
-
-                  {notification.type === 'new-mission' && (
-                    <div className="p-4 bg-orange-400 text-white">
-                      <p className="font-semibold text-sm mb-1">
-                        New Missions to Explore!
-                      </p>
-                      <p className="text-sm opacity-90">
-                        {notification.message}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
+            ))
+          )}
         </div>
       </div>
     </>

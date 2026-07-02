@@ -1,4 +1,4 @@
-import { MissionHistoryScaffold } from '@/components/mission/MissionHistoryScaffold';
+import { MissionHistory } from '@/components/mission/MissionHistory';
 
 export default function HistoryPage() {
   return (
@@ -13,7 +13,7 @@ export default function HistoryPage() {
       </header>
 
       <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col pb-5">
-        <MissionHistoryScaffold />
+        <MissionHistory />
       </div>
     </main>
   );

@@ -36,7 +36,6 @@ export function LearnerProvider({ children }: { children: ReactNode }) {
   const [showEmailPrompt, setShowEmailPrompt] = useState(false);
 
   useEffect(() => {
-    console.log('🎓 Initializing LearnerContext');
     initializeLearnerSession();
   }, []);
 
@@ -45,6 +44,7 @@ export function LearnerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const stored = localStorage.getItem('learnerEmail');
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydration from localStorage; not readable during SSR render
       if (stored) setLearnerEmailState(stored);
     } catch {
       // localStorage unavailable - skip
@@ -76,7 +76,7 @@ export function LearnerProvider({ children }: { children: ReactNode }) {
         { merge: true },
       );
     } catch (error) {
-      console.warn('⚠️ Failed to persist learner email to Firestore:', error);
+      console.warn('Failed to persist learner email to Firestore:', error);
     }
   }
 
@@ -100,7 +100,6 @@ export function LearnerProvider({ children }: { children: ReactNode }) {
       if (learnerSnap.exists()) {
         // Existing learner - update last active timestamp
         const existingLearner = learnerSnap.data() as Learner;
-        console.log('👋 Welcome back, learner:', existingLearner.displayName || session.sessionId);
         if (existingLearner.learnerEmail) setLearnerEmailState(existingLearner.learnerEmail);
 
         // Update last active timestamp
@@ -112,7 +111,6 @@ export function LearnerProvider({ children }: { children: ReactNode }) {
       } else {
         // New learner - create profile
         const newLearner = createAnonymousLearner(session.sessionId);
-        console.log('✨ Creating new learner:', session.sessionId);
 
         await setDoc(learnerRef, {
           ...newLearner,
@@ -124,7 +122,7 @@ export function LearnerProvider({ children }: { children: ReactNode }) {
         setLearner(newLearner);
       }
     } catch (error) {
-      console.warn('⚠️ Firestore learner init unavailable, using local session fallback:', error);
+      console.warn('Firestore learner init unavailable, using local session fallback:', error);
 
       const session = getOrCreateSession();
       const fallbackLearner = createAnonymousLearner(session.sessionId);
@@ -158,9 +156,8 @@ export function LearnerProvider({ children }: { children: ReactNode }) {
       });
 
       setLearner({ ...learner, displayName: sanitized });
-      console.log('✅ Display name updated:', sanitized);
     } catch (error) {
-      console.error('❌ Failed to update display name:', error);
+      console.error('Failed to update display name:', error);
       throw error;
     }
   }

@@ -28,7 +28,7 @@ interface RoverSimulatorProps {
   simVideoLoading?: boolean;
 }
 
-export function RoverSimulatorScaffold({
+export function RoverSimulator({
   trajectory = [],
   isPlaying = false,
   onReset,
@@ -156,6 +156,7 @@ export function RoverSimulatorScaffold({
   useEffect(() => {
     if (isManual) return;
     playheadRef.current = 0;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- restart playback when a new trajectory arrives (external event)
     setIsPaused(false);
     drawScene();
     syncHud();
@@ -173,6 +174,7 @@ export function RoverSimulatorScaffold({
   useEffect(() => {
     if (resetVersion === 0) return;
     playheadRef.current = 0;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- react to the shared reset signal from the workspace controls
     setIsPaused(true);
     drawScene();
     syncHud();

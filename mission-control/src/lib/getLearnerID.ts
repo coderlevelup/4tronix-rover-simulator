@@ -31,7 +31,6 @@ export function getLearnerID(): string {
     const existingId = localStorage.getItem(LEARNER_ID_KEY);
 
     if (existingId && existingId.length > 0) {
-      console.log('📋 Reusing existing learner ID:', existingId);
       return existingId;
     }
 
@@ -41,12 +40,10 @@ export function getLearnerID(): string {
     // Store in localStorage
     localStorage.setItem(LEARNER_ID_KEY, newId);
 
-    console.log('✨ Generated new learner ID:', newId);
     return newId;
   } catch (error) {
-    console.error('❌ Failed to access localStorage:', error);
     // Fallback: generate temporary ID (won't persist)
-    console.warn('⚠️ Using temporary learner ID (will not persist)');
+    console.warn('localStorage unavailable, using temporary learner ID (will not persist):', error);
     return nanoid(21);
   }
 }
@@ -59,9 +56,8 @@ export function clearLearnerID(): void {
 
   try {
     localStorage.removeItem(LEARNER_ID_KEY);
-    console.log('🗑️ Learner ID cleared');
   } catch (error) {
-    console.error('❌ Failed to clear learner ID:', error);
+    console.error('Failed to clear learner ID:', error);
   }
 }
 
