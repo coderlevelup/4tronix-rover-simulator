@@ -45,6 +45,8 @@ describe('queue confirmation', () => {
       create: jest.fn(),
       findById: jest.fn(),
       findBySessionId: jest.fn(),
+      findByLearnerId: jest.fn(),
+      findAll: jest.fn(),
       getQueuedMissions: jest.fn(),
       update: jest.fn(),
       getQueueLength: jest.fn(),
@@ -72,6 +74,8 @@ describe('queue confirmation', () => {
     const dto: CreateMissionDto = {
       yardId: 'uct-rover-1',
       sessionId: 'test-session-123',
+      learnerId: 'test-learner',
+      name: 'Test Mission',
       code: 'rover.forward(100)',
     };
 
@@ -80,6 +84,8 @@ describe('queue confirmation', () => {
       id: 'mission-123',
       yardId: 'uct-rover-1',
       sessionId: 'test-session-123',
+      learnerId: 'test-learner',
+      name: 'Test Mission',
       code: 'rover.forward(100)',
       status: 'queued',
       submittedAt: new Date().toISOString(),
@@ -117,6 +123,8 @@ describe('queue confirmation', () => {
     const dto: CreateMissionDto = {
       yardId: 'uct-rover-1',
       sessionId: 'test-session-456',
+      learnerId: 'test-learner',
+      name: 'Test Mission',
       code: 'rover.forward(50)',
     };
 
@@ -125,6 +133,8 @@ describe('queue confirmation', () => {
       id: 'mission-456',
       yardId: 'uct-rover-1',
       sessionId: 'test-session-456',
+      learnerId: 'test-learner',
+      name: 'Test Mission',
       code: 'rover.forward(50)',
       status: 'queued',
       submittedAt: new Date().toISOString(),
@@ -162,6 +172,8 @@ describe('queue confirmation', () => {
     const dto: CreateMissionDto = {
       yardId: 'uct-rover-2', // Different yard from previous tests
       sessionId: 'test-session-789',
+      learnerId: 'test-learner',
+      name: 'Test Mission',
       code: 'rover.turn_left(90)', // Different rover command
     };
 
@@ -170,6 +182,8 @@ describe('queue confirmation', () => {
       id: 'mission-789',
       yardId: 'uct-rover-2',
       sessionId: 'test-session-789',
+      learnerId: 'test-learner',
+      name: 'Test Mission',
       code: 'rover.turn_left(90)',
       status: 'queued',
       submittedAt: new Date().toISOString(),

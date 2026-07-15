@@ -7,7 +7,7 @@ jest.mock('nanoid', () => ({
 
 describe('FirestoreMissionRepository', () => {
   it('omits undefined fields before writing to Firestore', async () => {
-    const set = jest.fn(async () => Promise.resolve());
+    const set = jest.fn(async (_data: Record<string, unknown>) => Promise.resolve());
     const countGet = jest.fn(async () => Promise.resolve({ data: () => ({ count: 0 }) }));
 
     const firestore = {
@@ -31,6 +31,7 @@ describe('FirestoreMissionRepository', () => {
 
     await repository.create({
       yardId: 'yard-1',
+      learnerId: 'learner-1',
       sessionId: 'session-1',
       learnerUid: undefined,
       code: 'rover.forward(100)',
@@ -42,7 +43,6 @@ describe('FirestoreMissionRepository', () => {
       },
       videoUrl: undefined,
       youtubeUrl: undefined,
-      submittedAt: new Date().toISOString(),
       startedAt: undefined,
       completedAt: undefined,
     });
@@ -72,7 +72,7 @@ describe('FirestoreMissionRepository', () => {
   });
 
   it('strips comments from mission code before writing to Firestore', async () => {
-    const set = jest.fn(async () => Promise.resolve());
+    const set = jest.fn(async (_data: Record<string, unknown>) => Promise.resolve());
     const countGet = jest.fn(async () => Promise.resolve({ data: () => ({ count: 0 }) }));
 
     const firestore = {
@@ -96,6 +96,7 @@ describe('FirestoreMissionRepository', () => {
 
     await repository.create({
       yardId: 'yard-1',
+      learnerId: 'learner-1',
       sessionId: 'session-1',
       learnerUid: undefined,
       code: '# comment line\nrover.forward(100)  # move\n\n# another comment\nrover.stop()',
@@ -107,7 +108,6 @@ describe('FirestoreMissionRepository', () => {
       },
       videoUrl: undefined,
       youtubeUrl: undefined,
-      submittedAt: new Date().toISOString(),
       startedAt: undefined,
       completedAt: undefined,
     });
