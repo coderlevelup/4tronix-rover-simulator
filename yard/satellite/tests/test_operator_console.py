@@ -117,6 +117,31 @@ def sign_in(client):
 # Auth gating
 # ---------------------------------------------------------------------------
 
+def test_root_redirects_to_login_without_session(client):
+    resp = client.get('/')
+    assert resp.status_code == 302
+    assert '/operator/login' in resp.headers['Location']
+
+
+def test_root_shows_station_hub_when_signed_in(client):
+    sign_in(client)
+    resp = client.get('/')
+    assert resp.status_code == 200
+    page = resp.get_data(as_text=True)
+    # All four stations reachable from the hub
+    assert '/operator/' in page
+    assert '/code/' in page
+    assert '/monitor/' in page
+    assert '/status' in page
+    assert 'op@test.com' in page
+
+
+def test_code_and_monitor_stay_public(client):
+    # Learner tablets and the TV never sign in; their pages must not gate.
+    assert client.get('/code/').status_code == 200
+    assert client.get('/monitor/').status_code == 200
+
+
 def test_console_page_redirects_to_login_without_session(client):
     resp = client.get('/operator/')
     assert resp.status_code == 302

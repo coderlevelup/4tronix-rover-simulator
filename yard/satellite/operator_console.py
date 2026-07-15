@@ -148,7 +148,7 @@ def console():
 @operator_bp.route('/login')
 def login_page():
     if session.get('operator'):
-        return redirect('/operator/')
+        return redirect('/')
     return render_template(
         'operator_login.html',
         configured=bool(_web_api_key() and _admin_configured()),

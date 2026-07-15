@@ -158,9 +158,9 @@ could not be written (it will reset on restart).
 
 | Route | Description |
 |-------|-------------|
-| `GET /` | Links to code, monitor, and operator console |
-| `GET /code/` | Tablet Blockly interface |
-| `GET /monitor/` | TV display interface |
+| `GET /` | Operator home hub (redirects to `/operator/login` when signed out) |
+| `GET /code/` | Tablet Blockly interface (no login - for learner tablets) |
+| `GET /monitor/` | TV display interface (no login - for the TV) |
 | `GET /operator/` | Operator console (Firebase login required) |
 
 ### Operator Console API

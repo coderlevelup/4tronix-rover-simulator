@@ -145,7 +145,7 @@
                 });
                 const data = await resp.json().catch(() => ({}));
                 if (!resp.ok) throw new Error(data.error || 'Login failed');
-                window.location.href = '/operator/';
+                window.location.href = '/';
             } catch (err) {
                 errorBox.textContent = err.message;
                 errorBox.style.display = 'block';

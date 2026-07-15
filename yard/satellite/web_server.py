@@ -10,7 +10,7 @@ import os
 import json
 import socket
 import requests
-from flask import Flask, render_template, request, jsonify, Response, stream_with_context
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context, session, redirect
 
 CAMERA_PORT = int(os.environ.get('CAMERA_PORT', 8890))
 
@@ -85,8 +85,14 @@ def _check_camera():
 
 @app.route('/')
 def index():
-    """Redirect to code interface"""
-    return '<a href="/code/">Go to Code Interface</a> | <a href="/monitor/">Go to Monitor</a> | <a href="/operator/">Operator Console</a> | <a href="/status">System Status</a>'
+    """Operator home: sign in first, then pick a station.
+
+    /code/ and /monitor/ stay directly reachable without login - tablets and
+    the TV are pointed at those URLs once during setup and never sign in.
+    """
+    if not session.get('operator'):
+        return redirect('/operator/login')
+    return render_template('home.html', operator=session['operator'])
 
 
 @app.route('/status')
