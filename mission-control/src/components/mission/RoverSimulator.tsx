@@ -24,8 +24,6 @@ interface RoverSimulatorProps {
   onReset?: () => void;
   editorMode?: 'manual' | 'blockly' | 'code';
   resetVersion?: number;
-  simVideoUrl?: string | null;
-  simVideoLoading?: boolean;
 }
 
 export function RoverSimulator({
@@ -34,8 +32,6 @@ export function RoverSimulator({
   onReset,
   editorMode,
   resetVersion = 0,
-  simVideoUrl,
-  simVideoLoading,
 }: RoverSimulatorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -93,7 +89,7 @@ export function RoverSimulator({
     const ro = new ResizeObserver(resize);
     ro.observe(wrap);
     return () => ro.disconnect();
-  }, [resize, simVideoUrl, simVideoLoading]);
+  }, [resize]);
 
   // --- HUD + playback ------------------------------------------------------
 
@@ -205,7 +201,6 @@ export function RoverSimulator({
   };
 
   const hasTrajectory = trajectory.length > 0;
-  const showCanvas = !simVideoUrl && !simVideoLoading;
 
   return (
     <div className="flex h-full flex-col gap-2 rounded-2xl border border-border/60 bg-card/40 p-3 clay">
@@ -214,7 +209,7 @@ export function RoverSimulator({
           <span className="h-2.5 w-2.5 rounded-full bg-block-move" />
           <p className="text-xs font-bold uppercase tracking-wider text-primary">Simulator</p>
         </div>
-        {showCanvas && hasTrajectory && (
+        {hasTrajectory && (
           <div className="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
             <Chip label="X" value={`${hud.x.toFixed(0)}`} />
             <Chip label="Y" value={`${hud.y.toFixed(0)}`} />
@@ -223,45 +218,21 @@ export function RoverSimulator({
         )}
       </div>
 
-      {/* Sim video player - shown when a video capture is available */}
-      {simVideoLoading && (
-        <div className="flex flex-1 items-center justify-center gap-3 rounded-xl border border-border bg-secondary/40">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-primary" />
-          <span className="text-sm text-muted-foreground">Rendering simulation video…</span>
-        </div>
-      )}
+      <div
+        ref={wrapRef}
+        className="relative min-h-0 w-full flex-1 overflow-hidden rounded-xl border border-border bg-[#1a0f0a]"
+      >
+        <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" />
+        {!hasTrajectory && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-4 text-center">
+            <p className="text-xs font-semibold text-white/80">
+              Tap a block or press Run to move your rover
+            </p>
+          </div>
+        )}
+      </div>
 
-      {simVideoUrl && !simVideoLoading && (
-        <div className="min-h-0 w-full flex-1 overflow-hidden rounded-xl border border-border bg-black">
-          <video
-            src={simVideoUrl}
-            controls
-            autoPlay
-            loop
-            className="h-full w-full"
-            style={{ objectFit: 'contain', display: 'block' }}
-          />
-        </div>
-      )}
-
-      {/* Canvas trajectory - shown when no video is available */}
-      {showCanvas && (
-        <div
-          ref={wrapRef}
-          className="relative min-h-0 w-full flex-1 overflow-hidden rounded-xl border border-border bg-[#1a0f0a]"
-        >
-          <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" />
-          {!hasTrajectory && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-4 text-center">
-              <p className="text-xs font-semibold text-white/80">
-                Tap a block or press Run to move your rover
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {hasTrajectory && showCanvas && (
+      {hasTrajectory && (
         <div className="flex shrink-0 flex-col gap-1.5">
           <input
             type="range"

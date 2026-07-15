@@ -62,7 +62,7 @@ There is no login and no operator surface in this app: learners are anonymous, a
 ## How It Works
 
 1. Learners build a mission in the workspace: driving manually records commands, and the Blockly and Python editors generate rover code.
-2. The in-browser 2D simulator previews the trajectory before submission; a simulation video can be captured for the mission record.
+2. The in-browser 2D simulator previews the trajectory before submission.
 3. Submitted code passes an AST-based allowlist check so only approved rover commands reach the queue.
 4. Missions are stored in Firestore and picked up for execution on the physical rover; learners track status from their history.
 5. At the yard, operators work the queue from the yard satellite's operator console, sending missions to the rover, marking them complete, and attaching the run video.

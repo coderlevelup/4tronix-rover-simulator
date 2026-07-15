@@ -12,7 +12,6 @@ import { validateMission } from '@/infrastructure/validation/schemas';
 import { EditorPanel, type EditorMode } from '@/components/mission/EditorPanel';
 import { SimulationPanel } from '@/components/mission/SimulationPanel';
 import { simulateCommands } from '@/lib/simulateCommands';
-import { recordSimVideo } from '@/lib/recordSimVideo';
 
 interface TrajectoryPoint {
   x: number;
@@ -38,8 +37,6 @@ export function MissionWorkspace() {
 
   const [trajectory, setTrajectory] = useState<TrajectoryPoint[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [simVideoUrl, setSimVideoUrl] = useState<string | null>(null);
-  const [simVideoLoading, setSimVideoLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<EditorMode>(initialMode);
   const [panelSplit, setPanelSplit] = useState(60);
@@ -54,9 +51,6 @@ export function MissionWorkspace() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const manualTrajectoryLengthRef = useRef(0);
   const [manualResetVersion, setManualResetVersion] = useState(0);
-  // Bumped on every run / mode switch so a slow video capture that finishes
-  // after the learner has moved on can't re-show a stale clip.
-  const runIdRef = useRef(0);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -67,49 +61,19 @@ export function MissionWorkspace() {
     containerRef.current.style.setProperty('--workspace-right', `${100 - panelSplit}fr`);
   }, [panelSplit]);
 
-  const runSimulationVideo = async (commands: SimulationCommand[]) => {
-    const myRun = ++runIdRef.current;
+  // Run the commands through the client-side physics model and play the
+  // trajectory in the simulator.
+  const runSimulation = (commands: SimulationCommand[]) => {
     setError(null);
-    setSimVideoUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
-    });
-
-    // Run the commands through the client-side physics model and show the
-    // trajectory animating right away. This also serves as the fallback view if
-    // video capture is unavailable.
     const simulated = simulateCommands(commands);
     setTrajectory(simulated);
     setIsPlaying(true);
-
-    // Best-effort: capture that animation to a video so a sim run produces a
-    // shareable clip, the same as a real rover run. If the browser cannot
-    // capture canvas streams, the live animation above still plays.
-    setSimVideoLoading(true);
-    try {
-      const blob = await recordSimVideo(simulated);
-      // A newer run (or a mode switch) happened while we were capturing - drop
-      // this clip instead of flashing it over the current view.
-      if (runIdRef.current !== myRun) return;
-      setSimVideoUrl(URL.createObjectURL(blob));
-    } catch (err) {
-      console.warn('Sim video capture unavailable; showing live animation only', err);
-    } finally {
-      if (runIdRef.current === myRun) setSimVideoLoading(false);
-    }
   };
 
-  // Switching editor mode starts a clean simulator: clear any captured clip and
-  // the previous run's trajectory so, e.g., Manual shows the live canvas instead
-  // of a leftover video.
+  // Switching editor mode starts a clean simulator: clear the previous run's
+  // trajectory so, e.g., Manual starts from an empty canvas.
   const handleEditorModeChange = useCallback((mode: EditorMode) => {
-    runIdRef.current++;
     setEditorMode(mode);
-    setSimVideoUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
-    });
-    setSimVideoLoading(false);
     setTrajectory([]);
     setIsPlaying(false);
     setError(null);
@@ -163,7 +127,6 @@ export function MissionWorkspace() {
       abortControllerRef.current = null;
     }
     setTrajectory([]);
-    setSimVideoUrl(null);
     setIsPlaying(false);
     manualTrajectoryLengthRef.current = 0;
   }, [editorMode]);
@@ -247,7 +210,7 @@ export function MissionWorkspace() {
           onManualTrajectory={handleManualTrajectory}
           onResetSimulation={handleResetSimulation}
           manualResetVersion={manualResetVersion}
-          onGenerateCommands={runSimulationVideo}
+          onGenerateCommands={runSimulation}
           onCodeChange={setCurrentCode}
           onBlocklyStateChange={setBlocklyState}
           missionName={missionName}
@@ -269,8 +232,6 @@ export function MissionWorkspace() {
           onReset={handleResetSimulation}
           editorMode={editorMode}
           resetVersion={manualResetVersion}
-          simVideoUrl={simVideoUrl}
-          simVideoLoading={simVideoLoading}
         />
       </div>
     </div>
