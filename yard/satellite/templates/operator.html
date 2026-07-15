@@ -4,16 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Operator Console</title>
+    <link rel="stylesheet" href="/static/yard-base.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0f0f0f;
-            color: #e0e0e0;
-            min-height: 100vh;
-            padding: 1.5rem;
-        }
+        body { min-height: 100vh; padding: 1.5rem; }
 
         .wrap { max-width: 860px; margin: 0 auto; }
 
@@ -174,6 +167,7 @@
 </head>
 <body>
     <div class="wrap">
+        {% set nav_active = 'queue' %}{% include "_nav.html" %}
         <header>
             <div>
                 <h1>Operator Console</h1>
@@ -181,9 +175,6 @@
             </div>
             <div class="toolbar">
                 <span class="badge" id="rover-badge"><span class="dot"></span><span id="rover-text">Rover: checking...</span></span>
-                <a href="/">Home</a>
-                <a href="/monitor/">Monitor</a>
-                <a href="/status">Status</a>
                 <button id="logout">Log out</button>
             </div>
         </header>
@@ -252,10 +243,16 @@
             }
             if (m.status === 'completed' && !m.youtubeUrl) {
                 return `<input type="url" placeholder="https://youtube.com/watch?v=..." value="${esc(drafts[m.id] || '')}" data-draft="${m.id}">
-                        <button class="btn primary" data-act="youtube" data-id="${m.id}">Attach video</button>`;
+                        <button class="btn primary" data-act="youtube" data-id="${m.id}">Attach video</button>
+                        <button class="btn" data-act="rerun" data-id="${m.id}">Rerun</button>`;
             }
             if (m.status === 'completed') {
-                return `<a class="yt-link" href="${esc(m.youtubeUrl)}" target="_blank" rel="noopener">Video attached &#8599;</a>`;
+                return `<a class="yt-link" href="${esc(m.youtubeUrl)}" target="_blank" rel="noopener">Video attached &#8599;</a>
+                        <button class="btn" data-act="rerun" data-id="${m.id}">Rerun</button>`;
+            }
+            if (m.status === 'failed') {
+                return `<button class="btn primary" data-act="rerun" data-id="${m.id}">Rerun</button>
+                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>`;
             }
             return '';
         }
@@ -313,7 +310,7 @@
                 return;
             }
 
-            const endpoints = { send: 'send', complete: 'complete', youtube: 'youtube' };
+            const endpoints = { send: 'send', complete: 'complete', youtube: 'youtube', rerun: 'rerun' };
             let body;
             if (action === 'youtube') body = { url: drafts[missionId] || '' };
 

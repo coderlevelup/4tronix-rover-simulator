@@ -257,16 +257,12 @@ def _get_mission_ref(mission_id):
     return ref, snapshot.to_dict() or {}
 
 
-@operator_bp.route('/api/missions/<mission_id>/send', methods=['POST'])
-@require_operator
-def api_send_to_rover(mission_id):
-    """Push the mission's Python onto the rover queue; mission -> processing."""
-    ref, mission = _get_mission_ref(mission_id)
-    if ref is None:
-        return jsonify({'error': 'Mission not found'}), 404
-    if mission.get('status') != 'queued':
-        return jsonify({'error': 'Only queued missions can be sent to the rover'}), 400
+def _dispatch_to_rover(mission):
+    """POST a mission's Python onto the rover queue.
 
+    Returns (True, None) on success or (False, response) where response is a
+    ready-to-return (json, status) tuple. Shared by send and rerun.
+    """
     params = {'code': mission.get('code') or ''}
     if mission.get('blocklyState'):
         params['blockly_state'] = mission['blocklyState']
@@ -278,12 +274,56 @@ def api_send_to_rover(mission_id):
             timeout=ROVER_TIMEOUT,
         )
     except requests.exceptions.RequestException:
-        return jsonify({'error': 'Cannot connect to rover server'}), 503
+        return False, (jsonify({'error': 'Cannot connect to rover server'}), 503)
 
     if resp.status_code != 200:
-        return jsonify({'error': f'Rover queue rejected the mission (HTTP {resp.status_code})'}), 502
+        return False, (jsonify({'error': f'Rover queue rejected the mission (HTTP {resp.status_code})'}), 502)
+
+    return True, None
+
+
+@operator_bp.route('/api/missions/<mission_id>/send', methods=['POST'])
+@require_operator
+def api_send_to_rover(mission_id):
+    """Push the mission's Python onto the rover queue; mission -> processing."""
+    ref, mission = _get_mission_ref(mission_id)
+    if ref is None:
+        return jsonify({'error': 'Mission not found'}), 404
+    if mission.get('status') != 'queued':
+        return jsonify({'error': 'Only queued missions can be sent to the rover'}), 400
+
+    ok, err = _dispatch_to_rover(mission)
+    if not ok:
+        return err
 
     ref.update({'status': 'processing', 'startedAt': _now_iso()})
+    return jsonify({'status': 'ok', 'missionId': mission_id})
+
+
+@operator_bp.route('/api/missions/<mission_id>/rerun', methods=['POST'])
+@require_operator
+def api_rerun(mission_id):
+    """Re-queue a completed or failed mission on the rover.
+
+    Clears the previous run's completion + video so the mission reflects the new
+    run, not stale data from the last one.
+    """
+    ref, mission = _get_mission_ref(mission_id)
+    if ref is None:
+        return jsonify({'error': 'Mission not found'}), 404
+    if mission.get('status') not in ('completed', 'failed'):
+        return jsonify({'error': 'Only completed or failed missions can be rerun'}), 400
+
+    ok, err = _dispatch_to_rover(mission)
+    if not ok:
+        return err
+
+    ref.update({
+        'status': 'processing',
+        'startedAt': _now_iso(),
+        'completedAt': None,
+        'youtubeUrl': None,
+    })
     return jsonify({'status': 'ok', 'missionId': mission_id})
 
 

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rover Monitor</title>
     <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <link rel="stylesheet" href="/static/yard-base.css">
     <style>
         * {
             margin: 0;
@@ -423,6 +424,7 @@
     <div class="container">
         <div class="camera-panel">
             <div class="camera-header">
+                <a class="yard-home" href="/" title="Home" aria-label="Home">&#127968;</a>
                 <h2>Camera Feed</h2>
                 <span style="font-size:12px;color:#555;font-family:monospace;">{{ server_hostname }}&nbsp;&nbsp;{{ server_ip }}:5050</span>
                 <div class="connection-badge">

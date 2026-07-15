@@ -1,0 +1,64 @@
+/*
+ * Shared base for the yard satellite console pages.
+ * Linked via <link rel="stylesheet" href="/static/yard-base.css"> so the reset,
+ * colour tokens, and nav live in one place instead of being copy-pasted into
+ * every template's <style> block.
+ */
+
+:root {
+  --bg: #0f0f0f;
+  --surface: #1a1a1a;
+  --border: #2a2a2a;
+  --border-hover: #555;
+  --text: #e0e0e0;
+  --text-dim: #888;
+  --text-faint: #666;
+  --heading: #fff;
+  --accent: #f97316;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Top nav strip for the content pages (home / status / queue). */
+.yard-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+  font-size: 0.85rem;
+}
+.yard-nav .brand {
+  font-weight: 700;
+  color: var(--heading);
+  margin-right: 0.6rem;
+}
+.yard-nav a {
+  color: var(--text-dim);
+  text-decoration: none;
+  padding: 0.3rem 0.6rem;
+  border-radius: 8px;
+}
+.yard-nav a:hover { color: var(--text); background: var(--surface); }
+.yard-nav a.active { color: var(--accent); font-weight: 600; }
+
+/* Small home link for the kiosk toolbars (code / monitor). */
+.yard-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  color: #aaa;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 20px;
+  line-height: 1;
+}
+.yard-home:hover { border-color: var(--border-hover); color: var(--text); }

@@ -1,0 +1,10 @@
+{# Shared top nav for the content pages. Set nav_active before including:
+   {% set nav_active = 'home' %}{% include "_nav.html" %} #}
+<nav class="yard-nav">
+  <span class="brand">Mars Yard</span>
+  <a href="/"{% if nav_active == 'home' %} class="active"{% endif %}>Home</a>
+  <a href="/code/"{% if nav_active == 'code' %} class="active"{% endif %}>Code</a>
+  <a href="/monitor/"{% if nav_active == 'monitor' %} class="active"{% endif %}>Monitor</a>
+  <a href="/operator/"{% if nav_active == 'queue' %} class="active"{% endif %}>Queue</a>
+  <a href="/status"{% if nav_active == 'status' %} class="active"{% endif %}>Status</a>
+</nav>
