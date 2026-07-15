@@ -35,9 +35,8 @@ The app runs at `http://localhost:3000`.
 
 ## Scripts
 
-- `npm run dev` - development server
-- `npm run build` - production build
-- `npm start` - serve the production build
+- `npm run dev` - development server (port 3000)
+- `npm run build` / `npm start` - production build and serve
 - `npm run lint` - ESLint
 - `npm test` - Jest unit and integration tests
 
@@ -47,8 +46,8 @@ The app runs at `http://localhost:3000`.
 - `/mission` - the mission workspace (manual drive, Blockly, and Python editors plus the simulator)
 - `/history` - the learner's own mission history
 - `/missions/[missionId]` - mission detail with run video and code viewer
-- `/login` - operator sign-in
-- `/operator` - operator console (requires the `operator` or `admin` custom claim)
+
+There is no login and no operator surface in this app: learners are anonymous, and the operator console lives on the yard satellite server (see below).
 
 ## Project Structure
 
@@ -66,7 +65,13 @@ The app runs at `http://localhost:3000`.
 2. The in-browser 2D simulator previews the trajectory before submission; a simulation video can be captured for the mission record.
 3. Submitted code passes an AST-based allowlist check so only approved rover commands reach the queue.
 4. Missions are stored in Firestore and picked up for execution on the physical rover; learners track status from their history.
-5. Operators review, run, and manage the mission queue from the operator console.
+5. At the yard, operators work the queue from the yard satellite's operator console, sending missions to the rover, marking them complete, and attaching the run video.
+
+## Where the Operator Console Lives
+
+Not here. This app is the public, learner-facing side only: no login, no auth, no operator routes.
+
+The operator console is part of the yard system (`yard/satellite/`, Flask + plain HTML/JS, port 3001), served at `/operator/` alongside the yard's existing `/code/` and `/monitor/` pages. Operators sign in there with their Firebase operator account; the console reads the mission queue from the same Firestore this app writes to, sends mission code to the rover queue with one tap, and records completion plus the YouTube link that this app then shows to learners. See `yard/satellite/.env.example` for its configuration.
 
 ## Rover Python API
 

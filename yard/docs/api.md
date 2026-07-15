@@ -158,9 +158,26 @@ could not be written (it will reset on restart).
 
 | Route | Description |
 |-------|-------------|
-| `GET /` | Links to code and monitor |
+| `GET /` | Links to code, monitor, and operator console |
 | `GET /code/` | Tablet Blockly interface |
 | `GET /monitor/` | TV display interface |
+| `GET /operator/` | Operator console (Firebase login required) |
+
+### Operator Console API
+
+Session-cookie authenticated (sign in at `/operator/login` with a Firebase
+account carrying an `operator` or `admin` custom claim). All endpoints return
+401 without a session. Configuration: see `satellite/.env.example`.
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /operator/api/login` | `{email, password}` → Firebase sign-in + role check |
+| `POST /operator/api/logout` | End the session |
+| `GET /operator/api/missions` | Mission queue from Firestore (newest first) |
+| `POST /operator/api/missions/<id>/send` | Push mission code to the rover queue as `run_python`; mission → `processing` |
+| `POST /operator/api/missions/<id>/complete` | Mission → `completed` |
+| `POST /operator/api/missions/<id>/youtube` | `{url}` attach the run video link |
+| `GET /operator/api/health` | Rover reachability for the console badge |
 
 ## Camera Server (mro.local:8890)
 

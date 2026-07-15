@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Operator Console</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f0f;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+
+        .wrap { max-width: 860px; margin: 0 auto; }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.25rem;
+        }
+
+        h1 { font-size: 1.5rem; font-weight: 600; color: #fff; }
+        .subtitle { font-size: 0.85rem; color: #666; }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.3rem 0.75rem;
+            border: 1px solid #333;
+            color: #888;
+        }
+        .badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
+        .badge.online  { border-color: #22c55e; color: #4ade80; }
+        .badge.online .dot { background: #22c55e; }
+        .badge.offline { border-color: #ef4444; color: #f87171; }
+        .badge.offline .dot { background: #ef4444; }
+
+        .toolbar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+        .toolbar a, .toolbar button {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            color: #ccc;
+            font-size: 0.8rem;
+            padding: 0.45rem 0.8rem;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .toolbar a:hover, .toolbar button:hover { border-color: #555; }
+
+        .stages {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+            gap: 0.6rem;
+            margin-bottom: 1.25rem;
+        }
+        .stage {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 10px;
+            padding: 0.6rem 0.9rem;
+            cursor: pointer;
+        }
+        .stage.active { border-color: #f97316; }
+        .stage .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: #888; }
+        .stage .count { font-size: 1.4rem; font-weight: 700; color: #fff; }
+
+        .mission {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            margin-bottom: 0.9rem;
+            overflow: hidden;
+        }
+
+        .mission-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid #242424;
+            flex-wrap: wrap;
+        }
+        .mission-title { font-size: 0.95rem; font-weight: 600; color: #fff; }
+        .mission-meta { font-size: 0.75rem; color: #666; font-family: ui-monospace, monospace; }
+
+        .pill {
+            border-radius: 999px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.2rem 0.6rem;
+            border: 1px solid;
+        }
+        .pill.queued     { color: #60a5fa; border-color: #1d4ed8; background: #172554; }
+        .pill.processing { color: #fbbf24; border-color: #b45309; background: #451a03; }
+        .pill.completed  { color: #4ade80; border-color: #15803d; background: #14532d; }
+        .pill.failed     { color: #f87171; border-color: #b91c1c; background: #450a0a; }
+
+        pre {
+            background: #111;
+            color: #d0d0d0;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.78rem;
+            line-height: 1.5;
+            padding: 0.9rem 1rem;
+            max-height: 180px;
+            overflow: auto;
+        }
+
+        .mission-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            padding: 0.75rem 1rem;
+            border-top: 1px solid #242424;
+        }
+
+        .btn {
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            background: #222;
+            color: #ccc;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0.5rem 0.9rem;
+            cursor: pointer;
+        }
+        .btn:hover { border-color: #555; }
+        .btn:disabled { opacity: 0.5; cursor: default; }
+        .btn.primary { background: #f97316; border-color: #f97316; color: #fff; }
+        .btn.primary:hover { background: #ea580c; }
+        .btn.success { background: #14532d; border-color: #15803d; color: #4ade80; }
+
+        .mission-actions input {
+            flex: 1;
+            min-width: 200px;
+            background: #111;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 0.8rem;
+            padding: 0.5rem 0.75rem;
+            outline: none;
+        }
+        .mission-actions input:focus { border-color: #f97316; }
+
+        .action-error { width: 100%; color: #f87171; font-size: 0.78rem; }
+        .yt-link { color: #4ade80; font-size: 0.8rem; text-decoration: none; }
+        .yt-link:hover { text-decoration: underline; }
+
+        .empty {
+            text-align: center;
+            color: #666;
+            padding: 3rem 1rem;
+            border: 1px dashed #2a2a2a;
+            border-radius: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <header>
+            <div>
+                <h1>Operator Console</h1>
+                <p class="subtitle">{{ operator.email }} &middot; mission queue</p>
+            </div>
+            <div class="toolbar">
+                <span class="badge" id="rover-badge"><span class="dot"></span><span id="rover-text">Rover: checking...</span></span>
+                <a href="/monitor/">Monitor</a>
+                <a href="/code/">Code</a>
+                <a href="/status">Status</a>
+                <button id="logout">Log out</button>
+            </div>
+        </header>
+
+        <div class="stages" id="stages"></div>
+        <div id="missions"></div>
+    </div>
+
+    <script>
+        const STAGES = [
+            { key: 'all',        label: 'All' },
+            { key: 'queued',     label: 'Queued' },
+            { key: 'processing', label: 'Running' },
+            { key: 'completed',  label: 'Done' },
+        ];
+        let stage = 'queued';
+        let missions = [];
+        // Draft YouTube URLs survive re-renders so a half-typed link is not
+        // wiped by the 15s refresh.
+        const drafts = {};
+
+        const stagesEl = document.getElementById('stages');
+        const missionsEl = document.getElementById('missions');
+
+        function count(key) {
+            if (key === 'all') return missions.length;
+            return missions.filter(m => m.status === key).length;
+        }
+
+        function relTime(iso) {
+            if (!iso) return '';
+            const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+            if (mins < 1) return 'just now';
+            if (mins < 60) return mins + 'm ago';
+            const hrs = Math.round(mins / 60);
+            if (hrs < 24) return hrs + 'h ago';
+            return Math.round(hrs / 24) + 'd ago';
+        }
+
+        function renderStages() {
+            stagesEl.innerHTML = STAGES.map(s => `
+                <div class="stage ${stage === s.key ? 'active' : ''}" data-stage="${s.key}">
+                    <div class="label">${s.label}</div>
+                    <div class="count">${count(s.key)}</div>
+                </div>`).join('');
+            stagesEl.querySelectorAll('.stage').forEach(el => {
+                el.onclick = () => { stage = el.dataset.stage; render(); };
+            });
+        }
+
+        function esc(s) {
+            return (s || '').replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[c]);
+        }
+
+        function actionsFor(m) {
+            if (m.status === 'queued') {
+                return `<button class="btn primary" data-act="send" data-id="${m.id}">Send to rover</button>
+                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>
+                        <button class="btn" data-act="complete" data-id="${m.id}">Mark complete</button>`;
+            }
+            if (m.status === 'processing') {
+                return `<button class="btn success" data-act="complete" data-id="${m.id}">Mark complete</button>
+                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>`;
+            }
+            if (m.status === 'completed' && !m.youtubeUrl) {
+                return `<input type="url" placeholder="https://youtube.com/watch?v=..." value="${esc(drafts[m.id] || '')}" data-draft="${m.id}">
+                        <button class="btn primary" data-act="youtube" data-id="${m.id}">Attach video</button>`;
+            }
+            if (m.status === 'completed') {
+                return `<a class="yt-link" href="${esc(m.youtubeUrl)}" target="_blank" rel="noopener">Video attached &#8599;</a>`;
+            }
+            return '';
+        }
+
+        function render() {
+            renderStages();
+            const visible = missions.filter(m => stage === 'all' || m.status === stage);
+            if (visible.length === 0) {
+                missionsEl.innerHTML = '<div class="empty">Nothing here. New submissions land automatically.</div>';
+                return;
+            }
+            missionsEl.innerHTML = visible.map(m => `
+                <div class="mission">
+                    <div class="mission-head">
+                        <div>
+                            <div class="mission-title">${esc(m.name) || 'Mission-' + m.id.slice(0, 8)}</div>
+                            <div class="mission-meta">${esc(m.yardId) || ''} &middot; ${relTime(m.submittedAt)}</div>
+                        </div>
+                        <span class="pill ${m.status}">${m.status === 'processing' ? 'running' : esc(m.status)}</span>
+                    </div>
+                    <pre>${esc((m.code || '').trim()) || '# No code'}</pre>
+                    <div class="mission-actions" data-mission="${m.id}">${actionsFor(m)}</div>
+                </div>`).join('');
+
+            missionsEl.querySelectorAll('input[data-draft]').forEach(el => {
+                el.oninput = () => { drafts[el.dataset.draft] = el.value; };
+            });
+            missionsEl.querySelectorAll('button[data-act]').forEach(el => {
+                el.onclick = () => act(el.dataset.act, el.dataset.id, el);
+            });
+        }
+
+        function showError(missionId, message) {
+            const row = missionsEl.querySelector(`.mission-actions[data-mission="${missionId}"]`);
+            if (!row) return;
+            let err = row.querySelector('.action-error');
+            if (!err) {
+                err = document.createElement('div');
+                err.className = 'action-error';
+                row.appendChild(err);
+            }
+            err.textContent = message;
+        }
+
+        async function act(action, missionId, btn) {
+            if (action === 'copy') {
+                const m = missions.find(x => x.id === missionId);
+                try {
+                    await navigator.clipboard.writeText(m.code || '');
+                    btn.textContent = 'Copied';
+                    setTimeout(() => { btn.textContent = 'Copy code'; }, 1500);
+                } catch {
+                    showError(missionId, 'Could not copy to clipboard');
+                }
+                return;
+            }
+
+            const endpoints = { send: 'send', complete: 'complete', youtube: 'youtube' };
+            let body;
+            if (action === 'youtube') body = { url: drafts[missionId] || '' };
+
+            btn.disabled = true;
+            try {
+                const resp = await fetch(`/operator/api/missions/${missionId}/${endpoints[action]}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: body ? JSON.stringify(body) : undefined,
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok) throw new Error(data.error || `Failed (HTTP ${resp.status})`);
+                delete drafts[missionId];
+                await load();
+            } catch (err) {
+                btn.disabled = false;
+                showError(missionId, err.message);
+            }
+        }
+
+        async function load() {
+            try {
+                const resp = await fetch('/operator/api/missions');
+                if (resp.status === 401) { window.location.href = '/operator/login'; return; }
+                const data = await resp.json();
+                missions = data.missions || [];
+                render();
+            } catch {
+                /* transient network error - next poll retries */
+            }
+        }
+
+        async function loadHealth() {
+            const badge = document.getElementById('rover-badge');
+            const text = document.getElementById('rover-text');
+            try {
+                const resp = await fetch('/operator/api/health');
+                const data = await resp.json();
+                badge.className = 'badge ' + (data.reachable ? 'online' : 'offline');
+                text.textContent = data.reachable ? 'Rover online' : 'Rover offline';
+            } catch {
+                badge.className = 'badge offline';
+                text.textContent = 'Rover offline';
+            }
+        }
+
+        document.getElementById('logout').onclick = async () => {
+            await fetch('/operator/api/logout', { method: 'POST' });
+            window.location.href = '/operator/login';
+        };
+
+        load();
+        loadHealth();
+        setInterval(load, 15000);
+        setInterval(loadHealth, 15000);
+    </script>
+</body>
+</html>

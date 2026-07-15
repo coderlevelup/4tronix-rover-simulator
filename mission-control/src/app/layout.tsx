@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter, Fredoka } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
-import { AuthProvider } from "@/contexts/AuthContext";
 import { LearnerProvider } from "@/contexts/LearnerContext";
 import { PageTransition } from "@/components/layout/PageTransition";
 
@@ -41,15 +40,13 @@ export default function RootLayout({
         {/* One restrained Mars glow anchored in a corner for warmth (no neon). */}
         <div className="pointer-events-none fixed -bottom-72 -right-52 h-[560px] w-[560px] rounded-full bg-gradient-mars opacity-[0.14] blur-3xl" />
 
-        <AuthProvider>
-          <LearnerProvider>
-            <Navbar />
-            {/* pb on mobile keeps content clear of the fixed bottom tab bar */}
-            <div className="pb-16 md:pb-0">
-              <PageTransition>{children}</PageTransition>
-            </div>
-          </LearnerProvider>
-        </AuthProvider>
+        <LearnerProvider>
+          <Navbar />
+          {/* pb on mobile keeps content clear of the fixed bottom tab bar */}
+          <div className="pb-16 md:pb-0">
+            <PageTransition>{children}</PageTransition>
+          </div>
+        </LearnerProvider>
       </body>
     </html>
   );

@@ -1,12 +1,13 @@
 /**
  * Firebase Client SDK Initialization
  *
- * Client-side Firebase configuration for authentication.
- * Uses NEXT_PUBLIC_* environment variables accessible in the browser.
+ * Client-side Firebase configuration for Firestore (mission feed, learner
+ * history). Uses NEXT_PUBLIC_* environment variables accessible in the
+ * browser. No Firebase Auth here: learners are anonymous, and the operator
+ * console lives on the yard satellite, not in this app.
  */
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
 import { initializeFirestore, getFirestore, Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -33,7 +34,6 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
 }
 
 let app: FirebaseApp;
-let auth: Auth;
 let firestore: Firestore;
 
 /**
@@ -47,17 +47,6 @@ export function initializeFirebaseClient(): FirebaseApp {
     app = getApps()[0];
   }
   return app;
-}
-
-/**
- * Get Firebase Auth instance
- */
-export function getFirebaseAuth(): Auth {
-  if (!auth) {
-    initializeFirebaseClient();
-    auth = getAuth(app);
-  }
-  return auth;
 }
 
 /**

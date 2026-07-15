@@ -3,6 +3,9 @@ flask>=2.0.0
 requests>=2.28.0
 websockets>=10.0
 
+# Operator console (/operator/) — Firestore mission queue + operator auth.
+firebase-admin>=6.0.0
+
 # Camera capture (camera_server.py) — only runs on the Raspberry Pi.
 # picamera2 is Pi-only; the marker lets `pip install -r` succeed on macOS/Windows
 # (it is simply skipped off Linux).

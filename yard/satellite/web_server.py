@@ -54,9 +54,20 @@ def _local_ip():
 
 app = Flask(__name__)
 
+# Operator console sessions. A stable secret keeps operators signed in across
+# restarts; without one, sessions just reset on restart (re-login).
+app.secret_key = os.environ.get('OPERATOR_SESSION_SECRET') or os.urandom(32)
+
 # Rover server URL — a value saved from the /status page wins over the
 # environment default, so field edits survive a systemd restart
 ROVER_URL = _load_config().get('rover_url') or os.environ.get('ROVER_URL', 'http://marspi.local:8523')
+
+# Operator console (/operator/) — reads the mission queue from Firestore and
+# dispatches to the rover queue. The getter indirection means runtime edits to
+# ROVER_URL from /status apply to the console too.
+app.config['ROVER_URL_GETTER'] = lambda: ROVER_URL
+from operator_console import operator_bp  # noqa: E402  (needs app + config above)
+app.register_blueprint(operator_bp)
 
 # Request timeout for rover API calls
 ROVER_TIMEOUT = 5.0
@@ -75,7 +86,7 @@ def _check_camera():
 @app.route('/')
 def index():
     """Redirect to code interface"""
-    return '<a href="/code/">Go to Code Interface</a> | <a href="/monitor/">Go to Monitor</a> | <a href="/status">System Status</a>'
+    return '<a href="/code/">Go to Code Interface</a> | <a href="/monitor/">Go to Monitor</a> | <a href="/operator/">Operator Console</a> | <a href="/status">System Status</a>'
 
 
 @app.route('/status')
@@ -283,6 +294,7 @@ if __name__ == '__main__':
     print(f"Starting satellite web server on port {port}")
     print(f"Rover URL: {ROVER_URL}")
     print("Routes:")
-    print("  /code/    - Tablet Blockly interface")
-    print("  /monitor/ - TV display interface")
+    print("  /code/     - Tablet Blockly interface")
+    print("  /monitor/  - TV display interface")
+    print("  /operator/ - Operator console (mission queue)")
     app.run(host='0.0.0.0', port=port, threaded=True, use_reloader=False)

@@ -28,8 +28,15 @@ The Yard system consists of three devices working together:
 | Device | Hostname | Services |
 |--------|----------|----------|
 | **Rover** | marspi.local:8523 | Queue-based instruction processor |
-| **Satellite** | mro.local:5050 | Web interfaces (`/code/`, `/monitor/`) |
+| **Satellite** | mro.local:3001 | Web interfaces (`/code/`, `/monitor/`, `/operator/`) |
 | **Camera** | mro.local:8890 | Pi AI camera WebSocket stream |
+
+The satellite also hosts the **operator console** (`/operator/`,
+`operator_console.py`): operators sign in with their Firebase account and
+work the mission-control queue from Firestore — send a mission's Python to
+the rover queue, mark it complete, attach the YouTube link. The public
+mission-control web app has no operator surface; this is the only operator UI
+and it lives on the yard network.
 
 ## Rover Server Architecture (Ports & Adapters)
 
