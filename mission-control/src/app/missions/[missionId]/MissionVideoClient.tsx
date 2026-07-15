@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Rocket, Zap } from 'lucide-react';
+import { ArrowLeft, Rocket, Star, Zap } from 'lucide-react';
 import { Mission } from '@/core/domain/entities/Mission';
 import Link from 'next/link';
 import { getFirestoreClient } from '@/lib/firebase';
@@ -11,6 +11,7 @@ import { BlocklyViewer } from '@/components/mission/BlocklyViewer';
 import { parseRoverCode } from '@/lib/parseRoverCode';
 import { simulateCommands } from '@/lib/simulateCommands';
 import { getDiscoveryStatus, DISCOVERY_BADGE_CLASS } from '@/lib/discoveryStatus';
+import { useFavorites } from '@/lib/useFavorites';
 
 function getYouTubeId(url: string | undefined): string | null {
   if (!url) return null;
@@ -28,6 +29,7 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
   const [selectedRunId, setSelectedRunId] = useState('sim');
   const [codeView, setCodeView] = useState<'blocks' | 'python'>('blocks');
   const [copied, setCopied] = useState(false);
+  const { isFavorite, toggleFavorite } = useFavorites();
 
   // The simulated run is reproducible from the mission's code, so it is computed
   // on demand rather than stored. Keeps hosting cheap and always in sync.
@@ -89,6 +91,7 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
   }
 
   const missionName = mission.name || `Mission ${mission.id.slice(0, 8)}`;
+  const starred = isFavorite(mission.id);
   const discoveryStatus = getDiscoveryStatus(mission.status);
   const selectedRun = runs.find((r) => r.id === selectedRunId) ?? runs[0];
   const durationMs = mission.executionMetadata?.duration_ms;
@@ -122,6 +125,16 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
             >
               {discoveryStatus}
             </span>
+            <button
+              onClick={() => toggleFavorite(mission.id, missionName)}
+              aria-label={starred ? 'Remove from favorites' : 'Add to favorites'}
+              aria-pressed={starred}
+              className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:text-amber-400"
+            >
+              <Star
+                className={`h-5 w-5 transition-colors ${starred ? 'fill-amber-400 text-amber-400' : ''}`}
+              />
+            </button>
             <span className="hidden shrink-0 font-mono text-xs text-muted-foreground sm:inline">
               {mission.yardId} · {dateLabel}
             </span>
