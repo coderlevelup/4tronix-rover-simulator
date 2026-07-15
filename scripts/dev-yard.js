@@ -15,9 +15,12 @@
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const { freePorts } = require('./free-port');
 
 const repoRoot = path.resolve(__dirname, '..');
 const isWindows = process.platform === 'win32';
+
+const ROVER_PORT = 8523; // hardcoded in yard/rover/rover_server.py
 
 const venvPython = isWindows
   ? path.join(repoRoot, '.venv', 'Scripts', 'python.exe')
@@ -38,13 +41,19 @@ if (!fs.existsSync(venvPython)) {
   );
 }
 
-const child = spawn(python, ['rover_server.py'], {
-  cwd: path.join(repoRoot, 'yard', 'rover'),
-  stdio: 'inherit',
-});
+(async () => {
+  // A previous crashed run may have left a server squatting on the port;
+  // clear it (only recognized dev processes) instead of dying on EADDRINUSE.
+  if (!(await freePorts([ROVER_PORT], '[yard]'))) process.exit(1);
 
-child.on('exit', (code) => process.exit(code ?? 0));
-child.on('error', (err) => {
-  console.error(`[yard] failed to start ${python}:`, err.message);
-  process.exit(1);
-});
+  const child = spawn(python, ['rover_server.py'], {
+    cwd: path.join(repoRoot, 'yard', 'rover'),
+    stdio: 'inherit',
+  });
+
+  child.on('exit', (code) => process.exit(code ?? 0));
+  child.on('error', (err) => {
+    console.error(`[yard] failed to start ${python}:`, err.message);
+    process.exit(1);
+  });
+})();

@@ -6,6 +6,15 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "mission-control"],
       "port": 3000
+    },
+    {
+      "name": "yard-satellite",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "set -a && source mission-control/.env && cd yard/satellite && python3 web_server.py"
+      ],
+      "port": 3001
     }
   ]
 }
