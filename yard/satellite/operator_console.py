@@ -185,8 +185,19 @@ def api_login():
 
     try:
         claims = _verify_id_token(resp.json()['idToken'])
-    except Exception:
-        return jsonify({'error': 'Could not verify the sign-in token'}), 401
+    except Exception as exc:
+        current_app.logger.warning(
+            'Operator token verification failed for %s: %s: %s',
+            email,
+            exc.__class__.__name__,
+            exc,
+        )
+        return jsonify({
+            'error': (
+                'Could not verify the sign-in token. Check that this satellite uses the '
+                'same Firebase project and service account as the login API, then try again.'
+            )
+        }), 401
 
     role = claims.get('role')
     if role not in ('operator', 'admin'):

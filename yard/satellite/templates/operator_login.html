@@ -103,6 +103,10 @@
             Firebase credentials are not configured on this satellite.
             Set FIREBASE_* variables before operators can sign in.
         </div>
+        {% else %}
+        <div class="warn">
+            Operators need an account in the same Firebase project and an operator/admin role.
+        </div>
         {% endif %}
 
         <div class="error" id="error"></div>

@@ -179,6 +179,22 @@ def test_login_rejects_accounts_without_operator_role(client, monkeypatch):
     assert resp.status_code == 403
 
 
+def test_login_reports_verify_failures_with_actionable_message(client, monkeypatch):
+    monkeypatch.setattr(operator_console, '_web_api_key', lambda: 'test-key')
+    monkeypatch.setattr(
+        operator_console.requests, 'post',
+        lambda *a, **k: FakeResponse(200, {'idToken': 'tok'}),
+    )
+    monkeypatch.setattr(
+        operator_console, '_verify_id_token',
+        lambda tok: (_ for _ in ()).throw(RuntimeError('token verification failed')),
+    )
+
+    resp = client.post('/operator/api/login', json={'email': 'op@test.com', 'password': 'pw'})
+    assert resp.status_code == 401
+    assert 'same Firebase project' in resp.get_json()['error']
+
+
 def test_login_accepts_operator_and_sets_session(client, monkeypatch):
     monkeypatch.setattr(operator_console, '_web_api_key', lambda: 'test-key')
     monkeypatch.setattr(
