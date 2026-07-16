@@ -270,7 +270,7 @@
     <div class="container">
         <div class="toolbar">
             <div class="toolbar-left">
-                <a class="yard-home" href="/" title="Home" aria-label="Home">&#127968;</a>
+                <a class="yard-home" href="/" title="Home" aria-label="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></a>
                 <button class="btn btn-run" id="runBtn">Run</button>
                 <button class="btn btn-stop" id="stopBtn">Stop</button>
                 <button class="btn btn-clear" id="clearBtn">Clear</button>
@@ -1036,15 +1036,51 @@
             showToast('Cleared');
         });
 
-        document.getElementById('importBtn').addEventListener('click', () => {
-            const json = prompt('Paste Blockly blocks JSON (copied from the hub operator page):');
-            if (!json || !json.trim()) return;
-            try {
-                Blockly.serialization.workspaces.load(JSON.parse(json), workspace);
-                showToast('Blocks imported', 'success');
-            } catch (e) {
-                showToast('Invalid blocks JSON', 'error');
+        // Load a mission copied from the queue: Blockly blocks JSON goes to the
+        // Blockly tab, Python goes to the Python tab. Shared by the Import button
+        // and the page-wide paste handler below.
+        function importMission(text) {
+            text = (text || '').trim();
+            if (!text) return false;
+            if (text[0] === '{') {
+                try {
+                    const state = JSON.parse(text);
+                    if (state && (state.blocks || state.variables)) {
+                        Blockly.serialization.workspaces.load(state, workspace);
+                        document.getElementById('tabBlockly').click();
+                        showToast('Blocks pasted', 'success');
+                        return true;
+                    }
+                } catch (e) { /* not JSON - try as Python below */ }
             }
+            if (/rover\.|time\.sleep/.test(text)) {
+                if (!pythonEditor) return false;
+                pythonEditor.setValue(text);
+                document.getElementById('tabPython').click();
+                showToast('Code pasted', 'success');
+                return true;
+            }
+            return false;
+        }
+
+        // Import button: read straight from the clipboard, fall back to a prompt.
+        document.getElementById('importBtn').addEventListener('click', async () => {
+            let text = '';
+            try { text = await navigator.clipboard.readText(); } catch (e) { /* clipboard blocked */ }
+            if (!text || !text.trim()) {
+                text = prompt('Paste the mission (Blockly blocks JSON or Python) copied from the queue:') || '';
+            }
+            if (!importMission(text)) showToast('Nothing to import', 'error');
+        });
+
+        // Paste anywhere (Ctrl/Cmd-V or right-click paste) to load a copied
+        // mission, unless the paste lands in the Python editor or a field.
+        document.addEventListener('paste', (e) => {
+            const t = e.target;
+            if (t && ((t.closest && t.closest('.monaco-editor')) || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+            const cd = e.clipboardData || window.clipboardData;
+            const text = cd ? cd.getData('text') : '';
+            if (importMission(text)) e.preventDefault();
         });
 
         document.getElementById('spyClose').addEventListener('click', () => {

@@ -6,9 +6,9 @@
     <title>Operator Console</title>
     <link rel="stylesheet" href="/static/yard-base.css">
     <style>
-        body { min-height: 100vh; padding: 1.5rem; }
+        body { min-height: 100vh; }
 
-        .wrap { max-width: 860px; margin: 0 auto; }
+        .wrap { max-width: 920px; margin: 0 auto; padding: 1.9rem 1.5rem 3rem; }
 
         header {
             display: flex;
@@ -166,18 +166,12 @@
     </style>
 </head>
 <body>
+    {% set nav_active = 'queue' %}{% include "_nav.html" %}
     <div class="wrap">
-        {% set nav_active = 'queue' %}{% include "_nav.html" %}
-        <header>
-            <div>
-                <h1>Operator Console</h1>
-                <p class="subtitle">{{ operator.email }} &middot; mission queue</p>
-            </div>
-            <div class="toolbar">
-                <span class="badge" id="rover-badge"><span class="dot"></span><span id="rover-text">Rover: checking...</span></span>
-                <button id="logout">Log out</button>
-            </div>
-        </header>
+        <div style="margin-bottom: 1.5rem;">
+            <p class="eyebrow">Mission Queue</p>
+            <h1 class="page-title">Operator Console</h1>
+        </div>
 
         <div class="stages" id="stages"></div>
         <div id="missions"></div>
@@ -239,7 +233,7 @@
             }
             if (m.status === 'processing') {
                 return `<button class="btn success" data-act="complete" data-id="${m.id}">Mark complete</button>
-                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>`;
+                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>${m.blocklyState ? `<button class="btn" data-act="copyblocks" data-id="${m.id}">Copy blocks</button>` : ''}`;
             }
             if (m.status === 'completed' && !m.youtubeUrl) {
                 return `<input type="url" placeholder="https://youtube.com/watch?v=..." value="${esc(drafts[m.id] || '')}" data-draft="${m.id}">
@@ -252,7 +246,7 @@
             }
             if (m.status === 'failed') {
                 return `<button class="btn primary" data-act="rerun" data-id="${m.id}">Rerun</button>
-                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>`;
+                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>${m.blocklyState ? `<button class="btn" data-act="copyblocks" data-id="${m.id}">Copy blocks</button>` : ''}`;
             }
             return '';
         }
@@ -298,12 +292,14 @@
         }
 
         async function act(action, missionId, btn) {
-            if (action === 'copy') {
+            if (action === 'copy' || action === 'copyblocks') {
                 const m = missions.find(x => x.id === missionId);
+                const text = action === 'copyblocks' ? (m.blocklyState || '') : (m.code || '');
+                const label = btn.textContent;
                 try {
-                    await navigator.clipboard.writeText(m.code || '');
+                    await navigator.clipboard.writeText(text);
                     btn.textContent = 'Copied';
-                    setTimeout(() => { btn.textContent = 'Copy code'; }, 1500);
+                    setTimeout(() => { btn.textContent = label; }, 1500);
                 } catch {
                     showError(missionId, 'Could not copy to clipboard');
                 }
@@ -343,29 +339,8 @@
             }
         }
 
-        async function loadHealth() {
-            const badge = document.getElementById('rover-badge');
-            const text = document.getElementById('rover-text');
-            try {
-                const resp = await fetch('/operator/api/health');
-                const data = await resp.json();
-                badge.className = 'badge ' + (data.reachable ? 'online' : 'offline');
-                text.textContent = data.reachable ? 'Rover online' : 'Rover offline';
-            } catch {
-                badge.className = 'badge offline';
-                text.textContent = 'Rover offline';
-            }
-        }
-
-        document.getElementById('logout').onclick = async () => {
-            await fetch('/operator/api/logout', { method: 'POST' });
-            window.location.href = '/operator/login';
-        };
-
         load();
-        loadHealth();
         setInterval(load, 15000);
-        setInterval(loadHealth, 15000);
     </script>
 </body>
 </html>

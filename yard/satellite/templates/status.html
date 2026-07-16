@@ -6,7 +6,7 @@
     <title>System Status</title>
     <link rel="stylesheet" href="/static/yard-base.css">
     <style>
-        body { min-height: 100vh; padding: 2rem; }
+        body { min-height: 100vh; }
 
         h1 {
             font-size: 1.8rem;
@@ -24,66 +24,62 @@
         .cards {
             display: flex;
             flex-direction: column;
-            gap: 1rem;
-            max-width: 640px;
+            gap: 0.85rem;
+            max-width: 720px;
+            margin-top: 1.4rem;
         }
 
         .card {
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
-            border-radius: 12px;
-            padding: 1.25rem 1.5rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.1rem 1.25rem;
             display: flex;
             align-items: center;
-            gap: 1.25rem;
+            gap: 1.1rem;
+            transition: border-color 0.16s, background 0.16s;
         }
+        .card:hover { border-color: var(--border-strong); background: var(--surface-2); }
 
         .badge {
             flex-shrink: 0;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
+            width: 46px;
+            height: 46px;
+            border-radius: 13px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.6rem;
-            font-weight: 700;
+            border: 1px solid var(--border);
+            color: var(--text-faint);
         }
+        .badge svg { width: 24px; height: 24px; }
+        .badge.green { background: rgba(52, 211, 153, 0.12);  color: var(--ok);   border-color: rgba(52, 211, 153, 0.3); }
+        .badge.amber { background: rgba(251, 191, 36, 0.12);  color: var(--warn); border-color: rgba(251, 191, 36, 0.3); }
+        .badge.red   { background: rgba(248, 113, 113, 0.12); color: var(--bad);  border-color: rgba(248, 113, 113, 0.3); }
+        .badge.grey  { background: var(--surface-3);          color: var(--text-faint); border-color: var(--border); }
 
-        .badge.green  { background: #14532d; color: #4ade80; border: 2px solid #22c55e; }
-        .badge.amber  { background: #451a03; color: #fb923c; border: 2px solid #f97316; }
-        .badge.red    { background: #450a0a; color: #f87171; border: 2px solid #ef4444; }
-        .badge.grey   { background: #1c1c1c; color: #555;    border: 2px solid #333; }
+        .card-body { flex: 1; min-width: 0; }
 
-        .card-body { flex: 1; }
+        .card-title { font-size: 1rem; font-weight: 650; color: var(--heading); margin-bottom: 0.3rem; }
 
-        .card-title {
-            font-size: 1rem;
-            font-weight: 600;
-            color: #fff;
-            margin-bottom: 0.35rem;
-        }
-
-        .card-detail {
-            font-size: 0.82rem;
-            color: #888;
-            line-height: 1.6;
-        }
-
-        .card-detail span { color: #ccc; }
+        .card-detail { font-size: 0.8rem; color: var(--text-dim); line-height: 1.55; font-family: var(--mono); }
+        .card-detail span { color: var(--text); }
 
         .status-label {
-            font-size: 0.75rem;
-            font-weight: 600;
+            display: inline-block;
+            margin-top: 0.55rem;
+            font-size: 0.64rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.06em;
-            margin-top: 0.25rem;
+            letter-spacing: 0.07em;
+            padding: 0.28rem 0.6rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
         }
-
-        .status-label.green { color: #4ade80; }
-        .status-label.amber { color: #fb923c; }
-        .status-label.red   { color: #f87171; }
-        .status-label.grey  { color: #555; }
+        .status-label.green { color: var(--ok);   background: rgba(52, 211, 153, 0.1);  border-color: rgba(52, 211, 153, 0.35); }
+        .status-label.amber { color: var(--warn); background: rgba(251, 191, 36, 0.1);  border-color: rgba(251, 191, 36, 0.35); }
+        .status-label.red   { color: var(--bad);  background: rgba(248, 113, 113, 0.1); border-color: rgba(248, 113, 113, 0.35); }
+        .status-label.grey  { color: var(--text-faint); background: var(--surface-3); border-color: var(--border); }
 
         .footer {
             margin-top: 2rem;
@@ -152,7 +148,9 @@
 <body>
     {% set nav_active = 'status' %}{% include "_nav.html" %}
 
-    <h1>System Status</h1>
+    <main class="page">
+    <p class="eyebrow">Diagnostics</p>
+    <h1 class="page-title" style="margin-bottom: 0.4rem;">System Status</h1>
     <p class="subtitle">
         Rover URL: <code id="rover-url">{{ rover_url }}</code>
         <button class="link-btn" id="edit-url-btn">edit</button>
@@ -198,13 +196,21 @@
     </div>
 
     <div class="footer" id="footer">Checking&hellip;</div>
+    </main>
 
     <script>
+        const BADGE_ICONS = {
+            green: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+            amber: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+            red: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+            grey: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+        };
+
         function setBadge(id, state) {
             const el = document.getElementById('badge-' + id);
             const lbl = document.getElementById('label-' + id);
             el.className = 'badge ' + state.colour;
-            el.textContent = state.icon;
+            el.innerHTML = BADGE_ICONS[state.colour] || '';
             lbl.className = 'status-label ' + state.colour;
             lbl.textContent = state.text;
         }
@@ -223,8 +229,8 @@
             const cam = r.camera;
             if (!cam) return '';
             return cam.detected
-                ? '<br>Mast cam: <span style="color:#4ade80">' + (cam.model || 'detected') + ' ✓</span>'
-                : '<br>Mast cam: <span style="color:#f87171">not detected ✗ (reseat + reboot)</span>';
+                ? '<br>Mast cam: <span style="color:#4ade80">' + (cam.model || 'detected') + '</span>'
+                : '<br>Mast cam: <span style="color:#f87171">not detected (reseat + reboot)</span>';
         }
 
         function poll() {
@@ -232,7 +238,7 @@
                 .then(r => r.json())
                 .then(data => {
                     // Satellite — always green if this page loaded
-                    setBadge('satellite', { colour: 'green', icon: '✓', text: 'OK' });
+                    setBadge('satellite', { colour: 'green', text: 'OK' });
                     setDetail('satellite',
                         row('Hostname', data.satellite.hostname) +
                         row('IP', data.satellite.ip)
@@ -244,12 +250,12 @@
                     // Rover
                     const r = data.rover;
                     if (!r.reachable) {
-                        setBadge('rover', { colour: 'red', icon: '✗', text: 'Unreachable' });
+                        setBadge('rover', { colour: 'red', text: 'Unreachable' });
                         setDetail('rover', row('URL', r.url));
                     } else if (r.status && r.status !== 'ok') {
                         // Reachable but the queue processor thread is dead:
                         // commands would be accepted yet never executed
-                        setBadge('rover', { colour: 'red', icon: '✗', text: 'Processor stalled' });
+                        setBadge('rover', { colour: 'red', text: 'Processor stalled' });
                         setDetail('rover',
                             row('Driver', r.driver) +
                             row('Queue', r.queue_size) +
@@ -257,9 +263,9 @@
                         );
                     } else {
                         if (r.hardware === false) {
-                            setBadge('rover', { colour: 'amber', icon: '!', text: 'Fake driver (no hardware)' });
+                            setBadge('rover', { colour: 'amber', text: 'Fake driver (no hardware)' });
                         } else {
-                            setBadge('rover', { colour: 'green', icon: '✓', text: 'OK' });
+                            setBadge('rover', { colour: 'green', text: 'OK' });
                         }
                         setDetail('rover',
                             row('Driver', r.driver) +
@@ -271,10 +277,10 @@
                     // Camera
                     const c = data.camera;
                     if (c.reachable) {
-                        setBadge('camera', { colour: 'green', icon: '✓', text: 'OK' });
+                        setBadge('camera', { colour: 'green', text: 'OK' });
                         setDetail('camera', row('Port', c.port));
                     } else {
-                        setBadge('camera', { colour: 'red', icon: '✗', text: 'Port closed' });
+                        setBadge('camera', { colour: 'red', text: 'Port closed' });
                         setDetail('camera', row('Port', c.port) + '(service not running?)');
                     }
 

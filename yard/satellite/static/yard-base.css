@@ -1,64 +1,164 @@
 /*
- * Shared base for the yard satellite console pages.
- * Linked via <link rel="stylesheet" href="/static/yard-base.css"> so the reset,
- * colour tokens, and nav live in one place instead of being copy-pasted into
- * every template's <style> block.
+ * Yard Satellite - shared design system.
+ * A professional dark "operations console": layered surfaces, a live command
+ * bar, bento station cards, status indicators, SVG icons (never emoji). Linked
+ * on every page so all five read as one control room.
  */
 
 :root {
-  --bg: #0f0f0f;
-  --surface: #1a1a1a;
-  --border: #2a2a2a;
-  --border-hover: #555;
-  --text: #e0e0e0;
-  --text-dim: #888;
-  --text-faint: #666;
-  --heading: #fff;
+  --bg: #0b0b0e;
+  --bg-2: #101015;
+  --surface: #16161d;
+  --surface-2: #1c1c25;
+  --surface-3: #22222c;
+  --border: #262631;
+  --border-strong: #37374480;
+  --text: #e9e9ee;
+  --text-dim: #9a9aa7;
+  --text-faint: #6a6a77;
+  --heading: #ffffff;
   --accent: #f97316;
+  --accent-2: #fb923c;
+  --accent-weak: rgba(249, 115, 22, 0.14);
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --bad: #f87171;
+  --radius: 14px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: var(--bg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: var(--text);
+  background:
+    radial-gradient(900px 480px at 50% -160px, var(--accent-weak), transparent 70%),
+    linear-gradient(rgba(255, 255, 255, 0.016) 1px, transparent 1px) 0 0 / 100% 44px,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.016) 1px, transparent 1px) 0 0 / 44px 100%,
+    var(--bg);
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Top nav strip for the content pages (home / status / queue). */
-.yard-nav {
+.mono, code, pre { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+/* ---- Command bar (all content pages) ------------------------------------ */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-  margin-bottom: 1.5rem;
-  font-size: 0.85rem;
+  gap: 1.1rem;
+  padding: 0 1.5rem;
+  height: 62px;
+  background: color-mix(in srgb, var(--bg-2) 82%, transparent);
+  backdrop-filter: blur(10px) saturate(1.2);
+  border-bottom: 1px solid var(--border);
 }
-.yard-nav .brand {
-  font-weight: 700;
-  color: var(--heading);
-  margin-right: 0.6rem;
+.brand { display: inline-flex; align-items: center; gap: 0.65rem; text-decoration: none; }
+.brand-mark {
+  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+  background: linear-gradient(140deg, var(--accent-2), #ea580c);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 3px 12px rgba(249, 115, 22, 0.35);
 }
-.yard-nav a {
-  color: var(--text-dim);
-  text-decoration: none;
-  padding: 0.3rem 0.6rem;
-  border-radius: 8px;
-}
-.yard-nav a:hover { color: var(--text); background: var(--surface); }
-.yard-nav a.active { color: var(--accent); font-weight: 600; }
+.brand-txt { display: flex; flex-direction: column; line-height: 1.05; }
+.brand-txt b { color: var(--heading); font-size: 0.98rem; font-weight: 700; letter-spacing: 0.01em; }
+.brand-txt small { color: var(--text-faint); font-size: 0.58rem; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; }
 
-/* Small home link for the kiosk toolbars (code / monitor). */
-.yard-home {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  text-decoration: none;
-  color: #aaa;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 20px;
-  line-height: 1;
+.topnav { display: flex; align-items: center; gap: 0.15rem; }
+.topnav a {
+  color: var(--text-dim); text-decoration: none; font-size: 0.85rem; font-weight: 500;
+  padding: 0.42rem 0.72rem; border-radius: 9px; transition: color 0.15s, background 0.15s;
 }
-.yard-home:hover { border-color: var(--border-hover); color: var(--text); }
+.topnav a:hover { color: var(--text); background: var(--surface); }
+.topnav a.active { color: var(--accent); background: var(--accent-weak); font-weight: 600; }
+
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 0.75rem; }
+.op-email { color: var(--text-faint); font-size: 0.78rem; font-family: var(--mono); }
+
+/* Live status chip */
+.sys {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.34rem 0.7rem; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface);
+  font-size: 0.78rem; color: var(--text-dim); white-space: nowrap;
+}
+.sys-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); flex-shrink: 0; }
+.sys-dot.ok  { background: var(--ok);  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.18); animation: sys-pulse 2.4s ease-in-out infinite; }
+.sys-dot.bad { background: var(--bad); box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.18); }
+@keyframes sys-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+.iconbtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; flex-shrink: 0; cursor: pointer;
+  color: var(--text-dim); background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.iconbtn:hover { color: var(--text); border-color: var(--accent); background: var(--surface-2); }
+.iconbtn svg { width: 18px; height: 18px; }
+
+/* Kiosk home button (code / monitor) */
+.yard-home {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 46px; height: 46px; flex-shrink: 0;
+  color: var(--text-dim); background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.yard-home:hover { color: var(--text); border-color: var(--accent); background: var(--surface-2); }
+.yard-home svg { width: 22px; height: 22px; }
+
+/* ---- Page shell + hub --------------------------------------------------- */
+.page { max-width: 960px; margin: 0 auto; padding: 2.2rem 1.5rem 3rem; }
+.eyebrow { color: var(--accent); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; }
+.page-title { color: var(--heading); font-size: 1.9rem; font-weight: 700; letter-spacing: -0.01em; margin-top: 0.4rem; }
+.page-sub { color: var(--text-dim); font-size: 0.9rem; margin-top: 0.35rem; }
+
+.stations { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1.6rem; }
+
+.station {
+  position: relative; overflow: hidden; text-decoration: none; color: inherit;
+  display: flex; flex-direction: column; gap: 0.9rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+  padding: 1.35rem; transition: transform 0.16s, border-color 0.16s, background 0.16s;
+}
+.station:hover { transform: translateY(-3px); border-color: var(--border-strong); background: var(--surface-2); }
+.station.hero { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 1.4rem; background: linear-gradient(120deg, rgba(249, 115, 22, 0.1), var(--surface) 55%); border-color: rgba(249, 115, 22, 0.35); }
+.station.hero:hover { border-color: var(--accent); }
+.station.hero::after { content: ""; position: absolute; right: -60px; top: -60px; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(249, 115, 22, 0.18), transparent 70%); pointer-events: none; }
+
+.station .ic {
+  flex-shrink: 0; width: 52px; height: 52px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-dim); background: var(--surface-3); border: 1px solid var(--border);
+}
+.station .ic svg { width: 26px; height: 26px; }
+.station.hero .ic { width: 60px; height: 60px; color: var(--accent); background: #2a1305; border-color: rgba(249, 115, 22, 0.5); }
+.station.hero .ic svg { width: 30px; height: 30px; }
+
+.station-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.station-title { color: var(--heading); font-size: 1.02rem; font-weight: 650; }
+.station.hero .station-title { font-size: 1.25rem; }
+.station-desc { color: var(--text-dim); font-size: 0.82rem; line-height: 1.55; }
+.station-meta { display: flex; align-items: center; justify-content: space-between; margin-top: auto; }
+
+.tag { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; padding: 0.26rem 0.55rem; border-radius: 999px; color: var(--text-faint); background: var(--surface-3); border: 1px solid var(--border); }
+.tag.accent { color: var(--accent); background: var(--accent-weak); border-color: rgba(249, 115, 22, 0.3); }
+.station .arrow { color: var(--text-faint); display: inline-flex; transition: color 0.16s, transform 0.16s; }
+.station .arrow svg { width: 20px; height: 20px; }
+.station:hover .arrow { color: var(--accent); transform: translateX(3px); }
+
+.hub-note { margin-top: 1.6rem; color: var(--text-faint); font-size: 0.78rem; line-height: 1.6; max-width: 640px; }
+
+@media (max-width: 760px) {
+  .stations { grid-template-columns: 1fr; }
+  .station.hero { flex-direction: column; align-items: flex-start; }
+  .topbar { gap: 0.6rem; padding: 0 0.9rem; }
+  .op-email { display: none; }
+  .brand-txt small { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, .sys-dot.ok { transition-duration: 0.01ms !important; animation: none !important; }
+}
