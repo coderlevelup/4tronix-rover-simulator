@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, X, Plus, Play, Rocket } from 'lucide-react';
+import { Search, X, Plus, Play, Rocket, Star } from 'lucide-react';
 import { Mission } from '@/core/domain/entities/Mission';
 import { getFirestoreClient } from '@/lib/firebase';
 import { FirestoreMissionRepository } from '@/infrastructure/persistence/FirestoreMissionRepository';
@@ -12,6 +12,7 @@ import {
   DISCOVERY_BADGE_CLASS,
   type DiscoveryStatus,
 } from '@/lib/discoveryStatus';
+import { useFavorites } from '@/lib/useFavorites';
 
 function getYouTubeId(url: string | undefined): string | null {
   if (!url) return null;
@@ -36,7 +37,7 @@ function formatDuration(ms: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-type StatusFilter = 'all' | DiscoveryStatus;
+type StatusFilter = 'all' | 'favorites' | DiscoveryStatus;
 
 export default function LandingPage() {
   const [missions, setMissions] = useState<Mission[]>([]);
@@ -44,6 +45,7 @@ export default function LandingPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const { favorites, isFavorite } = useFavorites();
 
   useEffect(() => {
     const loadMissions = async () => {
@@ -99,14 +101,16 @@ export default function LandingPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return missions.filter((m) => {
-      if (statusFilter !== 'all' && getDiscoveryStatus(m.status) !== statusFilter) return false;
+      if (statusFilter === 'favorites' && !isFavorite(m.id)) return false;
+      if (statusFilter !== 'all' && statusFilter !== 'favorites' && getDiscoveryStatus(m.status) !== statusFilter) return false;
       if (!q) return true;
       return (m.name ?? '').toLowerCase().includes(q) || m.code.toLowerCase().includes(q);
     });
-  }, [missions, query, statusFilter]);
+  }, [missions, query, statusFilter, isFavorite]);
 
-  const filters: { key: StatusFilter; label: string; count: number }[] = [
+  const filters: { key: StatusFilter; label: string; count: number; icon?: typeof Star }[] = [
     { key: 'all', label: 'All', count: counts.all },
+    { key: 'favorites', label: 'Favorites', count: favorites.length, icon: Star },
     { key: 'Completed', label: 'Completed', count: counts.Completed },
     { key: 'Pending', label: 'Pending', count: counts.Pending },
   ];
@@ -149,6 +153,7 @@ export default function LandingPage() {
         <div className="flex items-center gap-2" role="group" aria-label="Filter missions by status">
           {filters.map((f) => {
             const active = statusFilter === f.key;
+            const Icon = f.icon;
             return (
               <button
                 key={f.key}
@@ -160,6 +165,7 @@ export default function LandingPage() {
                     : 'border border-border/70 bg-card/50 text-muted-foreground hover:text-foreground'
                 }`}
               >
+                {Icon && <Icon className="h-3.5 w-3.5" />}
                 {f.label}
                 <span
                   className={`rounded-full px-1.5 text-xs tabular-nums ${
