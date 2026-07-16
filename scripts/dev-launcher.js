@@ -5,9 +5,9 @@ const net = require('node:net');
 const path = require('node:path');
 
 const repoRoot = path.resolve(__dirname, '..');
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const isWindows = process.platform === 'win32';
 const isMac = process.platform === 'darwin';
+const npmExecPath = process.env.npm_execpath;
 
 const services = [
   { name: 'control', label: 'Mission Control', port: 3000, script: 'dev:control', url: 'http://localhost:3000' },
@@ -16,7 +16,14 @@ const services = [
 ];
 
 function run(script) {
-  return spawn(npmCommand, ['run', script], {
+  if (npmExecPath) {
+    return spawn(process.execPath, [npmExecPath, 'run', script], {
+      cwd: repoRoot,
+      stdio: 'inherit',
+    });
+  }
+
+  return spawn('npm', ['run', script], {
     cwd: repoRoot,
     stdio: 'inherit',
   });
@@ -71,7 +78,11 @@ async function waitForPorts(ports, children, timeoutMs = 120000) {
 function killChildren(children) {
   for (const child of children) {
     if (child.exitCode === null && child.signalCode === null) {
-      child.kill('SIGTERM');
+      try {
+        child.kill('SIGTERM');
+      } catch {
+        // Windows can reject a kill if the child already exited.
+      }
     }
   }
 }
