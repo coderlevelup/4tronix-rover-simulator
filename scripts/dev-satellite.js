@@ -15,7 +15,7 @@
  *   1. yard/satellite/.env        (satellite-specific overrides)
  *   2. mission-control/.env       (the shared Firebase project config)
  */
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const { freePorts } = require('./free-port');
@@ -63,6 +63,26 @@ const python = fs.existsSync(venvPython)
     : 'python3';
 
 (async () => {
+  // Preflight: the satellite needs its Python deps (firebase-admin, flask) in
+  // the interpreter we run. Without them the operator login fails at runtime
+  // with a cryptic "could not verify token", so install them on first run.
+  // (These live in yard/satellite/requirements.txt, separate from the desktop
+  // simulator's root requirements.txt.)
+  const hasDeps = spawnSync(python, ['-c', 'import firebase_admin, flask'], { stdio: 'ignore' });
+  if (!hasDeps.error && hasDeps.status !== 0) {
+    const reqs = path.join('yard', 'satellite', 'requirements.txt');
+    console.log('[satellite] installing Python dependencies (first run)...');
+    const install = spawnSync(python, ['-m', 'pip', 'install', '-r', reqs], {
+      cwd: repoRoot,
+      stdio: 'inherit',
+    });
+    if (install.status !== 0) {
+      console.error('[satellite] could not install Python dependencies. Run this, then retry:');
+      console.error(`[satellite]   ${python} -m pip install -r ${reqs}`);
+      process.exit(1);
+    }
+  }
+
   // A previous crashed run may have left a server squatting on the port;
   // clear it (only recognized dev processes) instead of dying on EADDRINUSE.
   if (!(await freePorts([port], '[satellite]'))) process.exit(1);
