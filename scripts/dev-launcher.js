@@ -23,6 +23,13 @@ function run(script) {
     });
   }
 
+  if (isWindows) {
+    return spawn('cmd', ['/d', '/s', '/c', `npm run ${script}`], {
+      cwd: repoRoot,
+      stdio: 'inherit',
+    });
+  }
+
   return spawn('npm', ['run', script], {
     cwd: repoRoot,
     stdio: 'inherit',
