@@ -5,9 +5,7 @@
     "dev:control": "node scripts/free-port.js 3000 && npm run dev --prefix mission-control -- -p 3000",
     "dev:satellite": "node scripts/dev-satellite.js",
     "dev:yard": "node scripts/dev-yard.js",
-    "dev": "concurrently --kill-others --names \"control,satellite,yard\" --prefix-colors \"cyan,green,yellow\" \"npm run dev:control\" \"npm run dev:satellite\" \"npm run dev:yard\""
-  },
-  "devDependencies": {
-    "concurrently": "^8.2.2"
+    "dev:all": "node scripts/dev-launcher.js",
+    "dev": "node scripts/dev-launcher.js"
   }
 }

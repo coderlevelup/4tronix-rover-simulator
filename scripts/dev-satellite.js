@@ -52,15 +52,6 @@ const env = {
   ...process.env,
 };
 
-if (env.FIREBASE_PROJECT_ID || env.GOOGLE_APPLICATION_CREDENTIALS) {
-  console.log('[satellite] Firebase config loaded (operator console enabled)');
-} else {
-  console.warn(
-    '[satellite] no Firebase config found - the operator console will show ' +
-      '"not configured". Fill mission-control/.env or yard/satellite/.env (see its .env.example).'
-  );
-}
-
 const venvPython = isWindows
   ? path.join(repoRoot, '.venv', 'Scripts', 'python.exe')
   : path.join(repoRoot, '.venv', 'bin', 'python3');
@@ -71,19 +62,12 @@ const python = fs.existsSync(venvPython)
     ? 'python'
     : 'python3';
 
-if (!fs.existsSync(venvPython)) {
-  console.warn(
-    `[satellite] virtualenv not found at ${venvPython} — falling back to "${python}" on PATH.\n` +
-      `[satellite] If imports fail, create the venv and install deps:\n` +
-      `[satellite]   python -m venv .venv\n` +
-      `[satellite]   ${isWindows ? '.venv\\Scripts\\pip' : '.venv/bin/pip'} install flask requests firebase-admin`
-  );
-}
-
 (async () => {
   // A previous crashed run may have left a server squatting on the port;
   // clear it (only recognized dev processes) instead of dying on EADDRINUSE.
   if (!(await freePorts([port], '[satellite]'))) process.exit(1);
+
+  console.log(`[satellite] port ${port}`);
 
   const child = spawn(python, ['web_server.py'], {
     cwd: path.join(repoRoot, 'yard', 'satellite'),

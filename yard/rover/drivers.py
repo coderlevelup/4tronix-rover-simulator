@@ -72,7 +72,6 @@ class FakeRoverDriver(RoverDriver):
     def __init__(self):
         self.animation_running = False
         self.animation_thread = None
-        print("[FAKE] FakeRoverDriver initialized")
 
     def forward(self, speed: int) -> None:
         print(f"[FAKE] Forward at speed {speed}")
@@ -145,7 +144,6 @@ class RealRoverDriver(RoverDriver):
 
         # Set initial LED state
         self._set_all_leds_white()
-        print("RealRoverDriver initialized")
 
     def forward(self, speed: int) -> None:
         self._set_leds_forward()

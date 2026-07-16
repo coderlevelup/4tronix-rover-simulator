@@ -5,7 +5,8 @@ Simulator library to allow dev and test of code for the Raspberry Pi-based 4tron
 ## Mission Control platform (hub + yard)
 
 This repo also hosts the Mission Control web platform built on top of the simulator.
-From the repo root, `npm run dev` brings the services up on fixed ports:
+From the repo root, `npm run dev` starts the full stack, waits for the web ports,
+and opens the two browser pages you actually use:
 
 | Service | URL | What it is |
 |---------|-----|------------|
@@ -15,12 +16,15 @@ From the repo root, `npm run dev` brings the services up on fixed ports:
 
 ```bash
 npm install      # first time only
-npm run dev      # hub:3000 + yard satellite:3001 + rover:8523
+npm run dev      # start hub + satellite + rover, then open 3000 and 3001
 ```
 
 Run a single service with `npm run dev:control`, `npm run dev:satellite`, or
 `npm run dev:yard`. The satellite port can be overridden with the `SATELLITE_PORT`
 env var.
+
+Useful terminal output is kept to the essentials: which driver is active and
+which ports are serving.
 
 ## Getting things set up
 

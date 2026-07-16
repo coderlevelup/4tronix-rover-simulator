@@ -7,6 +7,7 @@ All business logic is in the RoverQueueService.
 
 import os
 import re
+import logging
 import subprocess
 
 from flask import Flask, request, jsonify, Response, stream_with_context, send_file
@@ -139,17 +140,19 @@ def main():
 
     driver_name = driver.__class__.__name__
     if driver_name == 'FakeRoverDriver':
-        print("Using FakeRoverDriver (not on Pi)")
+        print("[yard] driver FakeRoverDriver (fake)")
     else:
-        print("Using RealRoverDriver (Pi detected)")
+        print("[yard] driver RealRoverDriver (hardware)")
 
     # Start queue processor
     service.start_processor()
-    print("Queue processor started")
 
     # Run Flask server
     try:
-        print("Starting rover server on port 8523...")
+        logging.getLogger('werkzeug').setLevel(logging.ERROR)
+        print("[yard] port 8523")
+        import flask.cli
+        flask.cli.show_server_banner = lambda *args, **kwargs: None
         app.run(host='0.0.0.0', port=8523, threaded=True)
     except KeyboardInterrupt:
         print("\nShutting down...")

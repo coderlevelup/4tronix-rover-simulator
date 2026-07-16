@@ -8,6 +8,7 @@ Proxies API calls to rover server.
 
 import os
 import json
+import logging
 import socket
 import requests
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context, session, redirect
@@ -296,11 +297,10 @@ def api_health():
 
 
 if __name__ == '__main__':
+    logging.getLogger('werkzeug').setLevel(logging.ERROR)
     port = int(os.environ.get('SATELLITE_PORT', 3001))
-    print(f"Starting satellite web server on port {port}")
-    print(f"Rover URL: {ROVER_URL}")
-    print("Routes:")
-    print("  /code/     - Tablet Blockly interface")
-    print("  /monitor/  - TV display interface")
-    print("  /operator/ - Operator console (mission queue)")
+    print(f"[satellite] serving on port {port}")
+    print(f"[satellite] rover url {ROVER_URL}")
+    import flask.cli
+    flask.cli.show_server_banner = lambda *args, **kwargs: None
     app.run(host='0.0.0.0', port=port, threaded=True, use_reloader=False)

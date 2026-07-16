@@ -33,12 +33,7 @@ const python = fs.existsSync(venvPython)
     : 'python3';
 
 if (!fs.existsSync(venvPython)) {
-  console.warn(
-    `[yard] virtualenv not found at ${venvPython} — falling back to "${python}" on PATH.\n` +
-      `[yard] If imports fail, create the venv and install deps:\n` +
-      `[yard]   python -m venv .venv\n` +
-      `[yard]   ${isWindows ? '.venv\\Scripts\\pip' : '.venv/bin/pip'} install -r yard/rover/requirements.txt`
-  );
+  console.warn(`[yard] python ${python} (virtualenv not found)`);
 }
 
 (async () => {
