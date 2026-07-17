@@ -174,3 +174,9 @@ npm-debug.log*
 
 # Root lockfile — dev-only tooling (concurrently); apps own their lockfiles
 /package-lock.json
+
+# Terraform (infra/): state and caches never get committed; the .terraform.lock.hcl DOES
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
