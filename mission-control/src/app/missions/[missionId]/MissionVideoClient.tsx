@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { getFirestoreClient } from '@/lib/firebase';
 import { FirestoreMissionRepository } from '@/infrastructure/persistence/FirestoreMissionRepository';
 import { RoverSimulator } from '@/components/mission/RoverSimulator';
+import { YouTubeEmbed } from '@/components/mission/YouTubeEmbed';
 import { BlocklyViewer } from '@/components/mission/BlocklyViewer';
 import { parseRoverCode } from '@/lib/parseRoverCode';
 import { simulateCommands } from '@/lib/simulateCommands';
@@ -162,15 +163,11 @@ export default function MissionVideoClient({ missionId }: { missionId: string })
             <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-border/60 bg-card/30">
               {selectedRun.kind === 'real' && selectedRun.youtubeId ? (
                 <div className="flex h-full w-full items-center justify-center p-2">
-                  <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black">
-                    <iframe
-                      src={`https://www.youtube.com/embed/${selectedRun.youtubeId}?rel=0`}
-                      title={missionName}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      className="absolute inset-0 h-full w-full border-0"
-                    />
-                  </div>
+                  <YouTubeEmbed
+                    key={selectedRun.id}
+                    youtubeId={selectedRun.youtubeId}
+                    title={missionName}
+                  />
                 </div>
               ) : (
                 <div className="h-full w-full p-2">

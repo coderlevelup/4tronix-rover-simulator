@@ -30,6 +30,7 @@ export function useFavorites() {
   const [favorites, setFavorites] = useState<FavoriteMission[]>([]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydration from localStorage; not readable during SSR render
     setFavorites(readFavorites());
   }, []);
 
