@@ -1,0 +1,16 @@
+# Build artifacts and deps are produced inside the image
+node_modules
+.next
+out
+
+# Never ship env files; config comes from build args + Secret Manager
+.env*
+!.env.example
+
+# Local tooling noise
+coverage
+jest-results.json
+*.tsbuildinfo
+.DS_Store
+Dockerfile
+.dockerignore

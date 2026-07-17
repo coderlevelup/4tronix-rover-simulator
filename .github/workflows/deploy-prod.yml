@@ -1,0 +1,70 @@
+name: Deploy prod
+
+# Prod promotion (Werner's deploy guide, Phase 3).
+#
+# Manually triggered, gated by the GitHub "production" Environment (configure
+# required reviewers there: Werner and/or Gavin approve). Promotes the image
+# digest CURRENTLY SERVING on staging to the prod service: the exact bytes
+# that were smoke-checked, no rebuild.
+#
+# Rollback is the same mechanism in reverse: rerun this workflow after
+# pointing staging at the previous digest, or
+#   gcloud run services update-traffic / gcloud run deploy --image <old digest>
+#
+# Variables (from Terraform outputs): GCP_WIF_PROVIDER, GCP_DEPLOY_SA,
+# GCP_PROJECT_ID, GCP_REGION, STAGING_SERVICE, PROD_SERVICE.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # OIDC token for WIF
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote staging digest to prod
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Read the digest serving on staging
+        run: |
+          IMAGE=$(gcloud run services describe "${{ vars.STAGING_SERVICE }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" --region "${{ vars.GCP_REGION }}" \
+            --format='value(spec.template.spec.containers[0].image)')
+          echo "Promoting: $IMAGE"
+          case "$IMAGE" in
+            *@sha256:*) ;;
+            *) echo "Staging is not pinned to a digest; refusing to promote a mutable tag" >&2; exit 1 ;;
+          esac
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Deploy Cloud Run prod
+        run: |
+          gcloud run deploy "${{ vars.PROD_SERVICE }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --image "$IMAGE" \
+            --quiet
+
+      - name: Smoke check
+        run: |
+          URL=$(gcloud run services describe "${{ vars.PROD_SERVICE }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" --region "${{ vars.GCP_REGION }}" \
+            --format='value(status.url)')
+          echo "Prod URL: $URL"
+          curl -sSf -o /dev/null "$URL/"
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$URL/operator")" = "404"
+          echo "Smoke check passed"

@@ -1,0 +1,96 @@
+name: Deploy staging
+
+# CD for mission-control (Werner's deploy guide, Phase 2).
+#
+# Runs only after the CI workflow finishes GREEN on main: build the Docker
+# image, push it to Artifact Registry tagged with the git SHA (immutable
+# artifact), deploy Cloud Run staging to that exact digest, then smoke-check.
+#
+# Auth is Workload Identity Federation (GitHub OIDC -> deploy service
+# account): no downloaded JSON keys anywhere. All environment-specific values
+# come from GitHub *variables* (Settings -> Secrets and variables -> Actions
+# -> Variables), which are filled from Terraform outputs once Phase 1 lands:
+#
+#   GCP_WIF_PROVIDER        projects/N/locations/global/workloadIdentityPools/github/providers/github
+#   GCP_DEPLOY_SA           deploy SA email (push image + update Cloud Run)
+#   GCP_PROJECT_ID          bt-impact-academy
+#   GCP_REGION              e.g. europe-west1
+#   GCP_AR_REPO             Artifact Registry docker repo name
+#   STAGING_SERVICE         e.g. mission-control-staging
+#   NEXT_PUBLIC_FIREBASE_*  public web config for the staging Firebase app
+#
+# Server secrets (FIREBASE_* admin credentials) are NOT here: Terraform wires
+# them from Secret Manager onto the Cloud Run service itself.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write # OIDC token for WIF
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build, push, deploy staging
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Build image (tag = git SHA)
+        working-directory: mission-control
+        run: |
+          IMAGE="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_AR_REPO }}/mission-control:${{ github.event.workflow_run.head_sha }}"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          docker build \
+            --build-arg NEXT_PUBLIC_FIREBASE_API_KEY='${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}' \
+            --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN='${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}' \
+            --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID='${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}' \
+            --build-arg NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET='${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}' \
+            --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID='${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}' \
+            --build-arg NEXT_PUBLIC_FIREBASE_APP_ID='${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}' \
+            --build-arg NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID='${{ vars.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID }}' \
+            -t "$IMAGE" .
+
+      - name: Push image
+        run: docker push "$IMAGE"
+
+      - name: Deploy Cloud Run staging (by digest)
+        run: |
+          DIGEST=$(gcloud artifacts docker images describe "$IMAGE" --format='value(image_summary.digest)')
+          gcloud run deploy "${{ vars.STAGING_SERVICE }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --image "${IMAGE%%:*}@${DIGEST}" \
+            --quiet
+
+      - name: Smoke check
+        run: |
+          URL=$(gcloud run services describe "${{ vars.STAGING_SERVICE }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" --region "${{ vars.GCP_REGION }}" \
+            --format='value(status.url)')
+          echo "Staging URL: $URL"
+          # Learner home must serve; the operator surface must NOT exist.
+          curl -sSf -o /dev/null "$URL/"
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$URL/operator")" = "404"
+          echo "Smoke check passed"
