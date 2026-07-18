@@ -148,6 +148,28 @@ def test_console_page_redirects_to_login_without_session(client):
     assert '/operator/login' in resp.headers['Location']
 
 
+# --- OPERATOR_AUTH=off (event-day offline mode, no internet for sign-in) ---
+
+def test_auth_off_opens_console_and_hub_without_session(client, monkeypatch):
+    monkeypatch.setenv('OPERATOR_AUTH', 'off')
+    assert client.get('/operator/').status_code == 200
+    assert client.get('/').status_code == 200
+    login = client.get('/operator/login')
+    assert login.status_code == 302  # login page steps aside
+
+
+def test_auth_off_opens_apis_without_session(client, missions, monkeypatch):
+    monkeypatch.setenv('OPERATOR_AUTH', 'off')
+    resp = client.post('/operator/api/missions/p1/complete')
+    assert resp.status_code == 200
+    assert missions['p1']['status'] == 'completed'
+
+
+def test_auth_on_by_default_when_variable_unset(client, monkeypatch):
+    monkeypatch.delenv('OPERATOR_AUTH', raising=False)
+    assert client.get('/operator/api/missions').status_code == 401
+
+
 def test_apis_reject_unauthenticated_requests(client):
     assert client.get('/operator/api/missions').status_code == 401
     assert client.post('/operator/api/missions/q1/send').status_code == 401

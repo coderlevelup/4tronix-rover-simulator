@@ -124,11 +124,31 @@ def _now_iso():
     return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
 
+# Event-day escape hatch: OPERATOR_AUTH=off skips login entirely. Firebase
+# sign-in needs internet, and venue wifi (science centre) can be too flaky to
+# get operators through the front door. The satellite only serves the yard's
+# own network, so open access for a day is an accepted trade. Unset the
+# variable to restore normal auth.
+OFFLINE_OPERATOR = {'uid': 'offline', 'email': 'offline operator', 'role': 'operator'}
+
+
+def auth_disabled():
+    return os.environ.get('OPERATOR_AUTH', '').strip().lower() in ('off', 'disabled', '0', 'false')
+
+
+def current_operator():
+    """The signed-in operator, or the offline stub when auth is disabled."""
+    operator = session.get('operator')
+    if operator:
+        return operator
+    return OFFLINE_OPERATOR if auth_disabled() else None
+
+
 def require_operator(f):
-    """API guard: 401 JSON unless a signed-in operator session exists."""
+    """API guard: 401 JSON unless an operator session exists (or auth is off)."""
     @wraps(f)
     def wrapper(*args, **kwargs):
-        if not session.get('operator'):
+        if not current_operator():
             return jsonify({'error': 'Unauthorized'}), 401
         return f(*args, **kwargs)
     return wrapper
@@ -140,14 +160,15 @@ def require_operator(f):
 
 @operator_bp.route('/')
 def console():
-    if not session.get('operator'):
+    operator = current_operator()
+    if not operator:
         return redirect('/operator/login')
-    return render_template('operator.html', operator=session['operator'])
+    return render_template('operator.html', operator=operator)
 
 
 @operator_bp.route('/login')
 def login_page():
-    if session.get('operator'):
+    if current_operator():
         return redirect('/')
     return render_template(
         'operator_login.html',
@@ -186,7 +207,10 @@ def api_login():
     try:
         claims = _verify_id_token(resp.json()['idToken'])
     except Exception:
-        return jsonify({'error': 'Could not verify the sign-in token'}), 401
+        return jsonify({
+            'error': 'Could not verify the sign-in token. Check that the satellite and '
+                     'the web app use the same Firebase project (matching FIREBASE_* env).'
+        }), 401
 
     role = claims.get('role')
     if role not in ('operator', 'admin'):

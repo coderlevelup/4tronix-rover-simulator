@@ -67,8 +67,8 @@ ROVER_URL = _load_config().get('rover_url') or os.environ.get('ROVER_URL', 'http
 # dispatches to the rover queue. The getter indirection means runtime edits to
 # ROVER_URL from /status apply to the console too.
 app.config['ROVER_URL_GETTER'] = lambda: ROVER_URL
-from operator_console import operator_bp  # noqa: E402  (needs app + config above)
-app.register_blueprint(operator_bp)
+import operator_console  # noqa: E402  (needs app + config above)
+app.register_blueprint(operator_console.operator_bp)
 
 # Request timeout for rover API calls
 ROVER_TIMEOUT = 5.0
@@ -91,9 +91,10 @@ def index():
     /code/ and /monitor/ stay directly reachable without login - tablets and
     the TV are pointed at those URLs once during setup and never sign in.
     """
-    if not session.get('operator'):
+    operator = operator_console.current_operator()
+    if not operator:
         return redirect('/operator/login')
-    return render_template('home.html', operator=session['operator'])
+    return render_template('home.html', operator=operator)
 
 
 @app.route('/status')
