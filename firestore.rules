@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOperator() {
+      return request.auth != null
+        && exists(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        )
+        && get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.role == "operator";
+    }
+
+    match /rover-configs/{configId} {
+      allow read, create, update, delete: if isOperator();
+    }
+
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    match /missions/{missionId} {
+      allow read, write: if true;
+    }
+
+    match /learners/{learnerId} {
+      allow read, write: if true;
+    }
+
+    match /missions/{missionId}/{document=**} {
+      allow read, write: if true;
+    }
+
+    match /learners/{learnerId}/{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
