@@ -10,12 +10,23 @@
            Dashboard-only styles. Reuses the same CSS custom properties
            already defined in yard-base.css and used by status.html
            (--surface, --border, --ok/--warn/--bad, --text-dim, etc.)
-           rather than introducing a parallel colour system.
+           rather than introducing a parallel colour system. No new
+           brand colours below — only layout, spacing, and type scale.
+
+           Structure, top to bottom:
+             1. Status strip   — network / rover / operator / last sync
+             2. Stats band     — big scannable queue metrics
+             3. Workspace      — Mission Queue (hero, ~70%) + Operations
+                                  panel (quick actions, health, network — 30%)
+             4. Stations       — application launchers
+
+           Spacing follows an 8px scale (0.5rem increments at the
+           16px root the rest of the app assumes) for every gap,
+           padding, and margin introduced here.
            ============================================================ */
         body { min-height: 100vh; }
 
-        /* Network banner — same visual language as operator.html's
-           .net-banner (amber = stale/cached, red = offline) */
+        /* ---------- Network banner (unchanged states + new "syncing") ---------- */
         .net-banner {
             display: none;
             align-items: center;
@@ -23,132 +34,229 @@
             font-size: 0.8rem;
             border-radius: 8px;
             padding: 0.6rem 0.9rem;
-            margin-bottom: 1.1rem;
+            margin-bottom: 1.5rem;
         }
         .net-banner.visible { display: flex; }
         .net-banner.stale   { color: #fbbf24; background: #451a03; border: 1px solid #b45309; }
         .net-banner.offline { color: #f87171; background: #450a0a; border: 1px solid #b91c1c; }
+        .net-banner.syncing { color: #60a5fa; background: #172554; border: 1px solid #1d4ed8; }
 
-        .dash-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 0.9rem;
-            margin-bottom: 1.8rem;
-        }
-
-        .dash-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 1.1rem 1.25rem;
-            display: block;
-            color: inherit;
-            text-decoration: none;
-            transition: border-color 0.16s, background 0.16s;
-        }
-        a.dash-card:hover { border-color: var(--border-strong); background: var(--surface-2); }
-
-        .dash-card-head {
+        /* ---------- 1. Status strip ---------- */
+        .status-strip {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            margin-bottom: 0.7rem;
+            gap: 1.5rem;
+            row-gap: 0.5rem;
+            flex-wrap: wrap;
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8rem;
         }
-        .dash-card-title {
+        .strip-item { display: flex; align-items: center; gap: 0.5rem; white-space: nowrap; }
+        .strip-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; flex-shrink: 0; }
+        .strip-dot.green { background: var(--ok); }
+        .strip-dot.amber { background: var(--warn); }
+        .strip-dot.red   { background: var(--bad); }
+        .strip-label { color: var(--text-faint, #666); }
+        .strip-value { color: var(--text, #ccc); font-weight: 600; }
+
+        /* ---------- 2. Stats band ---------- */
+        .stats-band {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .stat-tile {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.25rem 1.5rem;
+        }
+        .stat-tile .stat-num { font-size: 2.1rem; font-weight: 700; line-height: 1; color: var(--heading, #fff); }
+        .stat-tile .stat-lbl {
+            margin-top: 0.5rem;
             font-size: 0.72rem;
-            font-weight: 700;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.07em;
+            letter-spacing: 0.06em;
             color: var(--text-faint, #888);
         }
-        .dash-card .arrow { width: 16px; height: 16px; color: var(--text-faint, #666); }
+        .stat-tile.warn .stat-num { color: var(--warn); }
+        .stat-tile.bad .stat-num { color: var(--bad); }
+        .stat-tile.wide { grid-column: span 2; }
+        .stat-tile.wide .stat-num { font-size: 1.15rem; font-weight: 600; }
 
-        /* Queue overview */
-        .queue-stats {
+        /* ---------- 3. Workspace: hero (70%) + operations panel (30%) ---------- */
+        .workspace {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.6rem;
-            margin-bottom: 0.7rem;
+            grid-template-columns: minmax(0, 1fr) 340px;
+            gap: 1.5rem;
+            align-items: start;
+            margin-bottom: 2rem;
         }
-        .queue-stat .num { font-size: 1.5rem; font-weight: 700; color: var(--heading, #fff); }
-        .queue-stat .lbl { font-size: 0.68rem; color: var(--text-dim, #888); text-transform: uppercase; letter-spacing: 0.05em; }
+        @media (max-width: 980px) {
+            .workspace { grid-template-columns: 1fr; }
+        }
+
+        /* -- Hero: Mission Queue -- */
+        .hero-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 1.5rem;
+        }
+        .hero-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.25rem;
+        }
+        .hero-head h2 { font-size: 1.1rem; font-weight: 700; color: var(--heading, #fff); }
+        .hero-head-meta { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.35rem; }
+        .hero-freshness { font-size: 0.74rem; color: var(--text-faint, #666); }
+        .hero-open {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #f97316;
+            text-decoration: none;
+            white-space: nowrap;
+            padding-top: 0.15rem;
+        }
+        .hero-open:hover { text-decoration: underline; }
+
         .queue-health-pill {
             display: inline-block;
-            font-size: 0.68rem;
+            font-size: 0.66rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            padding: 0.22rem 0.6rem;
+            padding: 0.2rem 0.55rem;
             border-radius: 999px;
             border: 1px solid var(--border);
         }
         .queue-health-pill.green { color: var(--ok);   background: rgba(52, 211, 153, 0.1);  border-color: rgba(52, 211, 153, 0.35); }
         .queue-health-pill.amber { color: var(--warn); background: rgba(251, 191, 36, 0.1);  border-color: rgba(251, 191, 36, 0.35); }
         .queue-health-pill.grey  { color: var(--text-faint, #888); background: var(--surface-3); border-color: var(--border); }
-        .queue-last {
-            margin-top: 0.6rem;
-            font-size: 0.78rem;
-            color: var(--text-dim, #888);
-        }
-        .queue-last b { color: var(--text, #ccc); font-weight: 600; }
 
-        /* System health */
-        .health-rows { display: flex; flex-direction: column; gap: 0.5rem; }
-        .health-row {
+        .hero-controls {
+            display: flex;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+        .hero-search {
+            flex: 1;
+            min-width: 200px;
             display: flex;
             align-items: center;
-            gap: 0.6rem;
-            font-size: 0.83rem;
+            gap: 0.5rem;
+            background: var(--surface-2, #1a1a1a);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.55rem 0.8rem;
         }
-        .health-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: #555; }
-        .health-dot.green { background: var(--ok); }
-        .health-dot.amber { background: var(--warn); }
-        .health-dot.red   { background: var(--bad); }
-        .health-name { color: var(--text, #ccc); flex-shrink: 0; min-width: 76px; }
-        .health-detail { color: var(--text-dim, #777); font-size: 0.76rem; }
-        .health-note {
-            margin-top: 0.7rem;
-            font-size: 0.72rem;
-            color: var(--text-faint, #555);
-            border-top: 1px solid var(--border);
-            padding-top: 0.6rem;
+        .hero-search svg { width: 15px; height: 15px; color: var(--text-faint, #666); flex-shrink: 0; }
+        .hero-search input {
+            flex: 1;
+            background: none;
+            border: none;
+            outline: none;
+            color: var(--text, #e0e0e0);
+            font-size: 0.85rem;
+        }
+        .hero-search input::placeholder { color: var(--text-faint, #555); }
+        .hero-sort {
+            background: var(--surface-2, #1a1a1a);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-dim, #ccc);
+            font-size: 0.8rem;
+            padding: 0 0.6rem;
         }
 
-        /* Activity feed */
-        .activity-list { display: flex; flex-direction: column; gap: 0.55rem; }
-        .activity-row {
-            display: flex;
-            align-items: baseline;
-            gap: 0.5rem;
-            font-size: 0.8rem;
-        }
-        .activity-row .pill {
-            flex-shrink: 0;
+        .filter-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
+        .filter-chip {
+            border: 1px solid var(--border);
+            background: var(--surface-2, #1a1a1a);
+            color: var(--text-dim, #999);
             border-radius: 999px;
-            font-size: 0.62rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 0.15rem 0.5rem;
-            border: 1px solid;
+            font-size: 0.74rem;
+            font-weight: 600;
+            padding: 0.35rem 0.8rem;
+            cursor: pointer;
         }
+        .filter-chip:hover { border-color: var(--border-strong); }
+        .filter-chip.active { border-color: #f97316; color: #f97316; background: rgba(249, 115, 22, 0.08); }
+
+        .mission-rows { display: flex; flex-direction: column; gap: 0.5rem; max-height: 620px; overflow-y: auto; }
+        .mission-row {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+            padding: 0.75rem 0.9rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--surface-2, #181818);
+        }
+        .mission-row .mr-name { flex: 1; min-width: 0; }
+        .mission-row .mr-title {
+            font-size: 0.87rem;
+            font-weight: 600;
+            color: var(--text, #ddd);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .mission-row .mr-meta {
+            font-size: 0.72rem;
+            color: var(--text-faint, #666);
+            font-family: ui-monospace, monospace;
+            margin-top: 0.2rem;
+        }
+        .mission-row .mr-time { font-size: 0.74rem; color: var(--text-faint, #666); flex-shrink: 0; }
+
+        .hero-empty {
+            text-align: center;
+            color: var(--text-faint, #666);
+            padding: 3rem 1rem;
+            border: 1px dashed var(--border);
+            border-radius: 12px;
+            font-size: 0.85rem;
+        }
+
+        .hero-foot {
+            margin-top: 1.1rem;
+            padding-top: 0.9rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.72rem;
+            color: var(--text-faint, #555);
+        }
+
+        /* Pills reused across hero rows — same status vocabulary as
+           operator.html so the colour language never changes screen to screen. */
+        .pill { border-radius: 999px; font-size: 0.64rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.18rem 0.55rem; border: 1px solid; flex-shrink: 0; }
         .pill.queued     { color: #60a5fa; border-color: #1d4ed8; background: #172554; }
         .pill.processing { color: #fbbf24; border-color: #b45309; background: #451a03; }
         .pill.completed  { color: #4ade80; border-color: #15803d; background: #14532d; }
         .pill.failed     { color: #f87171; border-color: #b91c1c; background: #450a0a; }
-        .activity-name { color: var(--text, #ccc); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .activity-time { color: var(--text-faint, #666); font-size: 0.72rem; flex-shrink: 0; }
-        .activity-empty { color: var(--text-faint, #666); font-size: 0.8rem; }
-        .activity-note {
-            margin-top: 0.7rem;
+
+        /* -- Operations panel: quick actions, system health, network status -- */
+        .ops-panel { display: flex; flex-direction: column; gap: 1.25rem; }
+        .ops-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.25rem 1.4rem; }
+        .ops-card h3 {
             font-size: 0.72rem;
-            color: var(--text-faint, #555);
-            border-top: 1px solid var(--border);
-            padding-top: 0.6rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-faint, #888);
+            margin-bottom: 1rem;
         }
 
-        /* Quick actions */
-        .actions-list { display: flex; flex-direction: column; gap: 0.5rem; }
+        .actions-list { display: flex; flex-direction: column; gap: 0.6rem; }
         .action-btn {
             display: flex;
             align-items: center;
@@ -156,11 +264,11 @@
             width: 100%;
             background: var(--surface-2, #1a1a1a);
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 10px;
             color: var(--text, #ccc);
-            font-size: 0.82rem;
+            font-size: 0.85rem;
             font-weight: 600;
-            padding: 0.55rem 0.8rem;
+            padding: 0.7rem 0.9rem;
             cursor: pointer;
             text-decoration: none;
             text-align: left;
@@ -168,27 +276,46 @@
         .action-btn:hover { border-color: var(--border-strong); }
         .action-btn .hint { font-size: 0.7rem; font-weight: 400; color: var(--text-faint, #666); }
 
-        /* Sign-in prompt for unauthenticated viewers (tablets/TV rarely land
-           here, but home.html has no login gate today, so this covers it) */
+        .health-rows { display: flex; flex-direction: column; gap: 0.6rem; }
+        .health-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.83rem; }
+        .health-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: #555; }
+        .health-dot.green { background: var(--ok); }
+        .health-dot.amber { background: var(--warn); }
+        .health-dot.red   { background: var(--bad); }
+        .health-name { color: var(--text, #ccc); flex-shrink: 0; min-width: 76px; }
+        .health-detail { color: var(--text-dim, #777); font-size: 0.76rem; }
+
+        .net-rows { display: flex; flex-direction: column; gap: 0.6rem; }
+        .net-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; font-size: 0.8rem; }
+        .net-row .nr-label { color: var(--text-faint, #888); }
+        .net-row .nr-value { color: var(--text, #ccc); font-weight: 600; text-align: right; }
+        .net-row .nr-value.green { color: var(--ok); }
+        .net-row .nr-value.amber { color: var(--warn); }
+        .net-row .nr-value.red   { color: var(--bad); }
+
+        .card-note {
+            margin-top: 0.9rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.72rem;
+            color: var(--text-faint, #555);
+        }
+
+        /* ---------- 4. Stations ---------- */
+        .stations { gap: 1rem; margin-bottom: 1.75rem; }
+        .section-label { margin-top: 0.5rem; }
+
+        /* ---------- Sign-in prompt (unauthenticated viewers) ---------- */
         .signin-note {
             background: var(--surface);
             border: 1px dashed var(--border);
             border-radius: 12px;
-            padding: 1rem 1.2rem;
+            padding: 1.25rem 1.5rem;
             font-size: 0.85rem;
             color: var(--text-dim, #888);
-            margin-bottom: 1.8rem;
+            margin-bottom: 2rem;
         }
         .signin-note a { color: #f97316; }
-
-        .section-label {
-            font-size: 0.72rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.07em;
-            color: var(--text-faint, #666);
-            margin-bottom: 0.7rem;
-        }
 
         .skel {
             display: inline-block;
@@ -199,6 +326,9 @@
             animation: skel-pulse 1.4s ease-in-out infinite;
         }
         @keyframes skel-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) {
+            .skel { animation: none; opacity: 0.7; }
+        }
     </style>
 </head>
 <body>
@@ -209,56 +339,107 @@
         <h1 class="page-title">Mission Control</h1>
         <p class="page-sub">Live queue, system health, and recent activity at a glance.</p>
 
+        {% if operator %}
+        <div class="status-strip">
+            <span class="strip-item"><span class="strip-dot" id="stripNetDot"></span><span class="strip-label">Network</span><span class="strip-value" id="stripNetValue">Checking&hellip;</span></span>
+            <span class="strip-item"><span class="strip-dot" id="stripRoverDot"></span><span class="strip-label">Rover</span><span class="strip-value" id="stripRoverValue">Checking&hellip;</span></span>
+            <span class="strip-item"><span class="strip-label">Operator</span><span class="strip-value">{{ operator.email }}</span></span>
+            <span class="strip-item"><span class="strip-label">Last sync</span><span class="strip-value" id="stripSyncValue">&mdash;</span></span>
+        </div>
+        {% endif %}
+
         <div class="net-banner" id="netBanner"></div>
 
         {% if operator %}
-        <section class="dash-grid">
-            <a class="dash-card" href="/operator/" id="queueCard">
-                <div class="dash-card-head">
-                    <span class="dash-card-title">Mission Queue</span>
-                    <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                </div>
-                <div class="queue-stats" id="queueStats">
-                    <div class="queue-stat"><div class="num"><span class="skel"></span></div><div class="lbl">Waiting</div></div>
-                    <div class="queue-stat"><div class="num"><span class="skel"></span></div><div class="lbl">Running</div></div>
-                    <div class="queue-stat"><div class="num"><span class="skel"></span></div><div class="lbl">Done</div></div>
-                </div>
-                <span class="queue-health-pill grey" id="queueHealthPill">checking&hellip;</span>
-                <div class="queue-last" id="queueLast">Loading&hellip;</div>
-            </a>
-
-            <div class="dash-card">
-                <div class="dash-card-head"><span class="dash-card-title">System Health</span></div>
-                <div class="health-rows" id="healthRows">
-                    <div class="health-row"><span class="health-dot"></span><span class="health-name">Rover</span><span class="health-detail"><span class="skel"></span></span></div>
-                    <div class="health-row"><span class="health-dot"></span><span class="health-name">Camera</span><span class="health-detail"><span class="skel"></span></span></div>
-                    <div class="health-row"><span class="health-dot"></span><span class="health-name">Satellite</span><span class="health-detail"><span class="skel"></span></span></div>
-                </div>
-                <div class="health-note">Backend/API health is inferred from this satellite responding. There's no separate database health signal exposed yet &mdash; add one to <code>/api/status</code> to show it here.</div>
-            </div>
-
-            <div class="dash-card">
-                <div class="dash-card-head"><span class="dash-card-title">Recent Missions</span></div>
-                <div class="activity-list" id="activityList">
-                    <div class="activity-empty">Loading&hellip;</div>
-                </div>
-                <div class="activity-note">Shows the most recent missions by submission time. There's no system event log yet (rover/camera connect, uploads, errors) &mdash; this is mission data only, not a full activity feed.</div>
-            </div>
-
-            <div class="dash-card">
-                <div class="dash-card-head"><span class="dash-card-title">Quick Actions</span></div>
-                <div class="actions-list">
-                    <a class="action-btn" href="/operator/">Open Mission Queue</a>
-                    <a class="action-btn" href="/status">Run Diagnostics</a>
-                    <button class="action-btn" id="refreshBtn" type="button">
-                        Refresh Now <span class="hint" id="refreshHint"></span>
-                    </button>
-                    <button class="action-btn" id="clearCacheBtn" type="button">
-                        Clear Local Cache <span class="hint">reloads this page</span>
-                    </button>
-                </div>
-            </div>
+        <section class="stats-band" id="statsBand">
+            <div class="stat-tile"><div class="stat-num"><span class="skel"></span></div><div class="stat-lbl">Queue size</div></div>
+            <div class="stat-tile"><div class="stat-num"><span class="skel"></span></div><div class="stat-lbl">Running</div></div>
+            <div class="stat-tile"><div class="stat-num"><span class="skel"></span></div><div class="stat-lbl">Completed</div></div>
+            <div class="stat-tile"><div class="stat-num"><span class="skel"></span></div><div class="stat-lbl">Failed</div></div>
+            <div class="stat-tile wide"><div class="stat-num"><span class="skel"></span></div><div class="stat-lbl">Last sync</div></div>
         </section>
+
+        <div class="workspace">
+            <!-- Mission Queue: the hero. Read-only overview by design — sending
+                 code, marking complete, and attaching video stay in the full
+                 Operator Console (/operator/) where those mutation endpoints
+                 live, so this panel can never drift out of sync with what
+                 actions are actually available. -->
+            <section class="hero-panel">
+                <div class="hero-head">
+                    <div>
+                        <h2>Mission Queue</h2>
+                        <div class="hero-head-meta">
+                            <span class="queue-health-pill grey" id="queueHealthPill">checking&hellip;</span>
+                            <span class="hero-freshness" id="heroFreshness"></span>
+                        </div>
+                    </div>
+                    <a class="hero-open" href="/operator/">Open full queue &rarr;</a>
+                </div>
+
+                <div class="hero-controls">
+                    <div class="hero-search">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" id="heroSearch" placeholder="Search missions by name or yard ID&hellip;" autocomplete="off">
+                    </div>
+                    <select class="hero-sort" id="heroSort">
+                        <option value="newest">Newest first</option>
+                        <option value="oldest">Oldest first</option>
+                        <option value="status">By status</option>
+                    </select>
+                </div>
+
+                <div class="filter-chips" id="heroFilters">
+                    <button class="filter-chip active" type="button" data-status="all">All</button>
+                    <button class="filter-chip" type="button" data-status="queued">Queued</button>
+                    <button class="filter-chip" type="button" data-status="processing">Running</button>
+                    <button class="filter-chip" type="button" data-status="completed">Completed</button>
+                    <button class="filter-chip" type="button" data-status="failed">Failed</button>
+                </div>
+
+                <div class="mission-rows" id="heroRows">
+                    <div class="hero-empty">Loading missions&hellip;</div>
+                </div>
+
+                <div class="hero-foot">Cached automatically — missions stay visible here if the connection drops.</div>
+            </section>
+
+            <div class="ops-panel">
+                <div class="ops-card">
+                    <h3>Quick Actions</h3>
+                    <div class="actions-list">
+                        <a class="action-btn" href="/operator/">Open Mission Queue</a>
+                        <a class="action-btn" href="/status">Run Diagnostics</a>
+                        <button class="action-btn" id="refreshBtn" type="button">
+                            Refresh Now <span class="hint" id="refreshHint"></span>
+                        </button>
+                        <button class="action-btn" id="clearCacheBtn" type="button">
+                            Clear Local Cache <span class="hint">reloads this page</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="ops-card">
+                    <h3>System Health</h3>
+                    <div class="health-rows" id="healthRows">
+                        <div class="health-row"><span class="health-dot"></span><span class="health-name">Rover</span><span class="health-detail"><span class="skel"></span></span></div>
+                        <div class="health-row"><span class="health-dot"></span><span class="health-name">Camera</span><span class="health-detail"><span class="skel"></span></span></div>
+                        <div class="health-row"><span class="health-dot"></span><span class="health-name">Satellite</span><span class="health-detail"><span class="skel"></span></span></div>
+                    </div>
+                    <div class="card-note">Backend/API health is inferred from this satellite responding. There's no separate database health signal exposed yet.</div>
+                </div>
+
+                <div class="ops-card">
+                    <h3>Network Status</h3>
+                    <div class="net-rows" id="netPanelRows">
+                        <div class="net-row"><span class="nr-label">Connection</span><span class="nr-value"><span class="skel"></span></span></div>
+                        <div class="net-row"><span class="nr-label">Last sync</span><span class="nr-value"><span class="skel"></span></span></div>
+                        <div class="net-row"><span class="nr-label">Cached missions</span><span class="nr-value"><span class="skel"></span></span></div>
+                        <div class="net-row"><span class="nr-label">Background sync</span><span class="nr-value"><span class="skel"></span></span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
         {% else %}
         <div class="signin-note">
             Sign in as an operator to see the live mission queue, system health, and recent activity.
@@ -318,20 +499,26 @@
         // Two independent data sources, fetched in parallel and cached
         // independently via YardCache (defined in _nav.html) so a slow
         // or failing endpoint never blocks the other section's paint.
-        //   - missionsData -> Queue overview + Recent Missions
+        //   - missionsData -> Stats band + Mission Queue hero
         //   - statusData   -> System Health
         // Each poller instantly repaints from its own last-known cache
         // on load, then refreshes in the background (stale-while-
         // revalidate), same pattern as status.html / operator.html.
+        // Both pollers also drive the Network Status panel and status
+        // strip, which read poller-reported state rather than duplicating
+        // any fetch logic of their own.
         // ============================================================
 
         var netBanner = document.getElementById('netBanner');
-        var bannerState = { missions: null, status: null }; // 'stale' | 'offline' | null per source
+        var bannerState = { missions: null, status: null }; // 'stale' | 'offline' | 'syncing' | null per source
 
         function paintBanner() {
             if (bannerState.missions === 'offline' || bannerState.status === 'offline') {
                 netBanner.className = 'net-banner visible offline';
-                netBanner.textContent = "Can't reach the server — showing last known data, retrying…";
+                netBanner.textContent = 'Offline – displaying cached missions';
+            } else if (bannerState.missions === 'syncing' || bannerState.status === 'syncing') {
+                netBanner.className = 'net-banner visible syncing';
+                netBanner.textContent = 'Syncing latest missions…';
             } else if (bannerState.missions === 'stale' || bannerState.status === 'stale') {
                 netBanner.className = 'net-banner visible stale';
                 netBanner.textContent = 'Showing cached data — refreshing…';
@@ -350,73 +537,117 @@
             return Math.round(hrs / 24) + 'd ago';
         }
 
+        function ageFrom(ts) {
+            if (!ts) return '—';
+            var s = Math.round((Date.now() - ts) / 1000);
+            if (s < 5) return 'just now';
+            if (s < 60) return s + 's ago';
+            var m = Math.round(s / 60);
+            if (m < 60) return m + 'm ago';
+            return Math.round(m / 60) + 'h ago';
+        }
+
         function esc(s) {
             return (s || '').replace(/[&<>"']/g, function (c) {
                 return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
             });
         }
 
-        // ---------------- Queue overview + Recent Missions ----------------
+        // ---------------- Mission Overview stats + Mission Queue hero ----------------
 
-        function renderMissions(missions) {
-            var waiting = 0, running = 0, done = 0;
-            missions.forEach(function (m) {
-                if (m.status === 'queued') waiting++;
-                else if (m.status === 'processing') running++;
-                else if (m.status === 'completed') done++;
-            });
+        var latestMissions = [];
+        var missionsHasLoaded = false;
+        var missionsSyncedAt = null;
+        var cachedMissionCount = 0;
+        var heroSearchQuery = '';
+        var heroStatusFilter = 'all';
+        var heroSortMode = 'newest';
 
-            var stats = document.getElementById('queueStats');
-            stats.innerHTML =
-                '<div class="queue-stat"><div class="num">' + waiting + '</div><div class="lbl">Waiting</div></div>' +
-                '<div class="queue-stat"><div class="num">' + running + '</div><div class="lbl">Running</div></div>' +
-                '<div class="queue-stat"><div class="num">' + done + '</div><div class="lbl">Done</div></div>';
+        function statTile(num, label, tone) {
+            return '<div class="stat-tile' + (tone ? ' ' + tone : '') + '"><div class="stat-num">' + num + '</div><div class="stat-lbl">' + label + '</div></div>';
+        }
+
+        function renderStatsBand(missions) {
+            var counts = { queued: 0, processing: 0, completed: 0, failed: 0 };
+            missions.forEach(function (m) { if (counts[m.status] !== undefined) counts[m.status]++; });
+
+            document.getElementById('statsBand').innerHTML =
+                statTile(missions.length, 'Queue size') +
+                statTile(counts.processing, 'Running') +
+                statTile(counts.completed, 'Completed') +
+                statTile(counts.failed, 'Failed', counts.failed > 0 ? 'bad' : '') +
+                statTile(missionsSyncedAt ? ageFrom(missionsSyncedAt) : '—', 'Last sync', 'wide');
 
             var pill = document.getElementById('queueHealthPill');
-            if (waiting === 0 && running === 0) {
+            if (counts.queued === 0 && counts.processing === 0) {
                 pill.className = 'queue-health-pill grey';
                 pill.textContent = 'Idle';
-            } else if (waiting > 5) {
+            } else if (counts.queued > 5) {
                 pill.className = 'queue-health-pill amber';
                 pill.textContent = 'Busy';
             } else {
                 pill.className = 'queue-health-pill green';
                 pill.textContent = 'Normal';
             }
+        }
 
-            var sorted = missions.slice().sort(function (a, b) {
-                return new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0);
+        function matchesHeroFilters(m) {
+            if (heroStatusFilter !== 'all' && m.status !== heroStatusFilter) return false;
+            if (!heroSearchQuery) return true;
+            var haystack = ((m.name || '') + ' ' + (m.yardId || '')).toLowerCase();
+            return haystack.indexOf(heroSearchQuery) !== -1;
+        }
+
+        var STATUS_ORDER = { processing: 0, queued: 1, failed: 2, completed: 3 };
+
+        function renderHeroRows() {
+            var rows = document.getElementById('heroRows');
+            var visible = latestMissions.filter(matchesHeroFilters);
+
+            visible.sort(function (a, b) {
+                if (heroSortMode === 'oldest') return new Date(a.submittedAt || 0) - new Date(b.submittedAt || 0);
+                if (heroSortMode === 'status') return (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9);
+                return new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0); // newest first (default)
             });
 
-            var last = document.getElementById('queueLast');
-            if (sorted.length === 0) {
-                last.textContent = 'No missions submitted yet.';
-            } else {
-                var mostRecent = sorted[0];
-                // No completedAt field exists in mission data today, so this
-                // reports submission recency, not a resolved completion time.
-                last.innerHTML = 'Most recent: <b>' + esc(mostRecent.name || 'Mission-' + mostRecent.id.slice(0, 8)) +
-                    '</b> &middot; ' + esc(mostRecent.status) + ' &middot; submitted ' + relTime(mostRecent.submittedAt);
+            if (visible.length === 0) {
+                rows.innerHTML = '<div class="hero-empty">' + (
+                    !missionsHasLoaded ? 'Loading missions&hellip;' :
+                    heroSearchQuery ? 'No missions match "' + esc(heroSearchQuery) + '".' :
+                    latestMissions.length === 0 ? 'Nothing here. New submissions land automatically.' :
+                    'No missions in this filter.'
+                ) + '</div>';
+                return;
             }
 
-            var list = document.getElementById('activityList');
-            var recent = sorted.slice(0, 6);
-            if (recent.length === 0) {
-                list.innerHTML = '<div class="activity-empty">Nothing here yet.</div>';
-            } else {
-                list.innerHTML = recent.map(function (m) {
-                    var label = m.status === 'processing' ? 'running' : m.status;
-                    return '<div class="activity-row">' +
-                        '<span class="pill ' + esc(m.status) + '">' + esc(label) + '</span>' +
-                        '<span class="activity-name">' + esc(m.name || 'Mission-' + m.id.slice(0, 8)) + '</span>' +
-                        '<span class="activity-time">' + relTime(m.submittedAt) + '</span>' +
-                        '</div>';
-                }).join('');
-            }
+            rows.innerHTML = visible.slice(0, 40).map(function (m) {
+                var label = m.status === 'processing' ? 'running' : m.status;
+                return '<div class="mission-row">' +
+                    '<span class="pill ' + esc(m.status) + '">' + esc(label) + '</span>' +
+                    '<span class="mr-name"><span class="mr-title">' + esc(m.name || 'Mission-' + m.id.slice(0, 8)) + '</span>' +
+                    '<span class="mr-meta">' + esc(m.yardId || '') + '</span></span>' +
+                    '<span class="mr-time">' + relTime(m.submittedAt) + '</span>' +
+                    '</div>';
+            }).join('');
+        }
+
+        function updateHeroFreshness() {
+            document.getElementById('heroFreshness').textContent =
+                missionsSyncedAt ? 'Synced ' + ageFrom(missionsSyncedAt) : '';
+        }
+
+        function renderMissions(missions) {
+            latestMissions = missions;
+            missionsHasLoaded = true;
+            renderStatsBand(missions);
+            renderHeroRows();
+            updateHeroFreshness();
         }
 
         var cachedMissions = YardCache.read('homeMissions');
         if (cachedMissions) {
+            cachedMissionCount = (cachedMissions.value || []).length;
+            missionsSyncedAt = cachedMissions.ts;
             renderMissions(cachedMissions.value);
             bannerState.missions = 'stale';
             paintBanner();
@@ -434,17 +665,40 @@
                     if (!data) return;
                     missionsFailures = 0;
                     var list = data.missions || [];
-                    YardCache.write('homeMissions', list);
+                    YardCache.write('homeMissions', list); // mirrors into sessionStorage + IndexedDB
+                    cachedMissionCount = list.length;
+                    missionsSyncedAt = Date.now();
                     renderMissions(list);
                     bannerState.missions = null;
                     paintBanner();
+                    updateNetworkPanel();
+                    updateStatusStrip();
                 });
             },
+            onOnline: function () { bannerState.missions = 'syncing'; paintBanner(); updateNetworkPanel(); },
+            onOffline: function () { bannerState.missions = 'offline'; paintBanner(); updateNetworkPanel(); },
             onError: function () {
                 missionsFailures++;
                 bannerState.missions = 'offline';
                 paintBanner();
+                updateNetworkPanel();
             }
+        });
+
+        document.getElementById('heroSearch').addEventListener('input', function (e) {
+            heroSearchQuery = e.target.value.trim().toLowerCase();
+            renderHeroRows();
+        });
+        document.getElementById('heroSort').addEventListener('change', function (e) {
+            heroSortMode = e.target.value;
+            renderHeroRows();
+        });
+        document.getElementById('heroFilters').addEventListener('click', function (e) {
+            var btn = e.target.closest('.filter-chip');
+            if (!btn) return;
+            heroStatusFilter = btn.dataset.status;
+            document.querySelectorAll('.filter-chip').forEach(function (c) { c.classList.toggle('active', c === btn); });
+            renderHeroRows();
         });
 
         // ---------------- System Health ----------------
@@ -455,7 +709,10 @@
                 '<span class="health-detail">' + detail + '</span></div>';
         }
 
+        var latestStatus = null;
+
         function renderStatus(data) {
+            latestStatus = data;
             var rows = [];
 
             var r = data.rover || {};
@@ -480,16 +737,20 @@
             rows.push(healthRow('Satellite', 'green', esc(s.hostname || '—')));
 
             document.getElementById('healthRows').innerHTML = rows.join('');
+            updateStatusStrip();
         }
+
+        var statusFailures = 0;
+        var statusSyncedAt = null;
 
         var cachedStatus = YardCache.read('fullStatus'); // shared cache key with status.html
         if (cachedStatus) {
+            statusSyncedAt = cachedStatus.ts;
             renderStatus(cachedStatus.value);
             bannerState.status = 'stale';
             paintBanner();
         }
 
-        var statusFailures = 0;
         var statusPoller = YardCache.createPoller({
             interval: 5000,
             maxInterval: 20000,
@@ -497,17 +758,88 @@
                 return fetch('/api/status').then(function (r) { return r.json(); }).then(function (data) {
                     statusFailures = 0;
                     YardCache.write('fullStatus', data);
+                    statusSyncedAt = Date.now();
                     renderStatus(data);
                     bannerState.status = null;
                     paintBanner();
+                    updateNetworkPanel();
                 });
             },
+            onOnline: function () { bannerState.status = 'syncing'; paintBanner(); },
+            onOffline: function () { bannerState.status = 'offline'; paintBanner(); updateNetworkPanel(); },
             onError: function () {
                 statusFailures++;
                 bannerState.status = 'offline';
                 paintBanner();
+                updateNetworkPanel();
             }
         });
+
+        // ---------------- Status strip (network / rover / operator / last sync) ----------------
+
+        function updateStatusStrip() {
+            var netDot = document.getElementById('stripNetDot');
+            var netVal = document.getElementById('stripNetValue');
+            var offline = bannerState.missions === 'offline' || bannerState.status === 'offline' || !navigator.onLine;
+            netDot.className = 'strip-dot ' + (offline ? 'red' : 'green');
+            netVal.textContent = offline ? 'Offline' : 'Online';
+
+            var roverDot = document.getElementById('stripRoverDot');
+            var roverVal = document.getElementById('stripRoverValue');
+            var rover = (latestStatus && latestStatus.rover) || (YardCache.read('roverStatus') || {}).value;
+            if (rover) {
+                var ok = rover.reachable && (rover.status == null || rover.status === 'ok');
+                roverDot.className = 'strip-dot ' + (ok ? 'green' : 'red');
+                roverVal.textContent = ok ? 'Online' : (rover.reachable ? 'Degraded' : 'Offline');
+            }
+
+            var lastSync = Math.max(missionsSyncedAt || 0, statusSyncedAt || 0) || null;
+            document.getElementById('stripSyncValue').textContent = lastSync ? ageFrom(lastSync) : '—';
+        }
+
+        // ---------------- Network Status panel ----------------
+
+        function backgroundSyncLabel() {
+            if (document.hidden) return 'Paused (tab hidden)';
+            if (missionsFailures > 0 || statusFailures > 0) {
+                return 'Retrying (attempt ' + Math.max(missionsFailures, statusFailures) + ')';
+            }
+            return 'Active';
+        }
+
+        function connectionQuality() {
+            var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            if (!c || !c.effectiveType) return navigator.onLine ? 'Unknown' : 'None';
+            return c.effectiveType.toUpperCase();
+        }
+
+        function netRow(label, value, tone) {
+            return '<div class="net-row"><span class="nr-label">' + label + '</span>' +
+                '<span class="nr-value' + (tone ? ' ' + tone : '') + '">' + value + '</span></div>';
+        }
+
+        function updateNetworkPanel() {
+            var offline = bannerState.missions === 'offline' || bannerState.status === 'offline' || !navigator.onLine;
+            var lastSync = Math.max(missionsSyncedAt || 0, statusSyncedAt || 0) || null;
+
+            document.getElementById('netPanelRows').innerHTML =
+                netRow('Connection', (offline ? 'Offline' : 'Online') + ' &middot; ' + connectionQuality(), offline ? 'red' : 'green') +
+                netRow('Last sync', lastSync ? ageFrom(lastSync) : 'Never') +
+                netRow('Cached missions', String(cachedMissionCount)) +
+                netRow('Background sync', backgroundSyncLabel(), (missionsFailures || statusFailures) ? 'amber' : '');
+
+            updateStatusStrip();
+        }
+
+        // Keep every relative-time readout ("Xs/Xm ago") ticking without
+        // waiting on the next poll — cheap, since it only touches text nodes.
+        setInterval(function () {
+            updateHeroFreshness();
+            updateStatusStrip();
+            updateNetworkPanel();
+        }, 5000);
+        updateNetworkPanel();
+        updateStatusStrip();
 
         // ---------------- Quick actions ----------------
 
