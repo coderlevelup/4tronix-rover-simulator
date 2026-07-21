@@ -304,4 +304,7 @@ if __name__ == '__main__':
     print(f"[satellite] rover url {ROVER_URL}")
     import flask.cli
     flask.cli.show_server_banner = lambda *args, **kwargs: None
+    # Start the operator console polling thread before starting the Flask server
+    from operator_console import start_polling
+    start_polling()
     app.run(host='0.0.0.0', port=port, threaded=True, use_reloader=False)

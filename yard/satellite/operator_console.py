@@ -27,6 +27,8 @@ shadow Python's stdlib `operator` module.
 
 import os
 import re
+import requests
+import threading
 from datetime import datetime, timezone
 from functools import wraps
 
@@ -397,3 +399,72 @@ def api_rover_health():
     except requests.exceptions.RequestException:
         pass
     return jsonify(result)
+
+# YouTube video fetching implementation
+YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY')
+YOUTUBE_CHANNEL_ID = os.environ.get('YOUTUBE_CHANNEL_ID')
+
+
+def check_for_new_videos():
+    # Runs every 5 minutes to check for newly uploaded mission videos.
+    print('[youtube-poll] Checking for new videos...')
+
+    if not YOUTUBE_API_KEY or not YOUTUBE_CHANNEL_ID:
+        print('[youtube-poll] Missing YOUTUBE_API_KEY or YOUTUBE_CHANNEL_ID; skipping poll')
+        return
+
+    # Get missions that are completed but do not yet have a YouTube link.
+    missions_ref = _firestore().collection(MISSIONS_COLLECTION)
+    unlinked = (
+        missions_ref
+        .where('status', '==', 'completed')
+        .where('youtubeUrl', '==', None)
+        .stream()
+    )
+    unlinked = list(unlinked)
+
+    if not unlinked:
+        return
+
+    # The uploads playlist id is the channel id with UC -> UU.
+    uploads_playlist = YOUTUBE_CHANNEL_ID.replace('UC', 'UU', 1)
+
+    response = requests.get(
+        'https://www.googleapis.com/youtube/v3/playlistItems',
+        params={
+            'part': 'snippet',
+            'playlistId': uploads_playlist,
+            'maxResults': 50,
+            'key': YOUTUBE_API_KEY,
+        },
+        timeout=10.0,
+    )
+    if response.status_code != 200:
+        print(f'[youtube-poll] YouTube API error: HTTP {response.status_code}')
+        return
+
+    videos = response.json().get('items', [])
+
+    # Match mission ids embedded in video descriptions.
+    for mission_doc in unlinked:
+        mission_id = mission_doc.id
+
+        for video in videos:
+            description = video.get('snippet', {}).get('description', '')
+
+            if f'MissionID: {mission_id}' in description:
+                video_id = video.get('snippet', {}).get('resourceId', {}).get('videoId')
+                if not video_id:
+                    continue
+                youtube_url = f'https://www.youtube.com/watch?v={video_id}'
+
+                missions_ref.document(mission_id).update({'youtubeUrl': youtube_url})
+                print(f'Linked mission {mission_id} to video {video_id}')
+                break
+
+# Run this every 5 minutes
+def start_polling():
+    check_for_new_videos()
+    # Schedule next check in 5 minutes (300 seconds)
+    threading.Timer(300, start_polling).start()  
+
