@@ -180,3 +180,7 @@ npm-debug.log*
 *.tfstate
 *.tfstate.*
 crash.log
+
+# Youtube API IDs
+client_secret.json
+
