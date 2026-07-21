@@ -212,6 +212,9 @@
         .net-banner.visible { display: flex; }
         .net-banner.stale { color: #fbbf24; background: #451a03; border: 1px solid #b45309; }
         .net-banner.offline { color: #f87171; background: #450a0a; border: 1px solid #b91c1c; }
+        .net-banner.syncing { color: #60a5fa; background: #172554; border: 1px solid #1d4ed8; }
+
+        .sync-status { font-size: 0.72rem; color: #555; margin: -0.55rem 0 0.9rem; }
     </style>
 </head>
 <body>
@@ -229,6 +232,7 @@
         </div>
 
         <div class="net-banner" id="netBanner"></div>
+        <div class="sync-status" id="syncStatus"></div>
         <div class="stages" id="stages"></div>
         <div id="missions"></div>
     </div>
@@ -423,6 +427,32 @@
         }
 
         let consecutiveFailures = 0;
+        let lastSyncedAt = null; // epoch ms of the last confirmed-fresh mission data (fetch or cache load)
+
+        const syncStatusEl = document.getElementById('syncStatus');
+
+        function formatAge(ms) {
+            const s = Math.round((Date.now() - ms) / 1000);
+            if (s < 5) return 'just now';
+            if (s < 60) return `${s}s ago`;
+            const m = Math.round(s / 60);
+            if (m < 60) return `${m}m ago`;
+            return `${Math.round(m / 60)}h ago`;
+        }
+
+        // "Last synced: …" is always visible once we have any timestamp,
+        // independent of the net-banner (which only appears for stale/
+        // offline/syncing states) — so the operator always has a concrete
+        // answer to "how current is this?"
+        function updateSyncStatus() {
+            syncStatusEl.textContent = lastSyncedAt ? `Last synced: ${formatAge(lastSyncedAt)}` : '';
+        }
+        setInterval(updateSyncStatus, 5000);
+
+        function markSynced(ts) {
+            lastSyncedAt = ts;
+            updateSyncStatus();
+        }
 
         // Instant paint from whatever this tab last saw, before the network
         // round-trip completes, so the console doesn't sit on "Loading…"
@@ -430,8 +460,22 @@
         const cachedMissions = YardCache.read('missions');
         if (cachedMissions) {
             applyMissions(cachedMissions.value);
-            const age = Math.round((Date.now() - cachedMissions.ts) / 1000);
-            setBanner('stale', `Showing missions from ${age}s ago — refreshing…`);
+            markSynced(cachedMissions.ts);
+            setBanner('stale', `Showing missions from ${Math.round((Date.now() - cachedMissions.ts) / 1000)}s ago — refreshing…`);
+        } else {
+            // No in-tab cache — e.g. the browser was fully closed and
+            // reopened, so sessionStorage is empty. Fall back to the
+            // persistent IndexedDB tier so missions from the last session
+            // still appear instantly instead of a blank "Loading…" screen.
+            // Guarded on !hasLoadedOnce so a network response that lands
+            // first (fast connection) isn't clobbered by this slower path.
+            YardCache.readPersistent('missions').then(function (persisted) {
+                if (persisted && !hasLoadedOnce) {
+                    applyMissions(persisted.value);
+                    markSynced(persisted.ts);
+                    setBanner('stale', `Showing missions from ${Math.round((Date.now() - persisted.ts) / 1000)}s ago — refreshing…`);
+                }
+            });
         }
 
         const missionsPoller = YardCache.createPoller({
@@ -443,9 +487,20 @@
                 const data = await resp.json();
                 const list = data.missions || [];
                 consecutiveFailures = 0;
-                YardCache.write('missions', list);
+                YardCache.write('missions', list); // mirrors into sessionStorage + IndexedDB
                 applyMissions(list);
-                setBanner(null); // back online — clear any stale/offline banner
+                markSynced(Date.now());
+                setBanner(null); // back online — clear any stale/offline/syncing banner
+            },
+            onOnline: function () {
+                // Immediate feedback the instant the browser reports we're
+                // back, rather than waiting for the resync fetch to resolve.
+                setBanner('syncing', 'Syncing latest missions…');
+            },
+            onOffline: function () {
+                setBanner('offline', hasLoadedOnce
+                    ? 'Offline – displaying cached missions'
+                    : 'Offline – waiting for connection…');
             },
             onError: function () {
                 consecutiveFailures++;
@@ -453,8 +508,8 @@
                     // We still have real data on screen (fresh or cached) — stay
                     // read-only rather than blocking the operator's view.
                     setBanner('offline', consecutiveFailures > 1
-                        ? `Can't reach the server (${consecutiveFailures} attempts) — showing last known missions, retrying…`
-                        : "Can't reach the server — showing last known missions, retrying…");
+                        ? `Offline – displaying cached missions (retry ${consecutiveFailures})`
+                        : 'Offline – displaying cached missions');
                 } else {
                     // Genuinely nothing to show yet (no cache, first load failed)
                     setBanner('offline', "Can't reach the server — retrying…");
@@ -462,6 +517,14 @@
                 }
             }
         });
+
+        // Reflect an already-offline browser (e.g. opened in airplane mode)
+        // immediately, instead of waiting for the first fetch to time out.
+        if (!navigator.onLine) {
+            setBanner('offline', hasLoadedOnce
+                ? 'Offline – displaying cached missions'
+                : 'Offline – waiting for connection…');
+        }
 
         const searchInput = document.getElementById('searchInput');
         const clearSearchBtn = document.getElementById('clearSearch');
