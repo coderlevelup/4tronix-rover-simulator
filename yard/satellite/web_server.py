@@ -11,8 +11,17 @@ import json
 import logging
 import socket
 import threading
+from pathlib import Path
+
 import requests
+from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context, session, redirect
+
+# Load this file's own .env before anything below reads os.environ - Flask
+# has no built-in equivalent of Next.js's automatic .env loading. Load by
+# explicit path (not the default upward search) so this never picks up a
+# different .env from a parent directory (e.g. mission-control's).
+load_dotenv(Path(__file__).resolve().parent / '.env')
 
 CAMERA_PORT = int(os.environ.get('CAMERA_PORT', 8890))
 

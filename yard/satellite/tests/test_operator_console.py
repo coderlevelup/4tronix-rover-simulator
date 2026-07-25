@@ -137,6 +137,13 @@ def missions():
 
 @pytest.fixture
 def client(missions, monkeypatch):
+    # web_server.py now calls load_dotenv() on import, so a developer's real
+    # local .env (OPERATOR_AUTH=off while testing at an event, a real
+    # YOUTUBE_API_KEY, etc.) would otherwise leak into every test run. Start
+    # every test from a clean slate; tests that care about a specific value
+    # set it themselves via monkeypatch.
+    for var in ('OPERATOR_AUTH', 'YOUTUBE_API_KEY', 'YOUTUBE_CHANNEL_ID'):
+        monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr(operator_console, '_firestore', lambda: FakeFirestore(missions))
     monkeypatch.setattr(operator_console, '_admin_configured', lambda: True)
     flask_app.config['TESTING'] = True
