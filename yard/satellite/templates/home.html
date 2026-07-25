@@ -6,29 +6,6 @@
     <title>Mars Yard</title>
     <link rel="stylesheet" href="/static/yard-base.css">
     <style>
-        /* ============================================================
-           Dashboard-only styles. Reuses the same CSS custom properties
-           already defined in yard-base.css (--surface, --border, --ok/
-           --warn/--bad, --text-dim, etc.) rather than a parallel colour
-           system.
-
-           Changes from the previous version, per design review:
-             - One .status-pill component (data-tone="ok|warn|bad|info|
-               neutral") replaces .pill and .queue-health-pill, which
-               previously reimplemented the same chip with different
-               opacity/padding logic.
-             - Orange (#f97316) is reserved for the brand mark only on
-               this page — selection/navigation states (active filter
-               chip, "Open full queue" link) now use the same blue
-               already used for "queued" status, so orange keeps its
-               meaning as "the one primary action" elsewhere in the app.
-             - Type scale consolidated from ~10 near-duplicate sizes
-               (0.64-0.87rem) down to 4 steps via the vars below.
-             - Removed the "Last sync" wide stat tile — it broke the
-               all-numeric pattern of the other four tiles and duplicated
-               the status strip's own "Last sync" field above it.
-             - Added :focus-visible rings on every interactive element.
-           ============================================================ */
         :root {
             --fs-body: 0.9rem;
             --fs-sm: 0.8rem;

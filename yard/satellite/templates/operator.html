@@ -6,22 +6,6 @@
     <title>Operator Console</title>
     <link rel="stylesheet" href="/static/yard-base.css">
     <style>
-        /* ============================================================
-           Changes from the previous version, per design review:
-             - Every hardcoded hex (#1a1a1a, #2a2a2a, #666, #888, etc.)
-               replaced with the same yard-base.css custom properties
-               home.html and status.html already use. This page was the
-               one place in the app with its own parallel colour system.
-             - .pill replaced with the shared .status-pill component
-               (data-tone="ok|warn|bad|info").
-             - Stage tabs and the search focus ring now use a blue
-               selection accent instead of orange, so orange keeps one
-               meaning across the app: "the primary action" (Send to
-               rover, Attach video, Rerun) — see .btn.primary below,
-               which is the one place orange is still used.
-             - Type scale consolidated via the vars below.
-             - :focus-visible added to every interactive element.
-           ============================================================ */
         :root {
             --fs-body: 0.9rem;
             --fs-sm: 0.8rem;
@@ -115,7 +99,6 @@
         }
         .toolbar a:hover, .toolbar button:hover { border-color: var(--border-strong); }
 
-        /* Stages/stations UI removed — styles intentionally omitted */
 
         .mission {
             background: var(--surface-2, #1a1a1a);
@@ -156,12 +139,6 @@
             padding: 0.75rem 1rem;
             border-top: 1px solid var(--border);
         }
-
-        /* Buttons: .btn is the neutral/secondary style everywhere; .btn.primary
-           is the ONLY place orange appears on this page, reserved for the
-           action that actually moves a mission forward (Send to rover,
-           Attach video, Rerun). .btn.success marks a just-completed state,
-           not an action, so it keeps the existing green convention. */
         .btn {
             border: 1px solid var(--border);
             border-radius: 8px;
@@ -244,9 +221,6 @@
         let searchQuery = '';
         const drafts = {};
 
-        // Shared across the app — see home.html's STATUS_TONE. Kept as a
-        // single source per file (no shared JS module yet) but the same
-        // four values, so the pill colour language never diverges.
         const STATUS_TONE = { queued: 'info', processing: 'warn', completed: 'ok', failed: 'bad' };
 
         const missionsEl = document.getElementById('missions');
