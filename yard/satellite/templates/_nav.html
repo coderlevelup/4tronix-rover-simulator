@@ -32,74 +32,15 @@
 </header>
 <script>
 // ============================================================
-// YardCache: shared cache + adaptive poller, in two tiers:
-//   1. sessionStorage — synchronous, instant paint across page
-//      navigations within a visit. Read via read().
-//   2. IndexedDB      — asynchronous, durable across page refreshes,
-//      tab closes, and full browser restarts. Read via readPersistent().
-// Every write() mirrors into both tiers automatically, so callers
-// (this nav bar, operator.html, status.html, home.html) get offline
-// persistence for free without touching their fetch logic. Adding a
-// new cached resource (users, challenges, ...) is just a new key —
-// no new plumbing needed.
+// YardCache: shared sessionStorage cache + adaptive poller.
+// Used by this nav bar, and reused as-is by operator.html and
+// status.html so every polling loop in the app behaves the same way.
+// sessionStorage (not localStorage) is deliberate: this is live
+// operational data, not a durable draft — it should give instant
+// paint across page navigations within a visit, but never survive
+// into a new day/tab and read as fresh.
 // ============================================================
 window.YardCache = window.YardCache || (function () {
-  var DB_NAME = 'yard-cache';
-  var DB_VERSION = 1;
-  var STORE = 'entries';
-  var dbPromise = null;
-
-  // Opens (and lazily upgrades) the shared IndexedDB database. Resolves to
-  // `null` — rather than rejecting — when IndexedDB is unavailable or blocked
-  // (e.g. private browsing), so every caller can treat "no persistence" as a
-  // normal, non-fatal case instead of special-casing errors everywhere.
-  function openDb() {
-    if (!('indexedDB' in window)) return Promise.resolve(null);
-    if (dbPromise) return dbPromise;
-    dbPromise = new Promise(function (resolve) {
-      var req;
-      try {
-        req = indexedDB.open(DB_NAME, DB_VERSION);
-      } catch (e) { resolve(null); return; }
-      req.onupgradeneeded = function () {
-        var db = req.result;
-        if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'key' });
-      };
-      req.onsuccess = function () { resolve(req.result); };
-      req.onerror = function () { resolve(null); };
-    });
-    return dbPromise;
-  }
-
-  function writePersistent(key, entry) {
-    openDb().then(function (db) {
-      if (!db) return;
-      try {
-        var tx = db.transaction(STORE, 'readwrite');
-        tx.objectStore(STORE).put({ key: key, value: entry.value, ts: entry.ts });
-      } catch (e) { /* non-fatal — sessionStorage tier still has it for this tab */ }
-    });
-  }
-
-  // Cold-start read: used when sessionStorage is empty (new tab/browser
-  // session) so the last known data still paints instantly instead of a
-  // blank state while the network round-trip is in flight.
-  function readPersistent(key) {
-    return openDb().then(function (db) {
-      if (!db) return null;
-      return new Promise(function (resolve) {
-        try {
-          var tx = db.transaction(STORE, 'readonly');
-          var req = tx.objectStore(STORE).get(key);
-          req.onsuccess = function () {
-            resolve(req.result ? { value: req.result.value, ts: req.result.ts } : null);
-          };
-          req.onerror = function () { resolve(null); };
-        } catch (e) { resolve(null); }
-      });
-    });
-  }
-
   function read(key) {
     try {
       var raw = sessionStorage.getItem('yard:' + key);
@@ -107,11 +48,9 @@ window.YardCache = window.YardCache || (function () {
     } catch (e) { return null; } // storage disabled/full — just skip caching
   }
   function write(key, value) {
-    var entry = { value: value, ts: Date.now() };
     try {
-      sessionStorage.setItem('yard:' + key, JSON.stringify(entry));
+      sessionStorage.setItem('yard:' + key, JSON.stringify({ value: value, ts: Date.now() }));
     } catch (e) { /* non-fatal */ }
-    writePersistent(key, entry); // mirror into IndexedDB for cross-session persistence
   }
 
   // Runs `fetchFn` on an adaptive schedule: normal cadence while the tab is
@@ -147,24 +86,17 @@ window.YardCache = window.YardCache || (function () {
       if (!document.hidden) { cur = interval; tick().catch(function () {}); } // catch up immediately on refocus
     });
 
-    // Resync the moment the browser/OS reports connectivity restored,
-    // instead of waiting out whatever backoff delay a prior failure left
-    // us at — this is what makes "plug the network back in" feel instant
-    // rather than up to maxInterval seconds later.
-    window.addEventListener('online', function () {
-      if (opts.onOnline) opts.onOnline();
-      cur = interval;
-      tick().catch(function () {});
-    });
-    if (opts.onOffline) {
-      window.addEventListener('offline', opts.onOffline);
-    }
+    // Backoff can grow up to maxInterval while offline, so without this a
+    // reconnect could sit waiting out the rest of that delay before the next
+    // attempt. The 'online' event fires as soon as the browser sees
+    // connectivity again, so jump straight to a fresh attempt instead.
+    window.addEventListener('online', function () { cur = interval; tick().catch(function () {}); });
 
     tick().catch(function () {});
     return { refreshNow: function () { cur = interval; return tick(); } };
   }
 
-  return { read: read, readPersistent: readPersistent, write: write, createPoller: createPoller };
+  return { read: read, write: write, createPoller: createPoller };
 })();
 
 (function () {
