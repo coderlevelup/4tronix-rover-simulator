@@ -1,7 +1,13 @@
 {# Shared command bar. Set nav_active before including:
    {% set nav_active = 'home' %}{% include "_nav.html" %}
    Shows a live rover status chip (polls /api/status) and, when an operator is
-   in context, their email + a logout button. #}
+   in context, their email + a logout button.
+
+   Also defines window.YardCache: a small stale-while-revalidate + adaptive-
+   polling helper shared by this bar, operator.html, and status.html, so all
+   three pages get instant cached first paint, pause polling in background
+   tabs, and back off automatically on transient network failures — without
+   duplicating that logic per page. #}
 <header class="topbar">
   <a class="brand" href="/">
     <span class="brand-mark"></span>
@@ -25,24 +31,108 @@
   </div>
 </header>
 <script>
+// ============================================================
+// YardCache: shared sessionStorage cache + adaptive poller.
+// Used by this nav bar, and reused as-is by operator.html and
+// status.html so every polling loop in the app behaves the same way.
+// sessionStorage (not localStorage) is deliberate: this is live
+// operational data, not a durable draft — it should give instant
+// paint across page navigations within a visit, but never survive
+// into a new day/tab and read as fresh.
+// ============================================================
+window.YardCache = window.YardCache || (function () {
+  function read(key) {
+    try {
+      var raw = sessionStorage.getItem('yard:' + key);
+      return raw ? JSON.parse(raw) : null; // {value, ts}
+    } catch (e) { return null; } // storage disabled/full — just skip caching
+  }
+  function write(key, value) {
+    try {
+      sessionStorage.setItem('yard:' + key, JSON.stringify({ value: value, ts: Date.now() }));
+    } catch (e) { /* non-fatal */ }
+  }
+
+  // Runs `fetchFn` on an adaptive schedule: normal cadence while the tab is
+  // visible and healthy, paused while backgrounded, and backed off
+  // (doubling up to maxInterval) on consecutive failures so a flaky network
+  // doesn't hammer the satellite with retries. Call .refreshNow() to jump
+  // the queue (e.g. right after the tab regains focus, or after a mutation).
+  function createPoller(opts) {
+    var interval = opts.interval || 5000;
+    var maxInterval = opts.maxInterval || 30000;
+    var cur = interval;
+    var timer = null;
+
+    function schedule(delay) {
+      if (timer) clearTimeout(timer);
+      if (document.hidden) return; // resumed by the visibilitychange listener below
+      timer = setTimeout(tick, delay);
+    }
+
+    function tick() {
+      return Promise.resolve(opts.fetchFn()).then(function () {
+        cur = interval; // reset backoff on success
+        schedule(cur);
+      }).catch(function (err) {
+        cur = Math.min(cur * 2, maxInterval); // back off on transient failures
+        if (opts.onError) opts.onError(err);
+        schedule(cur);
+        throw err; // let a caller awaiting refreshNow() still see the failure
+      });
+    }
+
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) { cur = interval; tick().catch(function () {}); } // catch up immediately on refocus
+    });
+
+    // Backoff can grow up to maxInterval while offline, so without this a
+    // reconnect could sit waiting out the rest of that delay before the next
+    // attempt. The 'online' event fires as soon as the browser sees
+    // connectivity again, so jump straight to a fresh attempt instead.
+    window.addEventListener('online', function () { cur = interval; tick().catch(function () {}); });
+
+    tick().catch(function () {});
+    return { refreshNow: function () { cur = interval; return tick(); } };
+  }
+
+  return { read: read, write: write, createPoller: createPoller };
+})();
+
 (function () {
-  function pollRover() {
-    var el = document.getElementById('sysRover');
-    if (!el) return;
+  var el = document.getElementById('sysRover');
+  if (el) {
     var dot = el.querySelector('.sys-dot'), txt = el.querySelector('.sys-txt');
-    fetch('/api/status').then(function (r) { return r.json(); }).then(function (d) {
-      var r = d.rover || {};
+
+    function paint(r) {
       var ok = r.reachable && (r.status == null || r.status === 'ok');
       dot.className = 'sys-dot ' + (ok ? 'ok' : 'bad');
       var q = (r.queue_size != null) ? '  ·  queue ' + r.queue_size : '';
       txt.textContent = ok ? ('Rover online' + q) : (r.reachable ? 'Rover degraded' : 'Rover offline');
-    }).catch(function () {
-      dot.className = 'sys-dot bad';
-      txt.textContent = 'Rover offline';
+    }
+
+    // Instant paint from the last known state so nav between pages doesn't
+    // flash "Rover…" on every load while the fresh fetch happens in the background.
+    var cached = YardCache.read('roverStatus');
+    if (cached) paint(cached.value);
+
+    YardCache.createPoller({
+      interval: 5000,
+      maxInterval: 30000,
+      fetchFn: function () {
+        return fetch('/api/status').then(function (r) { return r.json(); }).then(function (d) {
+          var r2 = d.rover || {};
+          YardCache.write('roverStatus', r2);
+          paint(r2);
+        });
+      },
+      onError: function () {
+        dot.className = 'sys-dot bad';
+        txt.textContent = 'Rover offline';
+      }
     });
   }
-  pollRover();
-  setInterval(pollRover, 5000);
+
   var lo = document.getElementById('navLogout');
   if (lo) lo.onclick = function () {
     fetch('/operator/api/logout', { method: 'POST' }).then(function () { location.href = '/operator/login'; });

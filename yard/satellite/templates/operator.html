@@ -6,7 +6,14 @@
     <title>Operator Console</title>
     <link rel="stylesheet" href="/static/yard-base.css">
     <style>
+        :root {
+            --fs-body: 0.9rem;
+            --fs-sm: 0.8rem;
+            --fs-xs: 0.72rem;
+            --accent-select: #60a5fa;
+        }
         body { min-height: 100vh; }
+        :focus-visible { outline: 2px solid var(--accent-select); outline-offset: 2px; border-radius: 4px; }
 
         .wrap { max-width: 920px; margin: 0 auto; padding: 1.9rem 1.5rem 3rem; }
 
@@ -19,59 +26,83 @@
             margin-bottom: 1.25rem;
         }
 
-        h1 { font-size: 1.5rem; font-weight: 600; color: #fff; }
-        .subtitle { font-size: 0.85rem; color: #666; }
+        h1 { font-size: 1.5rem; font-weight: 600; color: var(--heading, #fff); }
+        .subtitle { font-size: var(--fs-sm); color: var(--text-faint, #666); }
 
-        .badge {
+        /* ---------- Status pill (shared) ---------- */
+        .status-pill {
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.3rem;
             border-radius: 999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.3rem 0.75rem;
-            border: 1px solid #333;
-            color: #888;
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.2rem 0.6rem;
+            border: 1px solid var(--border);
+            background: var(--surface-3, #222);
+            color: var(--text-faint, #888);
+            flex-shrink: 0;
         }
-        .badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
-        .badge.online  { border-color: #22c55e; color: #4ade80; }
-        .badge.online .dot { background: #22c55e; }
-        .badge.offline { border-color: #ef4444; color: #f87171; }
-        .badge.offline .dot { background: #ef4444; }
+        .status-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+        .status-pill[data-tone="ok"]   { color: var(--ok);   background: rgba(52, 211, 153, 0.1);  border-color: rgba(52, 211, 153, 0.35); }
+        .status-pill[data-tone="warn"] { color: var(--warn); background: rgba(251, 191, 36, 0.1);  border-color: rgba(251, 191, 36, 0.35); }
+        .status-pill[data-tone="bad"]  { color: var(--bad);  background: rgba(248, 113, 113, 0.1); border-color: rgba(248, 113, 113, 0.35); }
+        .status-pill[data-tone="info"] { color: var(--accent-select); background: rgba(96, 165, 250, 0.1); border-color: rgba(96, 165, 250, 0.35); }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--surface-2, #1a1a1a);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.45rem 0.7rem;
+            margin-bottom: 1rem;
+            max-width: 360px;
+        }
+        .search-box:focus-within { border-color: var(--accent-select); }
+        .search-box svg { width: 16px; height: 16px; color: var(--text-faint, #666); flex-shrink: 0; }
+        .search-box input {
+            flex: 1;
+            background: none;
+            border: none;
+            outline: none;
+            color: var(--text, #e0e0e0);
+            font-size: var(--fs-sm);
+        }
+        .search-box input::placeholder { color: var(--text-faint, #555); }
+        .search-box .clear-search {
+            background: none;
+            border: none;
+            color: var(--text-faint, #666);
+            cursor: pointer;
+            font-size: 0.9rem;
+            padding: 0 0.2rem;
+            display: none;
+            border-radius: 4px;
+        }
+        .search-box .clear-search.visible { display: block; }
+        .search-box .clear-search:hover { color: var(--text, #ccc); }
 
         .toolbar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
         .toolbar a, .toolbar button {
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
+            background: var(--surface-2, #1a1a1a);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            color: #ccc;
-            font-size: 0.8rem;
+            color: var(--text-dim, #ccc);
+            font-size: var(--fs-sm);
             padding: 0.45rem 0.8rem;
             text-decoration: none;
             cursor: pointer;
         }
-        .toolbar a:hover, .toolbar button:hover { border-color: #555; }
+        .toolbar a:hover, .toolbar button:hover { border-color: var(--border-strong); }
 
-        .stages {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-            gap: 0.6rem;
-            margin-bottom: 1.25rem;
-        }
-        .stage {
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
-            border-radius: 10px;
-            padding: 0.6rem 0.9rem;
-            cursor: pointer;
-        }
-        .stage.active { border-color: #f97316; }
-        .stage .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: #888; }
-        .stage .count { font-size: 1.4rem; font-weight: 700; color: #fff; }
 
         .mission {
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
+            background: var(--surface-2, #1a1a1a);
+            border: 1px solid var(--border);
             border-radius: 12px;
             margin-bottom: 0.9rem;
             overflow: hidden;
@@ -83,31 +114,17 @@
             justify-content: space-between;
             gap: 0.75rem;
             padding: 0.8rem 1rem;
-            border-bottom: 1px solid #242424;
+            border-bottom: 1px solid var(--border);
             flex-wrap: wrap;
         }
-        .mission-title { font-size: 0.95rem; font-weight: 600; color: #fff; }
-        .mission-meta { font-size: 0.75rem; color: #666; font-family: ui-monospace, monospace; }
-
-        .pill {
-            border-radius: 999px;
-            font-size: 0.68rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 0.2rem 0.6rem;
-            border: 1px solid;
-        }
-        .pill.queued     { color: #60a5fa; border-color: #1d4ed8; background: #172554; }
-        .pill.processing { color: #fbbf24; border-color: #b45309; background: #451a03; }
-        .pill.completed  { color: #4ade80; border-color: #15803d; background: #14532d; }
-        .pill.failed     { color: #f87171; border-color: #b91c1c; background: #450a0a; }
+        .mission-title { font-size: var(--fs-body); font-weight: 600; color: var(--heading, #fff); }
+        .mission-meta { font-size: var(--fs-xs); color: var(--text-faint, #666); font-family: ui-monospace, monospace; }
 
         pre {
-            background: #111;
-            color: #d0d0d0;
+            background: var(--surface-3, #111);
+            color: var(--text-dim, #d0d0d0);
             font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-            font-size: 0.78rem;
+            font-size: var(--fs-sm);
             line-height: 1.5;
             padding: 0.9rem 1rem;
             max-height: 180px;
@@ -120,49 +137,61 @@
             gap: 0.5rem;
             flex-wrap: wrap;
             padding: 0.75rem 1rem;
-            border-top: 1px solid #242424;
+            border-top: 1px solid var(--border);
         }
-
         .btn {
-            border: 1px solid #2a2a2a;
+            border: 1px solid var(--border);
             border-radius: 8px;
-            background: #222;
-            color: #ccc;
-            font-size: 0.8rem;
+            background: var(--surface-3, #222);
+            color: var(--text-dim, #ccc);
+            font-size: var(--fs-sm);
             font-weight: 600;
             padding: 0.5rem 0.9rem;
             cursor: pointer;
         }
-        .btn:hover { border-color: #555; }
+        .btn:hover { border-color: var(--border-strong); }
         .btn:disabled { opacity: 0.5; cursor: default; }
         .btn.primary { background: #f97316; border-color: #f97316; color: #fff; }
-        .btn.primary:hover { background: #ea580c; }
-        .btn.success { background: #14532d; border-color: #15803d; color: #4ade80; }
+        .btn.primary:hover:not(:disabled) { background: #ea580c; }
+        .btn.success { background: rgba(52, 211, 153, 0.15); border-color: rgba(52, 211, 153, 0.4); color: var(--ok); }
 
         .mission-actions input {
             flex: 1;
             min-width: 200px;
-            background: #111;
-            border: 1px solid #2a2a2a;
+            background: var(--surface-3, #111);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            color: #e0e0e0;
-            font-size: 0.8rem;
+            color: var(--text, #e0e0e0);
+            font-size: var(--fs-sm);
             padding: 0.5rem 0.75rem;
             outline: none;
         }
-        .mission-actions input:focus { border-color: #f97316; }
+        .mission-actions input:focus-visible { border-color: #f97316; }
 
-        .action-error { width: 100%; color: #f87171; font-size: 0.78rem; }
-        .yt-link { color: #4ade80; font-size: 0.8rem; text-decoration: none; }
+        .action-error { width: 100%; color: var(--bad); font-size: var(--fs-xs); }
+        .yt-link { color: var(--ok); font-size: var(--fs-sm); text-decoration: none; border-radius: 4px; }
         .yt-link:hover { text-decoration: underline; }
 
         .empty {
             text-align: center;
-            color: #666;
+            color: var(--text-faint, #666);
             padding: 3rem 1rem;
-            border: 1px dashed #2a2a2a;
+            border: 1px dashed var(--border);
             border-radius: 12px;
         }
+
+        .net-banner {
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: var(--fs-sm);
+            border-radius: 8px;
+            padding: 0.55rem 0.85rem;
+            margin-bottom: 0.9rem;
+        }
+        .net-banner.visible { display: flex; }
+        .net-banner.stale { color: #fbbf24; background: #451a03; border: 1px solid #b45309; }
+        .net-banner.offline { color: #f87171; background: #450a0a; border: 1px solid #b91c1c; }
     </style>
 </head>
 <body>
@@ -173,30 +202,43 @@
             <h1 class="page-title">Operator Console</h1>
         </div>
 
-        <div class="stages" id="stages"></div>
+        <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="searchInput" placeholder="Search missions by name or yard ID&hellip;" autocomplete="off">
+            <button class="clear-search" id="clearSearch" title="Clear search" aria-label="Clear search">&times;</button>
+        </div>
+
+        <div class="net-banner" id="netBanner"></div>
+        <!-- stages/stations UI removed -->
         <div id="missions"></div>
     </div>
 
     <script>
-        const STAGES = [
-            { key: 'all',        label: 'All' },
-            { key: 'queued',     label: 'Queued' },
-            { key: 'processing', label: 'Running' },
-            { key: 'completed',  label: 'Done' },
-        ];
-        let stage = 'queued';
+        let stage = 'all';
         let missions = [];
-        // Draft YouTube URLs survive re-renders so a half-typed link is not
-        // wiped by the 15s refresh.
+        let missionsJson = null;
+        let hasLoadedOnce = false;
+        let searchQuery = '';
         const drafts = {};
 
-        const stagesEl = document.getElementById('stages');
-        const missionsEl = document.getElementById('missions');
+        const STATUS_TONE = { queued: 'info', processing: 'warn', completed: 'ok', failed: 'bad' };
 
-        function count(key) {
-            if (key === 'all') return missions.length;
-            return missions.filter(m => m.status === key).length;
+        const missionsEl = document.getElementById('missions');
+        const netBanner = document.getElementById('netBanner');
+
+        function setBanner(kind, text) {
+            if (!kind) { netBanner.className = 'net-banner'; return; }
+            netBanner.className = 'net-banner visible ' + kind;
+            netBanner.textContent = text;
         }
+
+        function matchesSearch(m) {
+            if (!searchQuery) return true;
+            const haystack = `${m.name || ''} ${m.yardId || ''}`.toLowerCase();
+            return haystack.includes(searchQuery);
+        }
+
+
 
         function relTime(iso) {
             if (!iso) return '';
@@ -208,16 +250,7 @@
             return Math.round(hrs / 24) + 'd ago';
         }
 
-        function renderStages() {
-            stagesEl.innerHTML = STAGES.map(s => `
-                <div class="stage ${stage === s.key ? 'active' : ''}" data-stage="${s.key}">
-                    <div class="label">${s.label}</div>
-                    <div class="count">${count(s.key)}</div>
-                </div>`).join('');
-            stagesEl.querySelectorAll('.stage').forEach(el => {
-                el.onclick = () => { stage = el.dataset.stage; render(); };
-            });
-        }
+
 
         function esc(s) {
             return (s || '').replace(/[&<>"']/g, c => ({
@@ -252,10 +285,15 @@
         }
 
         function render() {
-            renderStages();
-            const visible = missions.filter(m => stage === 'all' || m.status === stage);
+            const visible = missions
+                .filter(m => stage === 'all' || m.status === stage)
+                .filter(matchesSearch);
             if (visible.length === 0) {
-                missionsEl.innerHTML = '<div class="empty">Nothing here. New submissions land automatically.</div>';
+                missionsEl.innerHTML = !hasLoadedOnce
+                    ? '<div class="empty">Loading missions&hellip;</div>'
+                    : searchQuery
+                        ? `<div class="empty">No missions match "${esc(searchQuery)}".</div>`
+                        : '<div class="empty">Nothing here. New submissions land automatically.</div>';
                 return;
             }
             missionsEl.innerHTML = visible.map(m => `
@@ -265,7 +303,7 @@
                             <div class="mission-title">${esc(m.name) || 'Mission-' + m.id.slice(0, 8)}</div>
                             <div class="mission-meta">${esc(m.yardId) || ''} &middot; ${relTime(m.submittedAt)}</div>
                         </div>
-                        <span class="pill ${m.status}">${m.status === 'processing' ? 'running' : esc(m.status)}</span>
+                        <span class="status-pill" data-tone="${STATUS_TONE[m.status] || ''}">${m.status === 'processing' ? 'running' : esc(m.status)}</span>
                     </div>
                     <pre>${esc((m.code || '').trim()) || '# No code'}</pre>
                     <div class="mission-actions" data-mission="${m.id}">${actionsFor(m)}</div>
@@ -291,6 +329,50 @@
             err.textContent = message;
         }
 
+        async function fetchWithTimeout(url, opts, timeoutMs) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs || 15000);
+            try {
+                return await fetch(url, { ...opts, signal: controller.signal });
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
+        function missionErrorMessage(err, resp, data) {
+            if (!resp) {
+                if (err && err.name === 'AbortError') {
+                    return 'Mission failed because the request timed out. Try again in a few minutes, or check the Status page for rover connectivity.';
+                }
+                return 'Mission failed because the network connection was interrupted. Check your internet connection and try again.';
+            }
+
+            const detail = data && data.error;
+
+            switch (resp.status) {
+                case 401:
+                    return 'Mission failed because your session has expired. Sign in again and retry the action.';
+                case 403:
+                    return "Mission failed because you don't have permission to do this. Ask an admin for operator access and try again.";
+                case 400:
+                case 422:
+                    return `Mission failed because of invalid input${detail ? ' (' + detail + ')' : ''}. Double-check the details and try again.`;
+                case 404:
+                    return 'Mission failed because this mission no longer exists. Refresh the queue and try again.';
+                case 408:
+                    return 'Mission failed because the request timed out. Try again in a few minutes.';
+                case 502:
+                case 503:
+                case 504:
+                    return 'Mission failed because the rover service is temporarily unavailable. Wait a moment and try again, or check the Status page.';
+                default:
+                    if (resp.status >= 500) {
+                        return 'Mission failed because of a server error. Try again, and check the Status page if it keeps happening.';
+                    }
+                    return `Mission failed for an unknown reason${detail ? ' (' + detail + ')' : ''}. Try again, and check the Status page if the problem continues.`;
+            }
+        }
+
         async function act(action, missionId, btn) {
             if (action === 'copy' || action === 'copyblocks') {
                 const m = missions.find(x => x.id === missionId);
@@ -311,36 +393,84 @@
             if (action === 'youtube') body = { url: drafts[missionId] || '' };
 
             btn.disabled = true;
+            let resp, data;
             try {
-                const resp = await fetch(`/operator/api/missions/${missionId}/${endpoints[action]}`, {
+                resp = await fetchWithTimeout(`/operator/api/missions/${missionId}/${endpoints[action]}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: body ? JSON.stringify(body) : undefined,
-                });
-                const data = await resp.json().catch(() => ({}));
+                }, 15000);
+                data = await resp.json().catch(() => ({}));
                 if (!resp.ok) throw new Error(data.error || `Failed (HTTP ${resp.status})`);
                 delete drafts[missionId];
-                await load();
+                missionsPoller.refreshNow().catch(() => {});
             } catch (err) {
                 btn.disabled = false;
-                showError(missionId, err.message);
+                showError(missionId, missionErrorMessage(err, resp, data));
             }
         }
 
-        async function load() {
-            try {
+        function applyMissions(list) {
+            const json = JSON.stringify(list);
+            missions = list;
+            hasLoadedOnce = true;
+            if (json === missionsJson) return false;
+            missionsJson = json;
+            render();
+            return true;
+        }
+
+        let consecutiveFailures = 0;
+
+        const cachedMissions = YardCache.read('missions');
+        if (cachedMissions) {
+            applyMissions(cachedMissions.value);
+            const age = Math.round((Date.now() - cachedMissions.ts) / 1000);
+            setBanner('stale', `Showing missions from ${age}s ago — refreshing…`);
+        }
+
+        const missionsPoller = YardCache.createPoller({
+            interval: 15000,
+            maxInterval: 60000,
+            fetchFn: async function () {
                 const resp = await fetch('/operator/api/missions');
                 if (resp.status === 401) { window.location.href = '/operator/login'; return; }
                 const data = await resp.json();
-                missions = data.missions || [];
-                render();
-            } catch {
-                /* transient network error - next poll retries */
+                const list = data.missions || [];
+                consecutiveFailures = 0;
+                YardCache.write('missions', list);
+                applyMissions(list);
+                setBanner(null);
+            },
+            onError: function () {
+                consecutiveFailures++;
+                if (hasLoadedOnce) {
+                    setBanner('offline', consecutiveFailures > 1
+                        ? `Can't reach the server (${consecutiveFailures} attempts) — showing last known missions, retrying…`
+                        : "Can't reach the server — showing last known missions, retrying…");
+                } else {
+                    setBanner('offline', "Can't reach the server — retrying…");
+                    render();
+                }
             }
-        }
+        });
 
-        load();
-        setInterval(load, 15000);
+        const searchInput = document.getElementById('searchInput');
+        const clearSearchBtn = document.getElementById('clearSearch');
+
+        searchInput.addEventListener('input', () => {
+            searchQuery = searchInput.value.trim().toLowerCase();
+            clearSearchBtn.classList.toggle('visible', searchQuery.length > 0);
+            render();
+        });
+
+        clearSearchBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            searchQuery = '';
+            clearSearchBtn.classList.remove('visible');
+            render();
+            searchInput.focus();
+        });
     </script>
 </body>
 </html>

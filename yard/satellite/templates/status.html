@@ -233,67 +233,92 @@
                 : '<br>Mast cam: <span style="color:#f87171">not detected (reseat + reboot)</span>';
         }
 
-        function poll() {
-            fetch('/api/status')
-                .then(r => r.json())
-                .then(data => {
-                    // Satellite — always green if this page loaded
-                    setBadge('satellite', { colour: 'green', text: 'OK' });
-                    setDetail('satellite',
-                        row('Hostname', data.satellite.hostname) +
-                        row('IP', data.satellite.ip)
-                    );
+        // Pure render step, split out from the fetch so a cached snapshot
+        // (read on load, see below) can paint instantly through the exact
+        // same path a live poll uses — no separate "cached" rendering to
+        // keep in sync.
+        function renderStatus(data) {
+            // Satellite — always green if this page loaded
+            setBadge('satellite', { colour: 'green', text: 'OK' });
+            setDetail('satellite',
+                row('Hostname', data.satellite.hostname) +
+                row('IP', data.satellite.ip)
+            );
 
-                    // Keep the displayed rover URL in sync with the server
-                    document.getElementById('rover-url').textContent = data.rover.url;
+            // Keep the displayed rover URL in sync with the server
+            document.getElementById('rover-url').textContent = data.rover.url;
 
-                    // Rover
-                    const r = data.rover;
-                    if (!r.reachable) {
-                        setBadge('rover', { colour: 'red', text: 'Unreachable' });
-                        setDetail('rover', row('URL', r.url));
-                    } else if (r.status && r.status !== 'ok') {
-                        // Reachable but the queue processor thread is dead:
-                        // commands would be accepted yet never executed
-                        setBadge('rover', { colour: 'red', text: 'Processor stalled' });
-                        setDetail('rover',
-                            row('Driver', r.driver) +
-                            row('Queue', r.queue_size) +
-                            roverCam(r)
-                        );
-                    } else {
-                        if (r.hardware === false) {
-                            setBadge('rover', { colour: 'amber', text: 'Fake driver (no hardware)' });
-                        } else {
-                            setBadge('rover', { colour: 'green', text: 'OK' });
-                        }
-                        setDetail('rover',
-                            row('Driver', r.driver) +
-                            row('Queue', r.queue_size) +
-                            roverCam(r)
-                        );
-                    }
+            // Rover
+            const r = data.rover;
+            if (!r.reachable) {
+                setBadge('rover', { colour: 'red', text: 'Unreachable' });
+                setDetail('rover', row('URL', r.url));
+            } else if (r.status && r.status !== 'ok') {
+                // Reachable but the queue processor thread is dead:
+                // commands would be accepted yet never executed
+                setBadge('rover', { colour: 'red', text: 'Processor stalled' });
+                setDetail('rover',
+                    row('Driver', r.driver) +
+                    row('Queue', r.queue_size) +
+                    roverCam(r)
+                );
+            } else {
+                if (r.hardware === false) {
+                    setBadge('rover', { colour: 'amber', text: 'Fake driver (no hardware)' });
+                } else {
+                    setBadge('rover', { colour: 'green', text: 'OK' });
+                }
+                setDetail('rover',
+                    row('Driver', r.driver) +
+                    row('Queue', r.queue_size) +
+                    roverCam(r)
+                );
+            }
 
-                    // Camera
-                    const c = data.camera;
-                    if (c.reachable) {
-                        setBadge('camera', { colour: 'green', text: 'OK' });
-                        setDetail('camera', row('Port', c.port));
-                    } else {
-                        setBadge('camera', { colour: 'red', text: 'Port closed' });
-                        setDetail('camera', row('Port', c.port) + '(service not running?)');
-                    }
-
-                    const now = new Date().toLocaleTimeString();
-                    document.getElementById('footer').textContent = 'Last checked: ' + now;
-                })
-                .catch(() => {
-                    document.getElementById('footer').textContent = 'Fetch failed — retrying…';
-                });
+            // Camera
+            const c = data.camera;
+            if (c.reachable) {
+                setBadge('camera', { colour: 'green', text: 'OK' });
+                setDetail('camera', row('Port', c.port));
+            } else {
+                setBadge('camera', { colour: 'red', text: 'Port closed' });
+                setDetail('camera', row('Port', c.port) + '(service not running?)');
+            }
         }
 
-        poll();
-        setInterval(poll, 5000);
+        // Instant paint from the last snapshot this tab saw, so the cards
+        // don't sit on "Loading…" every time this page is opened.
+        const cachedStatus = YardCache.read('fullStatus');
+        if (cachedStatus) {
+            renderStatus(cachedStatus.value);
+            const age = Math.round((Date.now() - cachedStatus.ts) / 1000);
+            document.getElementById('footer').textContent = 'Showing cached status (' + age + 's old) — refreshing…';
+        }
+
+        let consecutiveFailures = 0;
+
+        const statusPoller = YardCache.createPoller({
+            interval: 5000,
+            maxInterval: 20000,
+            fetchFn: function () {
+                return fetch('/api/status').then(r => r.json()).then(data => {
+                    consecutiveFailures = 0;
+                    YardCache.write('fullStatus', data);
+                    renderStatus(data);
+                    const now = new Date().toLocaleTimeString();
+                    document.getElementById('footer').textContent = 'Last checked: ' + now;
+                });
+            },
+            onError: function () {
+                // Exponential backoff (handled by the poller) means retries
+                // space out on their own; surface that instead of implying
+                // we're hammering the satellite every 5s regardless.
+                consecutiveFailures++;
+                document.getElementById('footer').textContent = consecutiveFailures > 1
+                    ? 'Fetch failed (' + consecutiveFailures + ' in a row) — backing off, retrying…'
+                    : 'Fetch failed — retrying…';
+            }
+        });
 
         // Rover URL editor
         const urlEditor = document.getElementById('url-editor');
@@ -330,7 +355,7 @@
                 } else {
                     urlError.textContent = 'Applied, but could not write config file — will reset on restart';
                 }
-                poll();
+                statusPoller.refreshNow().catch(() => {}); // jump the backoff queue after a config change instead of waiting out any backoff delay; failure is already surfaced via the footer banner
             } catch (e) {
                 urlError.textContent = 'Save failed: ' + e.message;
             }

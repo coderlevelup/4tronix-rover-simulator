@@ -3,160 +3,211 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Operator Login</title>
+    <title>Operator Login &middot; Mars Yard</title>
+    <link rel="stylesheet" href="/static/yard-base.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* ============================================================
+           Login-only layout. No new colours — every value below reads
+           from the same custom properties yard-base.css already defines
+           for home.html / status.html / monitor.html, so this page finally
+           shares one visual identity with the rest of the console instead
+           of being a hardcoded, unbranded island.
+           ============================================================ */
+        body { min-height: 100vh; display: flex; flex-direction: column; }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0f0f0f;
-            color: #e0e0e0;
-            min-height: 100vh;
+        .login-wrap {
+            flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 2rem;
+            padding: 2rem 1.5rem;
         }
 
-        .card {
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
-            border-radius: 12px;
-            padding: 2rem;
+        .login-card {
             width: 100%;
             max-width: 380px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.75rem;
         }
 
-        h1 { font-size: 1.4rem; font-weight: 600; color: #fff; }
-        .subtitle { font-size: 0.85rem; color: #666; margin: 0.35rem 0 1.5rem; }
+        .login-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-bottom: 1.5rem;
+        }
+        .login-brand .brand-mark {
+            width: 26px; height: 26px; border-radius: 7px;
+            background: #f97316;
+            flex-shrink: 0;
+        }
+        .login-brand-txt b { display: block; font-size: 0.95rem; font-weight: 700; color: var(--heading, #fff); }
+        .login-brand-txt small { display: block; font-size: 0.74rem; color: var(--text-faint, #777); margin-top: 0.1rem; }
+
+        /* One alert component, used for exactly one purpose: something the
+           operator needs to act on. Routine guidance (below) is plain text,
+           not an alert, so real problems don't get lost in the noise. */
+        .alert {
+            display: flex;
+            gap: 0.6rem;
+            align-items: flex-start;
+            border-radius: 10px;
+            padding: 0.7rem 0.9rem;
+            margin-bottom: 1.1rem;
+            font-size: 0.82rem;
+            line-height: 1.45;
+        }
+        .alert svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 0.1rem; }
+        .alert.tone-bad  { color: var(--bad);  background: rgba(248, 113, 113, 0.1); border: 1px solid rgba(248, 113, 113, 0.3); }
+        .alert.tone-warn { color: var(--warn); background: rgba(251, 191, 36, 0.1);  border: 1px solid rgba(251, 191, 36, 0.3); }
 
         label {
             display: block;
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: #888;
+            letter-spacing: 0.07em;
+            color: var(--text-faint, #888);
             margin-bottom: 0.4rem;
         }
+        .field { margin-bottom: 1rem; }
 
         input {
             width: 100%;
-            background: #111;
-            border: 1px solid #2a2a2a;
+            background: var(--surface-2, #141414);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            color: #e0e0e0;
-            font-size: 0.95rem;
-            padding: 0.7rem 0.9rem;
-            margin-bottom: 1rem;
+            color: var(--text, #e0e0e0);
+            font-size: 0.9rem;
+            padding: 0.65rem 0.85rem;
             outline: none;
         }
-        input:focus { border-color: #f97316; }
+        input::placeholder { color: var(--text-faint, #555); }
+        input:hover { border-color: var(--border-strong); }
+        input:focus-visible { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.18); }
 
-        button {
+        button[type="submit"] {
             width: 100%;
             background: #f97316;
             border: none;
             border-radius: 8px;
             color: #fff;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             font-weight: 600;
             padding: 0.75rem;
             cursor: pointer;
+            margin-top: 0.25rem;
         }
-        button:hover { background: #ea580c; }
-        button:disabled { opacity: 0.5; cursor: default; }
+        button[type="submit"]:hover:not(:disabled) { background: #ea580c; }
+        button[type="submit"]:focus-visible { outline: 2px solid #f97316; outline-offset: 2px; }
+        button[type="submit"]:disabled { opacity: 0.55; cursor: default; }
 
-        .error {
-            background: #450a0a;
-            border: 1px solid #ef4444;
-            border-radius: 8px;
-            color: #f87171;
-            font-size: 0.85rem;
-            padding: 0.6rem 0.9rem;
-            margin-bottom: 1rem;
-            display: none;
+        .login-help {
+            margin-top: 1.1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.78rem;
+            color: var(--text-faint, #777);
+            line-height: 1.5;
         }
+        .login-help a { color: #f97316; text-decoration: none; }
+        .login-help a:hover { text-decoration: underline; }
+        .login-help a:focus-visible { outline: 2px solid #f97316; outline-offset: 2px; border-radius: 3px; }
 
-        .warn {
-            background: #451a03;
-            border: 1px solid #f97316;
-            border-radius: 8px;
-            color: #fb923c;
-            font-size: 0.85rem;
-            padding: 0.6rem 0.9rem;
-            margin-bottom: 1rem;
+        .login-links {
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            font-size: 0.78rem;
         }
-
-        .links { margin-top: 1.25rem; font-size: 0.8rem; text-align: center; }
-        .links a { color: #666; text-decoration: none; }
-        .links a:hover { color: #ccc; }
+        .login-links a { color: var(--text-faint, #777); text-decoration: none; }
+        .login-links a:hover { color: var(--text, #ccc); }
+        .login-links a:focus-visible { outline: 2px solid #f97316; outline-offset: 2px; border-radius: 3px; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>Operator Login</h1>
-        <p class="subtitle">Mars Yard &middot; mission control operator console</p>
+    {% include "_nav.html" %}
 
-        {% if not configured %}
-        <div class="warn">
-            Firebase credentials are not configured on this satellite.
-            Set FIREBASE_* variables before operators can sign in.
-        </div>
-        {% else %}
-        <div class="warn">
-            Operators need an account in the same Firebase project and an operator/admin role.
-        </div>
-        {% endif %}
+    <div class="login-wrap">
+        <div class="login-card">
+            <div class="login-brand">
+                <span class="brand-mark" aria-hidden="true"></span>
+                <span class="login-brand-txt"><b>Mars Yard</b><small>Operator sign-in</small></span>
+            </div>
 
-        <div class="error" id="error"></div>
+            {% if not configured %}
+            <div class="alert tone-bad" role="alert">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>Firebase credentials aren&rsquo;t configured on this satellite. Sign-in is unavailable until <code>FIREBASE_*</code> variables are set.</span>
+            </div>
+            {% endif %}
 
-        <form id="login-form">
-            <label for="email">Email</label>
-            <input id="email" type="email" autocomplete="email" required>
+            <div class="error alert tone-bad" id="error" role="alert" style="display:none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span id="errorText"></span>
+            </div>
 
-            <label for="password">Password</label>
-            <input id="password" type="password" autocomplete="current-password" required>
+            <form id="login-form" novalidate>
+                <div class="field">
+                    <label for="email">Email</label>
+                    <input id="email" type="email" autocomplete="email" placeholder="you@yourteam.com" required {% if not configured %}disabled{% endif %}>
+                </div>
+                <div class="field">
+                    <label for="password">Password</label>
+                    <input id="password" type="password" autocomplete="current-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" required {% if not configured %}disabled{% endif %}>
+                </div>
+                <button id="submit" type="submit" {% if not configured %}disabled{% endif %}>Sign in</button>
+            </form>
 
-            <button id="submit" type="submit">Sign in</button>
-        </form>
+            <p class="login-help">
+                Sign in with your Firebase account and an operator or admin role.
+                Don&rsquo;t have access? <a href="mailto:yard-admin@example.com">Request an operator account</a>.
+            </p>
 
-        <div class="links">
-            <a href="/monitor/">Monitor</a> &middot;
-            <a href="/code/">Code</a> &middot;
-            <a href="/status">Status</a>
+            <div class="login-links">
+                <a href="/monitor/">Monitor</a>
+                <a href="/code/">Code</a>
+                <a href="/status">Status</a>
+            </div>
         </div>
     </div>
 
     <script>
-        const form = document.getElementById('login-form');
-        const errorBox = document.getElementById('error');
-        const submit = document.getElementById('submit');
+        var form = document.getElementById('login-form');
+        var errorBox = document.getElementById('error');
+        var errorText = document.getElementById('errorText');
+        var submit = document.getElementById('submit');
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            errorBox.style.display = 'none';
-            submit.disabled = true;
-            submit.textContent = 'Signing in...';
-            try {
-                const resp = await fetch('/operator/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: document.getElementById('email').value,
-                        password: document.getElementById('password').value,
-                    }),
-                });
-                const data = await resp.json().catch(() => ({}));
-                if (!resp.ok) throw new Error(data.error || 'Login failed');
-                window.location.href = '/';
-            } catch (err) {
-                errorBox.textContent = err.message;
-                errorBox.style.display = 'block';
-                submit.disabled = false;
-                submit.textContent = 'Sign in';
-            }
-        });
+        if (form) {
+            form.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                errorBox.style.display = 'none';
+                submit.disabled = true;
+                submit.textContent = 'Signing in\u2026';
+                try {
+                    var resp = await fetch('/operator/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            email: document.getElementById('email').value,
+                            password: document.getElementById('password').value,
+                        }),
+                    });
+                    var data = await resp.json().catch(function () { return {}; });
+                    if (!resp.ok) throw new Error(data.error || 'Login failed. Check your email and password.');
+                    window.location.href = '/';
+                } catch (err) {
+                    errorText.textContent = err.message;
+                    errorBox.style.display = 'flex';
+                    submit.disabled = false;
+                    submit.textContent = 'Sign in';
+                    document.getElementById('email').focus();
+                }
+            });
+        }
     </script>
 </body>
 </html>
