@@ -115,25 +115,7 @@
         }
         .toolbar a:hover, .toolbar button:hover { border-color: var(--border-strong); }
 
-        .stages {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-            gap: 0.6rem;
-            margin-bottom: 1.25rem;
-        }
-        .stage {
-            background: var(--surface-2, #1a1a1a);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 0.6rem 0.9rem;
-            cursor: pointer;
-        }
-        .stage:hover { border-color: var(--border-strong); }
-        /* Selection state — blue, not orange. This is navigation, not
-           the console's primary action, so it stays out of orange's way. */
-        .stage.active { border-color: var(--accent-select); }
-        .stage .label { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint, #888); }
-        .stage .count { font-size: 1.4rem; font-weight: 700; color: var(--heading, #fff); }
+        /* Stages/stations UI removed — styles intentionally omitted */
 
         .mission {
             background: var(--surface-2, #1a1a1a);
@@ -250,18 +232,12 @@
         </div>
 
         <div class="net-banner" id="netBanner"></div>
-        <div class="stages" id="stages"></div>
+        <!-- stages/stations UI removed -->
         <div id="missions"></div>
     </div>
 
     <script>
-        const STAGES = [
-            { key: 'all',        label: 'All' },
-            { key: 'queued',     label: 'Queued' },
-            { key: 'processing', label: 'Running' },
-            { key: 'completed',  label: 'Done' },
-        ];
-        let stage = 'queued';
+        let stage = 'all';
         let missions = [];
         let missionsJson = null;
         let hasLoadedOnce = false;
@@ -273,7 +249,6 @@
         // four values, so the pill colour language never diverges.
         const STATUS_TONE = { queued: 'info', processing: 'warn', completed: 'ok', failed: 'bad' };
 
-        const stagesEl = document.getElementById('stages');
         const missionsEl = document.getElementById('missions');
         const netBanner = document.getElementById('netBanner');
 
@@ -289,11 +264,7 @@
             return haystack.includes(searchQuery);
         }
 
-        function count(key) {
-            const pool = missions.filter(matchesSearch);
-            if (key === 'all') return pool.length;
-            return pool.filter(m => m.status === key).length;
-        }
+
 
         function relTime(iso) {
             if (!iso) return '';
@@ -305,17 +276,7 @@
             return Math.round(hrs / 24) + 'd ago';
         }
 
-        function renderStages() {
-            stagesEl.innerHTML = STAGES.map(s => `
-                <div class="stage ${stage === s.key ? 'active' : ''}" data-stage="${s.key}" tabindex="0" role="button" aria-pressed="${stage === s.key}">
-                    <div class="label">${s.label}</div>
-                    <div class="count">${count(s.key)}</div>
-                </div>`).join('');
-            stagesEl.querySelectorAll('.stage').forEach(el => {
-                el.onclick = () => { stage = el.dataset.stage; render(); };
-                el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); stage = el.dataset.stage; render(); } };
-            });
-        }
+
 
         function esc(s) {
             return (s || '').replace(/[&<>"']/g, c => ({
@@ -350,7 +311,6 @@
         }
 
         function render() {
-            renderStages();
             const visible = missions
                 .filter(m => stage === 'all' || m.status === stage)
                 .filter(matchesSearch);
