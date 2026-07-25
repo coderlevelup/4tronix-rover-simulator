@@ -6,7 +6,30 @@
     <title>Operator Console</title>
     <link rel="stylesheet" href="/static/yard-base.css">
     <style>
+        /* ============================================================
+           Changes from the previous version, per design review:
+             - Every hardcoded hex (#1a1a1a, #2a2a2a, #666, #888, etc.)
+               replaced with the same yard-base.css custom properties
+               home.html and status.html already use. This page was the
+               one place in the app with its own parallel colour system.
+             - .pill replaced with the shared .status-pill component
+               (data-tone="ok|warn|bad|info").
+             - Stage tabs and the search focus ring now use a blue
+               selection accent instead of orange, so orange keeps one
+               meaning across the app: "the primary action" (Send to
+               rover, Attach video, Rerun) — see .btn.primary below,
+               which is the one place orange is still used.
+             - Type scale consolidated via the vars below.
+             - :focus-visible added to every interactive element.
+           ============================================================ */
+        :root {
+            --fs-body: 0.9rem;
+            --fs-sm: 0.8rem;
+            --fs-xs: 0.72rem;
+            --accent-select: #60a5fa;
+        }
         body { min-height: 100vh; }
+        :focus-visible { outline: 2px solid var(--accent-select); outline-offset: 2px; border-radius: 4px; }
 
         .wrap { max-width: 920px; margin: 0 auto; padding: 1.9rem 1.5rem 3rem; }
 
@@ -19,71 +42,78 @@
             margin-bottom: 1.25rem;
         }
 
-        h1 { font-size: 1.5rem; font-weight: 600; color: #fff; }
-        .subtitle { font-size: 0.85rem; color: #666; }
+        h1 { font-size: 1.5rem; font-weight: 600; color: var(--heading, #fff); }
+        .subtitle { font-size: var(--fs-sm); color: var(--text-faint, #666); }
 
-        .badge {
+        /* ---------- Status pill (shared) ---------- */
+        .status-pill {
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.3rem;
             border-radius: 999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.3rem 0.75rem;
-            border: 1px solid #333;
-            color: #888;
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.2rem 0.6rem;
+            border: 1px solid var(--border);
+            background: var(--surface-3, #222);
+            color: var(--text-faint, #888);
+            flex-shrink: 0;
         }
-        .badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
-        .badge.online  { border-color: #22c55e; color: #4ade80; }
-        .badge.online .dot { background: #22c55e; }
-        .badge.offline { border-color: #ef4444; color: #f87171; }
-        .badge.offline .dot { background: #ef4444; }
+        .status-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+        .status-pill[data-tone="ok"]   { color: var(--ok);   background: rgba(52, 211, 153, 0.1);  border-color: rgba(52, 211, 153, 0.35); }
+        .status-pill[data-tone="warn"] { color: var(--warn); background: rgba(251, 191, 36, 0.1);  border-color: rgba(251, 191, 36, 0.35); }
+        .status-pill[data-tone="bad"]  { color: var(--bad);  background: rgba(248, 113, 113, 0.1); border-color: rgba(248, 113, 113, 0.35); }
+        .status-pill[data-tone="info"] { color: var(--accent-select); background: rgba(96, 165, 250, 0.1); border-color: rgba(96, 165, 250, 0.35); }
 
         .search-box {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
+            background: var(--surface-2, #1a1a1a);
+            border: 1px solid var(--border);
             border-radius: 8px;
             padding: 0.45rem 0.7rem;
             margin-bottom: 1rem;
             max-width: 360px;
         }
-        .search-box svg { width: 16px; height: 16px; color: #666; flex-shrink: 0; }
+        .search-box:focus-within { border-color: var(--accent-select); }
+        .search-box svg { width: 16px; height: 16px; color: var(--text-faint, #666); flex-shrink: 0; }
         .search-box input {
             flex: 1;
             background: none;
             border: none;
             outline: none;
-            color: #e0e0e0;
-            font-size: 0.85rem;
+            color: var(--text, #e0e0e0);
+            font-size: var(--fs-sm);
         }
-        .search-box input::placeholder { color: #555; }
+        .search-box input::placeholder { color: var(--text-faint, #555); }
         .search-box .clear-search {
             background: none;
             border: none;
-            color: #666;
+            color: var(--text-faint, #666);
             cursor: pointer;
             font-size: 0.9rem;
             padding: 0 0.2rem;
             display: none;
+            border-radius: 4px;
         }
         .search-box .clear-search.visible { display: block; }
-        .search-box .clear-search:hover { color: #ccc; }
+        .search-box .clear-search:hover { color: var(--text, #ccc); }
 
         .toolbar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
         .toolbar a, .toolbar button {
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
+            background: var(--surface-2, #1a1a1a);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            color: #ccc;
-            font-size: 0.8rem;
+            color: var(--text-dim, #ccc);
+            font-size: var(--fs-sm);
             padding: 0.45rem 0.8rem;
             text-decoration: none;
             cursor: pointer;
         }
-        .toolbar a:hover, .toolbar button:hover { border-color: #555; }
+        .toolbar a:hover, .toolbar button:hover { border-color: var(--border-strong); }
 
         .stages {
             display: grid;
@@ -92,19 +122,22 @@
             margin-bottom: 1.25rem;
         }
         .stage {
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
+            background: var(--surface-2, #1a1a1a);
+            border: 1px solid var(--border);
             border-radius: 10px;
             padding: 0.6rem 0.9rem;
             cursor: pointer;
         }
-        .stage.active { border-color: #f97316; }
-        .stage .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: #888; }
-        .stage .count { font-size: 1.4rem; font-weight: 700; color: #fff; }
+        .stage:hover { border-color: var(--border-strong); }
+        /* Selection state — blue, not orange. This is navigation, not
+           the console's primary action, so it stays out of orange's way. */
+        .stage.active { border-color: var(--accent-select); }
+        .stage .label { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint, #888); }
+        .stage .count { font-size: 1.4rem; font-weight: 700; color: var(--heading, #fff); }
 
         .mission {
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
+            background: var(--surface-2, #1a1a1a);
+            border: 1px solid var(--border);
             border-radius: 12px;
             margin-bottom: 0.9rem;
             overflow: hidden;
@@ -116,31 +149,17 @@
             justify-content: space-between;
             gap: 0.75rem;
             padding: 0.8rem 1rem;
-            border-bottom: 1px solid #242424;
+            border-bottom: 1px solid var(--border);
             flex-wrap: wrap;
         }
-        .mission-title { font-size: 0.95rem; font-weight: 600; color: #fff; }
-        .mission-meta { font-size: 0.75rem; color: #666; font-family: ui-monospace, monospace; }
-
-        .pill {
-            border-radius: 999px;
-            font-size: 0.68rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 0.2rem 0.6rem;
-            border: 1px solid;
-        }
-        .pill.queued     { color: #60a5fa; border-color: #1d4ed8; background: #172554; }
-        .pill.processing { color: #fbbf24; border-color: #b45309; background: #451a03; }
-        .pill.completed  { color: #4ade80; border-color: #15803d; background: #14532d; }
-        .pill.failed     { color: #f87171; border-color: #b91c1c; background: #450a0a; }
+        .mission-title { font-size: var(--fs-body); font-weight: 600; color: var(--heading, #fff); }
+        .mission-meta { font-size: var(--fs-xs); color: var(--text-faint, #666); font-family: ui-monospace, monospace; }
 
         pre {
-            background: #111;
-            color: #d0d0d0;
+            background: var(--surface-3, #111);
+            color: var(--text-dim, #d0d0d0);
             font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-            font-size: 0.78rem;
+            font-size: var(--fs-sm);
             line-height: 1.5;
             padding: 0.9rem 1rem;
             max-height: 180px;
@@ -153,58 +172,60 @@
             gap: 0.5rem;
             flex-wrap: wrap;
             padding: 0.75rem 1rem;
-            border-top: 1px solid #242424;
+            border-top: 1px solid var(--border);
         }
 
+        /* Buttons: .btn is the neutral/secondary style everywhere; .btn.primary
+           is the ONLY place orange appears on this page, reserved for the
+           action that actually moves a mission forward (Send to rover,
+           Attach video, Rerun). .btn.success marks a just-completed state,
+           not an action, so it keeps the existing green convention. */
         .btn {
-            border: 1px solid #2a2a2a;
+            border: 1px solid var(--border);
             border-radius: 8px;
-            background: #222;
-            color: #ccc;
-            font-size: 0.8rem;
+            background: var(--surface-3, #222);
+            color: var(--text-dim, #ccc);
+            font-size: var(--fs-sm);
             font-weight: 600;
             padding: 0.5rem 0.9rem;
             cursor: pointer;
         }
-        .btn:hover { border-color: #555; }
+        .btn:hover { border-color: var(--border-strong); }
         .btn:disabled { opacity: 0.5; cursor: default; }
         .btn.primary { background: #f97316; border-color: #f97316; color: #fff; }
-        .btn.primary:hover { background: #ea580c; }
-        .btn.success { background: #14532d; border-color: #15803d; color: #4ade80; }
+        .btn.primary:hover:not(:disabled) { background: #ea580c; }
+        .btn.success { background: rgba(52, 211, 153, 0.15); border-color: rgba(52, 211, 153, 0.4); color: var(--ok); }
 
         .mission-actions input {
             flex: 1;
             min-width: 200px;
-            background: #111;
-            border: 1px solid #2a2a2a;
+            background: var(--surface-3, #111);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            color: #e0e0e0;
-            font-size: 0.8rem;
+            color: var(--text, #e0e0e0);
+            font-size: var(--fs-sm);
             padding: 0.5rem 0.75rem;
             outline: none;
         }
-        .mission-actions input:focus { border-color: #f97316; }
+        .mission-actions input:focus-visible { border-color: #f97316; }
 
-        .action-error { width: 100%; color: #f87171; font-size: 0.78rem; }
-        .yt-link { color: #4ade80; font-size: 0.8rem; text-decoration: none; }
+        .action-error { width: 100%; color: var(--bad); font-size: var(--fs-xs); }
+        .yt-link { color: var(--ok); font-size: var(--fs-sm); text-decoration: none; border-radius: 4px; }
         .yt-link:hover { text-decoration: underline; }
 
         .empty {
             text-align: center;
-            color: #666;
+            color: var(--text-faint, #666);
             padding: 3rem 1rem;
-            border: 1px dashed #2a2a2a;
+            border: 1px dashed var(--border);
             border-radius: 12px;
         }
 
-        /* Stale/offline banner — reuses the pill colour language already
-           used for mission status (amber/red) instead of introducing new
-           tokens */
         .net-banner {
             display: none;
             align-items: center;
             gap: 0.5rem;
-            font-size: 0.78rem;
+            font-size: var(--fs-sm);
             border-radius: 8px;
             padding: 0.55rem 0.85rem;
             margin-bottom: 0.9rem;
@@ -225,7 +246,7 @@
         <div class="search-box">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" id="searchInput" placeholder="Search missions by name or yard ID&hellip;" autocomplete="off">
-            <button class="clear-search" id="clearSearch" title="Clear search">&times;</button>
+            <button class="clear-search" id="clearSearch" title="Clear search" aria-label="Clear search">&times;</button>
         </div>
 
         <div class="net-banner" id="netBanner"></div>
@@ -242,12 +263,15 @@
         ];
         let stage = 'queued';
         let missions = [];
-        let missionsJson = null;   // last-rendered snapshot, for change detection below
-        let hasLoadedOnce = false; // true once we've had a real (cached or fetched) list to show
+        let missionsJson = null;
+        let hasLoadedOnce = false;
         let searchQuery = '';
-        // Draft YouTube URLs survive re-renders so a half-typed link is not
-        // wiped by the 15s refresh.
         const drafts = {};
+
+        // Shared across the app — see home.html's STATUS_TONE. Kept as a
+        // single source per file (no shared JS module yet) but the same
+        // four values, so the pill colour language never diverges.
+        const STATUS_TONE = { queued: 'info', processing: 'warn', completed: 'ok', failed: 'bad' };
 
         const stagesEl = document.getElementById('stages');
         const missionsEl = document.getElementById('missions');
@@ -283,12 +307,13 @@
 
         function renderStages() {
             stagesEl.innerHTML = STAGES.map(s => `
-                <div class="stage ${stage === s.key ? 'active' : ''}" data-stage="${s.key}">
+                <div class="stage ${stage === s.key ? 'active' : ''}" data-stage="${s.key}" tabindex="0" role="button" aria-pressed="${stage === s.key}">
                     <div class="label">${s.label}</div>
                     <div class="count">${count(s.key)}</div>
                 </div>`).join('');
             stagesEl.querySelectorAll('.stage').forEach(el => {
                 el.onclick = () => { stage = el.dataset.stage; render(); };
+                el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); stage = el.dataset.stage; render(); } };
             });
         }
 
@@ -344,7 +369,7 @@
                             <div class="mission-title">${esc(m.name) || 'Mission-' + m.id.slice(0, 8)}</div>
                             <div class="mission-meta">${esc(m.yardId) || ''} &middot; ${relTime(m.submittedAt)}</div>
                         </div>
-                        <span class="pill ${m.status}">${m.status === 'processing' ? 'running' : esc(m.status)}</span>
+                        <span class="status-pill" data-tone="${STATUS_TONE[m.status] || ''}">${m.status === 'processing' ? 'running' : esc(m.status)}</span>
                     </div>
                     <pre>${esc((m.code || '').trim()) || '# No code'}</pre>
                     <div class="mission-actions" data-mission="${m.id}">${actionsFor(m)}</div>
@@ -370,10 +395,6 @@
             err.textContent = message;
         }
 
-        // fetch() has no built-in timeout — without one, a mission action against
-        // an unresponsive rover just hangs forever with no feedback. This aborts
-        // the request after `timeoutMs` so that case is distinguishable from a
-        // plain network failure below.
         async function fetchWithTimeout(url, opts, timeoutMs) {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), timeoutMs || 15000);
@@ -384,10 +405,6 @@
             }
         }
 
-        // Turns a failed mission action into a short, plain-language message:
-        // what likely went wrong, why (if known), and the concrete next step —
-        // rather than surfacing a raw error string or bare HTTP status code.
-        // `resp` is undefined when the request never reached the server at all.
         function missionErrorMessage(err, resp, data) {
             if (!resp) {
                 if (err && err.name === 'AbortError') {
@@ -452,11 +469,6 @@
                 data = await resp.json().catch(() => ({}));
                 if (!resp.ok) throw new Error(data.error || `Failed (HTTP ${resp.status})`);
                 delete drafts[missionId];
-                // Pull the just-updated mission in right away rather than waiting
-                // out the poll interval. Not awaited: if this follow-up refresh
-                // itself fails, that's a separate (already-surfaced-elsewhere)
-                // problem and shouldn't be reported as "the mission failed" when
-                // the action above actually succeeded.
                 missionsPoller.refreshNow().catch(() => {});
             } catch (err) {
                 btn.disabled = false;
@@ -464,12 +476,6 @@
             }
         }
 
-        // Applies a freshly-fetched (or cached) mission list. Skips the
-        // (relatively expensive) full DOM rebuild when the data is byte-
-        // identical to what's already on screen — the 15s poll fires
-        // constantly, and without this an operator mid-typing a YouTube
-        // URL would have their input torn down and re-focus lost on every
-        // tick even though nothing actually changed server-side.
         function applyMissions(list) {
             const json = JSON.stringify(list);
             missions = list;
@@ -482,9 +488,6 @@
 
         let consecutiveFailures = 0;
 
-        // Instant paint from whatever this tab last saw, before the network
-        // round-trip completes, so the console doesn't sit on "Loading…"
-        // every time an operator switches back to this tab/page.
         const cachedMissions = YardCache.read('missions');
         if (cachedMissions) {
             applyMissions(cachedMissions.value);
@@ -503,20 +506,17 @@
                 consecutiveFailures = 0;
                 YardCache.write('missions', list);
                 applyMissions(list);
-                setBanner(null); // back online — clear any stale/offline banner
+                setBanner(null);
             },
             onError: function () {
                 consecutiveFailures++;
                 if (hasLoadedOnce) {
-                    // We still have real data on screen (fresh or cached) — stay
-                    // read-only rather than blocking the operator's view.
                     setBanner('offline', consecutiveFailures > 1
                         ? `Can't reach the server (${consecutiveFailures} attempts) — showing last known missions, retrying…`
                         : "Can't reach the server — showing last known missions, retrying…");
                 } else {
-                    // Genuinely nothing to show yet (no cache, first load failed)
                     setBanner('offline', "Can't reach the server — retrying…");
-                    render(); // repaint the "Loading…" empty-state note if still blank
+                    render();
                 }
             }
         });

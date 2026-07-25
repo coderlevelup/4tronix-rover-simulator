@@ -8,30 +8,66 @@
     <style>
         /* ============================================================
            Dashboard-only styles. Reuses the same CSS custom properties
-           already defined in yard-base.css and used by status.html
-           (--surface, --border, --ok/--warn/--bad, --text-dim, etc.)
-           rather than introducing a parallel colour system. No new
-           brand colours below — only layout, spacing, and type scale.
+           already defined in yard-base.css (--surface, --border, --ok/
+           --warn/--bad, --text-dim, etc.) rather than a parallel colour
+           system.
 
-           Structure, top to bottom:
-             1. Status strip   — network / rover / operator / last sync
-             2. Stats band     — big scannable queue metrics
-             3. Workspace      — Mission Queue (hero, ~70%) + Operations
-                                  panel (quick actions, health, network — 30%)
-             4. Stations       — application launchers
-
-           Spacing follows an 8px scale (0.5rem increments at the
-           16px root the rest of the app assumes) for every gap,
-           padding, and margin introduced here.
+           Changes from the previous version, per design review:
+             - One .status-pill component (data-tone="ok|warn|bad|info|
+               neutral") replaces .pill and .queue-health-pill, which
+               previously reimplemented the same chip with different
+               opacity/padding logic.
+             - Orange (#f97316) is reserved for the brand mark only on
+               this page — selection/navigation states (active filter
+               chip, "Open full queue" link) now use the same blue
+               already used for "queued" status, so orange keeps its
+               meaning as "the one primary action" elsewhere in the app.
+             - Type scale consolidated from ~10 near-duplicate sizes
+               (0.64-0.87rem) down to 4 steps via the vars below.
+             - Removed the "Last sync" wide stat tile — it broke the
+               all-numeric pattern of the other four tiles and duplicated
+               the status strip's own "Last sync" field above it.
+             - Added :focus-visible rings on every interactive element.
            ============================================================ */
+        :root {
+            --fs-body: 0.9rem;
+            --fs-sm: 0.8rem;
+            --fs-xs: 0.72rem;
+            --accent-select: #60a5fa; /* selection/navigation accent — NOT the brand/primary-action colour */
+        }
         body { min-height: 100vh; }
 
-        /* ---------- Network banner (unchanged states + new "syncing") ---------- */
+        :focus-visible { outline: 2px solid var(--accent-select); outline-offset: 2px; border-radius: 4px; }
+
+        /* ---------- Status pill (shared) ---------- */
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            border-radius: 999px;
+            font-size: 0.66rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.22rem 0.6rem;
+            border: 1px solid var(--border);
+            background: var(--surface-3, #222);
+            color: var(--text-faint, #888);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .status-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+        .status-pill[data-tone="ok"]   { color: var(--ok);   background: rgba(52, 211, 153, 0.1);  border-color: rgba(52, 211, 153, 0.35); }
+        .status-pill[data-tone="warn"] { color: var(--warn); background: rgba(251, 191, 36, 0.1);  border-color: rgba(251, 191, 36, 0.35); }
+        .status-pill[data-tone="bad"]  { color: var(--bad);  background: rgba(248, 113, 113, 0.1); border-color: rgba(248, 113, 113, 0.35); }
+        .status-pill[data-tone="info"] { color: var(--accent-select); background: rgba(96, 165, 250, 0.1); border-color: rgba(96, 165, 250, 0.35); }
+
+        /* ---------- Network banner ---------- */
         .net-banner {
             display: none;
             align-items: center;
             gap: 0.5rem;
-            font-size: 0.8rem;
+            font-size: var(--fs-sm);
             border-radius: 8px;
             padding: 0.6rem 0.9rem;
             margin-bottom: 1.5rem;
@@ -39,7 +75,7 @@
         .net-banner.visible { display: flex; }
         .net-banner.stale   { color: #fbbf24; background: #451a03; border: 1px solid #b45309; }
         .net-banner.offline { color: #f87171; background: #450a0a; border: 1px solid #b91c1c; }
-        .net-banner.syncing { color: #60a5fa; background: #172554; border: 1px solid #1d4ed8; }
+        .net-banner.syncing { color: var(--accent-select); background: #172554; border: 1px solid #1d4ed8; }
 
         /* ---------- 1. Status strip ---------- */
         .status-strip {
@@ -51,7 +87,7 @@
             padding-bottom: 1rem;
             margin-bottom: 1.5rem;
             border-bottom: 1px solid var(--border);
-            font-size: 0.8rem;
+            font-size: var(--fs-sm);
         }
         .strip-item { display: flex; align-items: center; gap: 0.5rem; white-space: nowrap; }
         .strip-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; flex-shrink: 0; }
@@ -61,7 +97,7 @@
         .strip-label { color: var(--text-faint, #666); }
         .strip-value { color: var(--text, #ccc); font-weight: 600; }
 
-        /* ---------- 2. Stats band ---------- */
+        /* ---------- 2. Stats band (now 4 even numeric tiles — no "wide" outlier) ---------- */
         .stats-band {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -77,7 +113,7 @@
         .stat-tile .stat-num { font-size: 2.1rem; font-weight: 700; line-height: 1; color: var(--heading, #fff); }
         .stat-tile .stat-lbl {
             margin-top: 0.5rem;
-            font-size: 0.72rem;
+            font-size: var(--fs-xs);
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.06em;
@@ -85,8 +121,6 @@
         }
         .stat-tile.warn .stat-num { color: var(--warn); }
         .stat-tile.bad .stat-num { color: var(--bad); }
-        .stat-tile.wide { grid-column: span 2; }
-        .stat-tile.wide .stat-num { font-size: 1.15rem; font-weight: 600; }
 
         /* ---------- 3. Workspace: hero (70%) + operations panel (30%) ---------- */
         .workspace {
@@ -100,7 +134,6 @@
             .workspace { grid-template-columns: 1fr; }
         }
 
-        /* -- Hero: Mission Queue -- */
         .hero-panel {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -117,30 +150,17 @@
         }
         .hero-head h2 { font-size: 1.1rem; font-weight: 700; color: var(--heading, #fff); }
         .hero-head-meta { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.35rem; }
-        .hero-freshness { font-size: 0.74rem; color: var(--text-faint, #666); }
+        .hero-freshness { font-size: var(--fs-xs); color: var(--text-faint, #666); }
         .hero-open {
-            font-size: 0.8rem;
+            font-size: var(--fs-sm);
             font-weight: 600;
-            color: #f97316;
+            color: var(--accent-select);
             text-decoration: none;
             white-space: nowrap;
             padding-top: 0.15rem;
+            border-radius: 4px;
         }
         .hero-open:hover { text-decoration: underline; }
-
-        .queue-health-pill {
-            display: inline-block;
-            font-size: 0.66rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 0.2rem 0.55rem;
-            border-radius: 999px;
-            border: 1px solid var(--border);
-        }
-        .queue-health-pill.green { color: var(--ok);   background: rgba(52, 211, 153, 0.1);  border-color: rgba(52, 211, 153, 0.35); }
-        .queue-health-pill.amber { color: var(--warn); background: rgba(251, 191, 36, 0.1);  border-color: rgba(251, 191, 36, 0.35); }
-        .queue-health-pill.grey  { color: var(--text-faint, #888); background: var(--surface-3); border-color: var(--border); }
 
         .hero-controls {
             display: flex;
@@ -159,6 +179,7 @@
             border-radius: 8px;
             padding: 0.55rem 0.8rem;
         }
+        .hero-search:focus-within { border-color: var(--accent-select); }
         .hero-search svg { width: 15px; height: 15px; color: var(--text-faint, #666); flex-shrink: 0; }
         .hero-search input {
             flex: 1;
@@ -166,7 +187,7 @@
             border: none;
             outline: none;
             color: var(--text, #e0e0e0);
-            font-size: 0.85rem;
+            font-size: var(--fs-sm);
         }
         .hero-search input::placeholder { color: var(--text-faint, #555); }
         .hero-sort {
@@ -174,7 +195,7 @@
             border: 1px solid var(--border);
             border-radius: 8px;
             color: var(--text-dim, #ccc);
-            font-size: 0.8rem;
+            font-size: var(--fs-sm);
             padding: 0 0.6rem;
         }
 
@@ -184,13 +205,13 @@
             background: var(--surface-2, #1a1a1a);
             color: var(--text-dim, #999);
             border-radius: 999px;
-            font-size: 0.74rem;
+            font-size: var(--fs-xs);
             font-weight: 600;
             padding: 0.35rem 0.8rem;
             cursor: pointer;
         }
         .filter-chip:hover { border-color: var(--border-strong); }
-        .filter-chip.active { border-color: #f97316; color: #f97316; background: rgba(249, 115, 22, 0.08); }
+        .filter-chip.active { border-color: var(--accent-select); color: var(--accent-select); background: rgba(96, 165, 250, 0.08); }
 
         .mission-rows { display: flex; flex-direction: column; gap: 0.5rem; max-height: 620px; overflow-y: auto; }
         .mission-row {
@@ -204,7 +225,7 @@
         }
         .mission-row .mr-name { flex: 1; min-width: 0; }
         .mission-row .mr-title {
-            font-size: 0.87rem;
+            font-size: var(--fs-body);
             font-weight: 600;
             color: var(--text, #ddd);
             overflow: hidden;
@@ -212,12 +233,12 @@
             white-space: nowrap;
         }
         .mission-row .mr-meta {
-            font-size: 0.72rem;
+            font-size: var(--fs-xs);
             color: var(--text-faint, #666);
             font-family: ui-monospace, monospace;
             margin-top: 0.2rem;
         }
-        .mission-row .mr-time { font-size: 0.74rem; color: var(--text-faint, #666); flex-shrink: 0; }
+        .mission-row .mr-time { font-size: var(--fs-xs); color: var(--text-faint, #666); flex-shrink: 0; }
 
         .hero-empty {
             text-align: center;
@@ -225,30 +246,21 @@
             padding: 3rem 1rem;
             border: 1px dashed var(--border);
             border-radius: 12px;
-            font-size: 0.85rem;
+            font-size: var(--fs-sm);
         }
 
         .hero-foot {
             margin-top: 1.1rem;
             padding-top: 0.9rem;
             border-top: 1px solid var(--border);
-            font-size: 0.72rem;
+            font-size: var(--fs-xs);
             color: var(--text-faint, #555);
         }
 
-        /* Pills reused across hero rows — same status vocabulary as
-           operator.html so the colour language never changes screen to screen. */
-        .pill { border-radius: 999px; font-size: 0.64rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.18rem 0.55rem; border: 1px solid; flex-shrink: 0; }
-        .pill.queued     { color: #60a5fa; border-color: #1d4ed8; background: #172554; }
-        .pill.processing { color: #fbbf24; border-color: #b45309; background: #451a03; }
-        .pill.completed  { color: #4ade80; border-color: #15803d; background: #14532d; }
-        .pill.failed     { color: #f87171; border-color: #b91c1c; background: #450a0a; }
-
-        /* -- Operations panel: quick actions, system health, network status -- */
         .ops-panel { display: flex; flex-direction: column; gap: 1.25rem; }
         .ops-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.25rem 1.4rem; }
         .ops-card h3 {
-            font-size: 0.72rem;
+            font-size: var(--fs-xs);
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.07em;
@@ -266,7 +278,7 @@
             border: 1px solid var(--border);
             border-radius: 10px;
             color: var(--text, #ccc);
-            font-size: 0.85rem;
+            font-size: var(--fs-sm);
             font-weight: 600;
             padding: 0.7rem 0.9rem;
             cursor: pointer;
@@ -274,19 +286,19 @@
             text-align: left;
         }
         .action-btn:hover { border-color: var(--border-strong); }
-        .action-btn .hint { font-size: 0.7rem; font-weight: 400; color: var(--text-faint, #666); }
+        .action-btn .hint { font-size: var(--fs-xs); font-weight: 400; color: var(--text-faint, #666); }
 
         .health-rows { display: flex; flex-direction: column; gap: 0.6rem; }
-        .health-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.83rem; }
+        .health-row { display: flex; align-items: center; gap: 0.6rem; font-size: var(--fs-sm); }
         .health-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: #555; }
         .health-dot.green { background: var(--ok); }
         .health-dot.amber { background: var(--warn); }
         .health-dot.red   { background: var(--bad); }
         .health-name { color: var(--text, #ccc); flex-shrink: 0; min-width: 76px; }
-        .health-detail { color: var(--text-dim, #777); font-size: 0.76rem; }
+        .health-detail { color: var(--text-dim, #777); font-size: var(--fs-xs); }
 
         .net-rows { display: flex; flex-direction: column; gap: 0.6rem; }
-        .net-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; font-size: 0.8rem; }
+        .net-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; font-size: var(--fs-sm); }
         .net-row .nr-label { color: var(--text-faint, #888); }
         .net-row .nr-value { color: var(--text, #ccc); font-weight: 600; text-align: right; }
         .net-row .nr-value.green { color: var(--ok); }
@@ -297,25 +309,23 @@
             margin-top: 0.9rem;
             padding-top: 0.75rem;
             border-top: 1px solid var(--border);
-            font-size: 0.72rem;
+            font-size: var(--fs-xs);
             color: var(--text-faint, #555);
         }
 
-        /* ---------- 4. Stations ---------- */
         .stations { gap: 1rem; margin-bottom: 1.75rem; }
         .section-label { margin-top: 0.5rem; }
 
-        /* ---------- Sign-in prompt (unauthenticated viewers) ---------- */
         .signin-note {
             background: var(--surface);
             border: 1px dashed var(--border);
             border-radius: 12px;
             padding: 1.25rem 1.5rem;
-            font-size: 0.85rem;
+            font-size: var(--fs-sm);
             color: var(--text-dim, #888);
             margin-bottom: 2rem;
         }
-        .signin-note a { color: #f97316; }
+        .signin-note a { color: #f97316; border-radius: 4px; }
 
         .skel {
             display: inline-block;
@@ -356,21 +366,15 @@
             <div class="stat-tile"><div class="stat-num"><span class="skel"></span></div><div class="stat-lbl">Running</div></div>
             <div class="stat-tile"><div class="stat-num"><span class="skel"></span></div><div class="stat-lbl">Completed</div></div>
             <div class="stat-tile"><div class="stat-num"><span class="skel"></span></div><div class="stat-lbl">Failed</div></div>
-            <div class="stat-tile wide"><div class="stat-num"><span class="skel"></span></div><div class="stat-lbl">Last sync</div></div>
         </section>
 
         <div class="workspace">
-            <!-- Mission Queue: the hero. Read-only overview by design — sending
-                 code, marking complete, and attaching video stay in the full
-                 Operator Console (/operator/) where those mutation endpoints
-                 live, so this panel can never drift out of sync with what
-                 actions are actually available. -->
             <section class="hero-panel">
                 <div class="hero-head">
                     <div>
                         <h2>Mission Queue</h2>
                         <div class="hero-head-meta">
-                            <span class="queue-health-pill grey" id="queueHealthPill">checking&hellip;</span>
+                            <span class="status-pill" data-tone="neutral" id="queueHealthPill">checking&hellip;</span>
                             <span class="hero-freshness" id="heroFreshness"></span>
                         </div>
                     </div>
@@ -495,22 +499,8 @@
     {% if operator %}
     <script>
     (function () {
-        // ============================================================
-        // Two independent data sources, fetched in parallel and cached
-        // independently via YardCache (defined in _nav.html) so a slow
-        // or failing endpoint never blocks the other section's paint.
-        //   - missionsData -> Stats band + Mission Queue hero
-        //   - statusData   -> System Health
-        // Each poller instantly repaints from its own last-known cache
-        // on load, then refreshes in the background (stale-while-
-        // revalidate), same pattern as status.html / operator.html.
-        // Both pollers also drive the Network Status panel and status
-        // strip, which read poller-reported state rather than duplicating
-        // any fetch logic of their own.
-        // ============================================================
-
         var netBanner = document.getElementById('netBanner');
-        var bannerState = { missions: null, status: null }; // 'stale' | 'offline' | 'syncing' | null per source
+        var bannerState = { missions: null, status: null };
 
         function paintBanner() {
             if (bannerState.missions === 'offline' || bannerState.status === 'offline') {
@@ -553,7 +543,10 @@
             });
         }
 
-        // ---------------- Mission Overview stats + Mission Queue hero ----------------
+        // Shared tone map: every status vocabulary in the app (mission
+        // status, queue health, rover/camera health) resolves to one of
+        // these four tones so .status-pill never needs a fifth colour.
+        var STATUS_TONE = { queued: 'info', processing: 'warn', completed: 'ok', failed: 'bad' };
 
         var latestMissions = [];
         var missionsHasLoaded = false;
@@ -575,18 +568,17 @@
                 statTile(missions.length, 'Queue size') +
                 statTile(counts.processing, 'Running') +
                 statTile(counts.completed, 'Completed') +
-                statTile(counts.failed, 'Failed', counts.failed > 0 ? 'bad' : '') +
-                statTile(missionsSyncedAt ? ageFrom(missionsSyncedAt) : '—', 'Last sync', 'wide');
+                statTile(counts.failed, 'Failed', counts.failed > 0 ? 'bad' : '');
 
             var pill = document.getElementById('queueHealthPill');
             if (counts.queued === 0 && counts.processing === 0) {
-                pill.className = 'queue-health-pill grey';
+                delete pill.dataset.tone; // no tone attr = default neutral/grey styling
                 pill.textContent = 'Idle';
             } else if (counts.queued > 5) {
-                pill.className = 'queue-health-pill amber';
+                pill.dataset.tone = 'warn';
                 pill.textContent = 'Busy';
             } else {
-                pill.className = 'queue-health-pill green';
+                pill.dataset.tone = 'ok';
                 pill.textContent = 'Normal';
             }
         }
@@ -607,7 +599,7 @@
             visible.sort(function (a, b) {
                 if (heroSortMode === 'oldest') return new Date(a.submittedAt || 0) - new Date(b.submittedAt || 0);
                 if (heroSortMode === 'status') return (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9);
-                return new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0); // newest first (default)
+                return new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0);
             });
 
             if (visible.length === 0) {
@@ -623,7 +615,7 @@
             rows.innerHTML = visible.slice(0, 40).map(function (m) {
                 var label = m.status === 'processing' ? 'running' : m.status;
                 return '<div class="mission-row">' +
-                    '<span class="pill ' + esc(m.status) + '">' + esc(label) + '</span>' +
+                    '<span class="status-pill" data-tone="' + STATUS_TONE[m.status] + '">' + esc(label) + '</span>' +
                     '<span class="mr-name"><span class="mr-title">' + esc(m.name || 'Mission-' + m.id.slice(0, 8)) + '</span>' +
                     '<span class="mr-meta">' + esc(m.yardId || '') + '</span></span>' +
                     '<span class="mr-time">' + relTime(m.submittedAt) + '</span>' +
@@ -665,7 +657,7 @@
                     if (!data) return;
                     missionsFailures = 0;
                     var list = data.missions || [];
-                    YardCache.write('homeMissions', list); // mirrors into sessionStorage + IndexedDB
+                    YardCache.write('homeMissions', list);
                     cachedMissionCount = list.length;
                     missionsSyncedAt = Date.now();
                     renderMissions(list);
@@ -701,8 +693,6 @@
             renderHeroRows();
         });
 
-        // ---------------- System Health ----------------
-
         function healthRow(name, colour, detail) {
             return '<div class="health-row"><span class="health-dot ' + colour + '"></span>' +
                 '<span class="health-name">' + name + '</span>' +
@@ -732,8 +722,6 @@
                 : healthRow('Camera', 'red', 'Port closed &mdash; service not running?'));
 
             var s = data.satellite || {};
-            // Satellite is always "green" if this response arrived at all —
-            // same convention status.html uses.
             rows.push(healthRow('Satellite', 'green', esc(s.hostname || '—')));
 
             document.getElementById('healthRows').innerHTML = rows.join('');
@@ -743,7 +731,7 @@
         var statusFailures = 0;
         var statusSyncedAt = null;
 
-        var cachedStatus = YardCache.read('fullStatus'); // shared cache key with status.html
+        var cachedStatus = YardCache.read('fullStatus');
         if (cachedStatus) {
             statusSyncedAt = cachedStatus.ts;
             renderStatus(cachedStatus.value);
@@ -775,8 +763,6 @@
             }
         });
 
-        // ---------------- Status strip (network / rover / operator / last sync) ----------------
-
         function updateStatusStrip() {
             var netDot = document.getElementById('stripNetDot');
             var netVal = document.getElementById('stripNetValue');
@@ -796,8 +782,6 @@
             var lastSync = Math.max(missionsSyncedAt || 0, statusSyncedAt || 0) || null;
             document.getElementById('stripSyncValue').textContent = lastSync ? ageFrom(lastSync) : '—';
         }
-
-        // ---------------- Network Status panel ----------------
 
         function backgroundSyncLabel() {
             if (document.hidden) return 'Paused (tab hidden)';
@@ -831,8 +815,6 @@
             updateStatusStrip();
         }
 
-        // Keep every relative-time readout ("Xs/Xm ago") ticking without
-        // waiting on the next poll — cheap, since it only touches text nodes.
         setInterval(function () {
             updateHeroFreshness();
             updateStatusStrip();
@@ -840,8 +822,6 @@
         }, 5000);
         updateNetworkPanel();
         updateStatusStrip();
-
-        // ---------------- Quick actions ----------------
 
         var refreshBtn = document.getElementById('refreshBtn');
         var refreshHint = document.getElementById('refreshHint');
