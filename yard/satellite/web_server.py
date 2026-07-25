@@ -10,6 +10,7 @@ import os
 import json
 import logging
 import socket
+import threading
 import requests
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context, session, redirect
 
@@ -304,4 +305,9 @@ if __name__ == '__main__':
     print(f"[satellite] rover url {ROVER_URL}")
     import flask.cli
     flask.cli.show_server_banner = lambda *args, **kwargs: None
+    # Run the YouTube-poll loop in the background so a slow/unreachable
+    # YouTube API call can't delay the tablet/monitor/rover proxy from
+    # coming up - those are local and time-critical, this isn't.
+    from operator_console import start_polling
+    threading.Thread(target=start_polling, daemon=True).start()
     app.run(host='0.0.0.0', port=port, threaded=True, use_reloader=False)

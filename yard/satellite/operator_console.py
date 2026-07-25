@@ -27,6 +27,8 @@ shadow Python's stdlib `operator` module.
 
 import os
 import re
+import requests
+import threading
 from datetime import datetime, timezone
 from functools import wraps
 
@@ -397,3 +399,101 @@ def api_rover_health():
     except requests.exceptions.RequestException:
         pass
     return jsonify(result)
+
+# YouTube video fetching implementation
+
+def _youtube_api_key():
+    return os.environ.get('YOUTUBE_API_KEY')
+
+
+def _youtube_channel_id():
+    return os.environ.get('YOUTUBE_CHANNEL_ID')
+
+
+def check_for_new_videos():
+    """Poll the YouTube channel for uploads matching a completed mission's ID.
+
+    A mission never has a `youtubeUrl` field at all until one is attached
+    (mission-control omits it entirely on write; only api_rerun explicitly
+    nulls it out), so this cannot filter on `youtubeUrl == None` in the
+    Firestore query itself - that only matches documents where the field is
+    present and null, not documents where it's absent. Fetch completed
+    missions and filter for a missing/falsy youtubeUrl in Python instead.
+    """
+    print('[youtube-poll] Checking for new videos...')
+
+    api_key = _youtube_api_key()
+    channel_id = _youtube_channel_id()
+    if not api_key or not channel_id:
+        print('[youtube-poll] Missing YOUTUBE_API_KEY or YOUTUBE_CHANNEL_ID; skipping poll')
+        return
+
+    try:
+        missions_ref = _firestore().collection(MISSIONS_COLLECTION)
+        completed = list(missions_ref.where('status', '==', 'completed').stream())
+    except Exception as e:
+        print(f'[youtube-poll] Failed to read Firestore: {e}')
+        return
+
+    unlinked = [doc for doc in completed if not doc.to_dict().get('youtubeUrl')]
+    if not unlinked:
+        return
+
+    # The uploads playlist id is the channel id with UC -> UU.
+    uploads_playlist = channel_id.replace('UC', 'UU', 1)
+
+    try:
+        response = requests.get(
+            'https://www.googleapis.com/youtube/v3/playlistItems',
+            params={
+                'part': 'snippet',
+                'playlistId': uploads_playlist,
+                'maxResults': 50,
+                'key': api_key,
+            },
+            timeout=10.0,
+        )
+    except requests.exceptions.RequestException as e:
+        print(f'[youtube-poll] Could not reach the YouTube API: {e}')
+        return
+
+    if response.status_code != 200:
+        print(f'[youtube-poll] YouTube API error: HTTP {response.status_code}')
+        return
+
+    videos = response.json().get('items', [])
+
+    # Match mission ids embedded in video descriptions.
+    for mission_doc in unlinked:
+        mission_id = mission_doc.id
+
+        for video in videos:
+            description = video.get('snippet', {}).get('description', '')
+
+            if f'MissionID: {mission_id}' in description:
+                video_id = video.get('snippet', {}).get('resourceId', {}).get('videoId')
+                if not video_id:
+                    continue
+                youtube_url = f'https://www.youtube.com/watch?v={video_id}'
+
+                missions_ref.document(mission_id).update({'youtubeUrl': youtube_url})
+                print(f'[youtube-poll] Linked mission {mission_id} to video {video_id}')
+                break
+
+
+def start_polling():
+    """Run check_for_new_videos every 5 minutes.
+
+    A bad poll (Firestore hiccup, YouTube API down, anything unexpected)
+    must never stop the loop - the reschedule always has to run, or the
+    feature silently dies until the satellite is restarted.
+    """
+    try:
+        check_for_new_videos()
+    except Exception as e:
+        print(f'[youtube-poll] Unexpected error during poll: {e}')
+
+    timer = threading.Timer(300, start_polling)
+    timer.daemon = True
+    timer.start()
+

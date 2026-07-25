@@ -58,6 +58,42 @@ class FakeFirestore:
         return FakeCollection(self._store)
 
 
+class FakeStreamDoc:
+    def __init__(self, doc_id, data):
+        self.id = doc_id
+        self._data = data
+
+    def to_dict(self):
+        return dict(self._data)
+
+
+class FakeQueryCollection(FakeCollection):
+    """FakeCollection + where()/order_by()/limit()/stream() for query-style reads."""
+
+    def __init__(self, store, docs=None):
+        super().__init__(store)
+        self._docs = list(store.items()) if docs is None else docs
+
+    def where(self, field, op, value):
+        assert op == '==', 'fake only supports equality filters'
+        filtered = [(k, v) for k, v in self._docs if v.get(field) == value]
+        return FakeQueryCollection(self._store, filtered)
+
+    def order_by(self, field, direction=None):
+        return self
+
+    def limit(self, n):
+        return self
+
+    def stream(self):
+        return [FakeStreamDoc(k, v) for k, v in self._docs]
+
+
+class FakeQueryFirestore(FakeFirestore):
+    def collection(self, name):
+        return FakeQueryCollection(self._store)
+
+
 class FakeResponse:
     def __init__(self, status_code=200, payload=None):
         self.status_code = status_code
@@ -342,29 +378,6 @@ def test_youtube_only_attaches_to_completed_missions(client, missions):
 
 def test_missions_endpoint_serialises_documents(client, missions, monkeypatch):
     sign_in(client)
-
-    class FakeQueryCollection(FakeCollection):
-        def order_by(self, field, direction=None):
-            return self
-
-        def limit(self, n):
-            return self
-
-        def stream(self):
-            class Doc:
-                def __init__(self, doc_id, data):
-                    self.id = doc_id
-                    self._data = data
-
-                def to_dict(self):
-                    return dict(self._data)
-
-            return [Doc(k, v) for k, v in self._store.items()]
-
-    class FakeQueryFirestore(FakeFirestore):
-        def collection(self, name):
-            return FakeQueryCollection(self._store)
-
     monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(missions))
 
     resp = client.get('/operator/api/missions')
@@ -375,3 +388,118 @@ def test_missions_endpoint_serialises_documents(client, missions, monkeypatch):
     q1 = next(m for m in payload['missions'] if m['id'] == 'q1')
     assert q1['status'] == 'queued'
     assert q1['code'].startswith('rover.forward')
+
+
+# ---------------------------------------------------------------------------
+# YouTube auto-linking poll
+# ---------------------------------------------------------------------------
+
+def fake_playlist_response(mission_id, video_id='vid123'):
+    return FakeResponse(200, {
+        'items': [{
+            'snippet': {
+                'description': f'MissionID: {mission_id}',
+                'resourceId': {'videoId': video_id},
+            },
+        }],
+    })
+
+
+@pytest.fixture
+def youtube_env(monkeypatch):
+    monkeypatch.setenv('YOUTUBE_API_KEY', 'test-key')
+    monkeypatch.setenv('YOUTUBE_CHANNEL_ID', 'UCabc123')
+
+
+def test_poll_links_mission_with_no_youtube_field_at_all(missions, monkeypatch, youtube_env):
+    # c1 is completed and has never had a youtubeUrl key written at all -
+    # this is what a real first-run completion looks like (mission-control
+    # never writes the field, and api_mark_complete doesn't touch it).
+    assert 'youtubeUrl' not in missions['c1']
+    monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(missions))
+    monkeypatch.setattr(
+        operator_console.requests, 'get',
+        lambda *a, **k: fake_playlist_response('c1'),
+    )
+
+    operator_console.check_for_new_videos()
+
+    assert missions['c1']['youtubeUrl'] == 'https://www.youtube.com/watch?v=vid123'
+
+
+def test_poll_skips_missions_that_already_have_a_link(missions, monkeypatch, youtube_env):
+    missions['c1']['youtubeUrl'] = 'https://www.youtube.com/watch?v=already-linked'
+    monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(missions))
+    monkeypatch.setattr(
+        operator_console.requests, 'get',
+        lambda *a, **k: pytest.fail('YouTube API must not be called when nothing is unlinked'),
+    )
+
+    operator_console.check_for_new_videos()
+
+    assert missions['c1']['youtubeUrl'] == 'https://www.youtube.com/watch?v=already-linked'
+
+
+def test_poll_skips_entirely_when_credentials_missing(missions, monkeypatch):
+    monkeypatch.delenv('YOUTUBE_API_KEY', raising=False)
+    monkeypatch.delenv('YOUTUBE_CHANNEL_ID', raising=False)
+    monkeypatch.setattr(
+        operator_console, '_firestore',
+        lambda: pytest.fail('must not touch Firestore without credentials'),
+    )
+
+    operator_console.check_for_new_videos()
+
+
+def test_poll_survives_youtube_api_error_response(missions, monkeypatch, youtube_env):
+    monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(missions))
+    monkeypatch.setattr(operator_console.requests, 'get', lambda *a, **k: FakeResponse(500))
+
+    operator_console.check_for_new_videos()
+
+    assert 'youtubeUrl' not in missions['c1']
+
+
+def test_poll_survives_youtube_network_error(missions, monkeypatch, youtube_env):
+    monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(missions))
+
+    def fake_get(*a, **k):
+        raise operator_console.requests.exceptions.ConnectionError()
+
+    monkeypatch.setattr(operator_console.requests, 'get', fake_get)
+
+    operator_console.check_for_new_videos()
+
+    assert 'youtubeUrl' not in missions['c1']
+
+
+def test_poll_survives_firestore_error(monkeypatch, youtube_env):
+    monkeypatch.setattr(
+        operator_console, '_firestore',
+        lambda: (_ for _ in ()).throw(RuntimeError('firestore unavailable')),
+    )
+
+    operator_console.check_for_new_videos()
+
+
+def test_start_polling_reschedules_even_when_check_raises(monkeypatch):
+    monkeypatch.setattr(
+        operator_console, 'check_for_new_videos',
+        lambda: (_ for _ in ()).throw(RuntimeError('boom')),
+    )
+
+    scheduled = []
+
+    class FakeTimer:
+        def __init__(self, interval, fn):
+            scheduled.append(interval)
+            self.daemon = None
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(operator_console.threading, 'Timer', FakeTimer)
+
+    operator_console.start_polling()
+
+    assert scheduled == [300]
