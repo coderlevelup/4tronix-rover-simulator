@@ -20,6 +20,12 @@ Configuration (environment):
   OPERATOR_SESSION_SECRET
       Optional. Stable Flask session secret; unset means sessions reset
       when the server restarts (operators just log in again).
+  YOUTUBE_API_KEY / YOUTUBE_CHANNEL_ID
+      Optional. Powers the background poll (start_polling/check_for_new_videos)
+      that auto-links a completed mission to its YouTube upload by matching
+      "MissionID: <id>" in the video description. Either unset disables the
+      poll (it logs and no-ops) - manual "attach YouTube URL" still works
+      without these.
 
 The module file is named operator_console (not operator) so it does not
 shadow Python's stdlib `operator` module.
