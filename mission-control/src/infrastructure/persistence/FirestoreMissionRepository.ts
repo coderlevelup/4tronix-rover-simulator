@@ -43,7 +43,7 @@ type FirestoreLike = AdminFirestore | ClientFirestore;
 type MissionDocData = Record<string, unknown>;
 type MissionDocSnapshot = { id: string; data: () => MissionDocData };
 type QuerySnapshotLike = { docs: MissionDocSnapshot[] };
-type DocSnapshotLike = { exists: () => boolean; data: () => MissionDocData | undefined };
+type DocSnapshotLike = { exists: boolean; data: () => MissionDocData | undefined };
 type CountSnapshotLike = { data: () => { count: number } };
 
 export class FirestoreMissionRepository implements IMissionRepository {
@@ -74,7 +74,7 @@ export class FirestoreMissionRepository implements IMissionRepository {
   async findById(id: string): Promise<Mission | null> {
     const snapshot = await this.getMissionDoc(id);
 
-    if (!snapshot.exists()) {
+    if (!snapshot.exists) {
       return null;
     }
 
@@ -115,7 +115,7 @@ export class FirestoreMissionRepository implements IMissionRepository {
   async update(id: string, updates: Partial<Mission>): Promise<Mission | null> {
     const snapshot = await this.getMissionDoc(id);
 
-    if (!snapshot.exists()) {
+    if (!snapshot.exists) {
       return null;
     }
 
@@ -207,10 +207,12 @@ export class FirestoreMissionRepository implements IMissionRepository {
 
   private async getMissionDoc(id: string): Promise<DocSnapshotLike> {
     if (this.isAdminFirestore()) {
-      return (await this.adminDb().collection(MISSIONS_COLLECTION).doc(id).get()) as unknown as DocSnapshotLike;
+      const snapshot = await this.adminDb().collection(MISSIONS_COLLECTION).doc(id).get();
+      return { exists: snapshot.exists, data: () => snapshot.data() as MissionDocData | undefined };
     }
 
-    return (await getDoc(doc(this.clientDb(), MISSIONS_COLLECTION, id))) as unknown as DocSnapshotLike;
+    const snapshot = await getDoc(doc(this.clientDb(), MISSIONS_COLLECTION, id));
+    return { exists: snapshot.exists(), data: () => snapshot.data() as MissionDocData | undefined };
   }
 
   private async writeMission(id: string, mission: Partial<Mission>): Promise<void> {

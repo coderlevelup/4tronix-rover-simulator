@@ -44,7 +44,7 @@ function makeCollection(store: Map<string, DocData>) {
     doc: jest.fn((id: string) => ({
       get: jest.fn(async () => {
         const data = store.get(id);
-        return { exists: () => !!data, data: () => data, id };
+        return { exists: !!data, data: () => data, id };
       }),
       set: jest.fn(async (data: DocData) => {
         store.set(id, data);
