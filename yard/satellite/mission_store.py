@@ -125,26 +125,25 @@ def get_missions(limit=100):
     return missions, last_synced
 
 def get_mission(mission_id):
-    """Read a single mission from the mirror by ID."""
+    """Read a single mission from the mirror."""
     with _db_lock:
         conn = _connect()
-        row = conn.execute(
-            'SELECT * FROM mission_mirror WHERE id = ?', (mission_id,)
-        ).fetchone()
+        row = conn.execute('SELECT * FROM mission_mirror WHERE id = ?', (mission_id,)).fetchone()
         conn.close()
     return dict(row) if row else None
 
 
 def write_and_enqueue(mission_id, mirror_updates, op, payload):
-    """Update the mirror AND append to outbox in one atomic transaction.
-
-    Both writes succeed or neither does — no half-states if power is lost.
-    """
+    """Update the mirror and append to outbox in one transaction."""
     with _db_lock:
         conn = _connect()
+        # Build SET clause from mirror_updates dict
         sets = ', '.join(f'{k} = ?' for k in mirror_updates)
-        vals = list(mirror_updates.values()) + [mission_id]
-        conn.execute(f'UPDATE mission_mirror SET {sets} WHERE id = ?', vals)
+        vals = list(mirror_updates.values())
+        conn.execute(
+            f'UPDATE mission_mirror SET {sets} WHERE id = ?',
+            vals + [mission_id]
+        )
         now = _now_iso()
         conn.execute(
             '''INSERT INTO outbox (uuid, mission_id, op, payload, event_at, created_at)
