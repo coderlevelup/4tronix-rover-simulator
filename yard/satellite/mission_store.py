@@ -1,6 +1,14 @@
 import sqlite3
 import threading
 import os
+import json
+import uuid as uuid_mod
+
+from datetime import datetime, timezone
+
+def _now_iso():
+    return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
 
 DB_PATH = os.environ.get('MISSION_MIRROR_DB', 'missions.db')
 _db_lock = threading.Lock()
@@ -41,6 +49,18 @@ def init_db():
             CREATE TABLE IF NOT EXISTS sync_meta (
                 key   TEXT PRIMARY KEY,
                 value TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS outbox (
+                seq        INTEGER PRIMARY KEY AUTOINCREMENT,
+                uuid       TEXT UNIQUE NOT NULL,
+                mission_id TEXT NOT NULL,
+                op         TEXT NOT NULL,
+                payload    TEXT NOT NULL,
+                event_at   TEXT NOT NULL,
+                attempts   INTEGER DEFAULT 0,
+                last_error TEXT,
+                created_at TEXT NOT NULL
             );
         """)
         conn.commit()
@@ -103,4 +123,76 @@ def get_missions(limit=100):
     last_synced = meta[0] if meta else None
     missions = [dict(row) for row in rows]
     return missions, last_synced
+
+def get_mission(mission_id):
+    """Read a single mission from the mirror by ID."""
+    with _db_lock:
+        conn = _connect()
+        row = conn.execute(
+            'SELECT * FROM mission_mirror WHERE id = ?', (mission_id,)
+        ).fetchone()
+        conn.close()
+    return dict(row) if row else None
+
+
+def write_and_enqueue(mission_id, mirror_updates, op, payload):
+    """Update the mirror AND append to outbox in one atomic transaction.
+
+    Both writes succeed or neither does — no half-states if power is lost.
+    """
+    with _db_lock:
+        conn = _connect()
+        sets = ', '.join(f'{k} = ?' for k in mirror_updates)
+        vals = list(mirror_updates.values()) + [mission_id]
+        conn.execute(f'UPDATE mission_mirror SET {sets} WHERE id = ?', vals)
+        now = _now_iso()
+        conn.execute(
+            '''INSERT INTO outbox (uuid, mission_id, op, payload, event_at, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)''',
+            (str(uuid_mod.uuid4()), mission_id, op, json.dumps(payload), now, now)
+        )
+        conn.commit()
+        conn.close()
+
+
+def peek_outbox():
+    """Return the oldest outbox entry (lowest seq), or None if empty."""
+    with _db_lock:
+        conn = _connect()
+        row = conn.execute(
+            'SELECT * FROM outbox ORDER BY seq ASC LIMIT 1'
+        ).fetchone()
+        conn.close()
+    return dict(row) if row else None
+
+
+def delete_outbox(seq):
+    """Remove an outbox entry after Firestore has confirmed the write."""
+    with _db_lock:
+        conn = _connect()
+        conn.execute('DELETE FROM outbox WHERE seq = ?', (seq,))
+        conn.commit()
+        conn.close()
+
+
+def mark_attempt(seq, error_msg):
+    """Record a failed flush attempt so we can see what went wrong."""
+    with _db_lock:
+        conn = _connect()
+        conn.execute(
+            'UPDATE outbox SET attempts = attempts + 1, last_error = ? WHERE seq = ?',
+            (error_msg, seq)
+        )
+        conn.commit()
+        conn.close()
+
+
+def outbox_count():
+    """How many entries are waiting to be pushed to Firestore."""
+    with _db_lock:
+        conn = _connect()
+        row = conn.execute('SELECT COUNT(*) FROM outbox').fetchone()
+        conn.close()
+    return row[0]
+
 
