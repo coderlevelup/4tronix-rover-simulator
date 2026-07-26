@@ -42,6 +42,7 @@ import requests
 from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session
 
 operator_bp = Blueprint('operator', __name__, url_prefix='/operator')
+from .mission_store import get_mission, get_missions, write_and_enqueue, outbox_count
 
 # Timeouts (seconds)
 LOGIN_TIMEOUT = 10.0
@@ -318,18 +319,28 @@ def _dispatch_to_rover(mission):
 @require_operator
 def api_send_to_rover(mission_id):
     """Push the mission's Python onto the rover queue; mission -> processing."""
-    ref, mission = _get_mission_ref(mission_id)
-    if ref is None:
+    from .mission_store import get_mission, write_and_enqueue
+
+    mission = get_mission(mission_id)
+    if mission is None:
         return jsonify({'error': 'Mission not found'}), 404
-    if mission.get('status') != 'queued':
+    if mission['status'] != 'queued':
         return jsonify({'error': 'Only queued missions can be sent to the rover'}), 400
+
+    now = _now_iso()
+    write_and_enqueue(
+        mission_id=mission_id,
+        mirror_updates={'status': 'processing', 'started_at': now, 'local_dirty': 1},
+        op='lock',
+        payload={'status': 'processing', 'startedAt': now, 'statusUpdatedAt': now},
+    )
 
     ok, err = _dispatch_to_rover(mission)
     if not ok:
         return err
 
-    ref.update({'status': 'processing', 'startedAt': _now_iso()})
     return jsonify({'status': 'ok', 'missionId': mission_id})
+
 
 
 @operator_bp.route('/api/missions/<mission_id>/rerun', methods=['POST'])
