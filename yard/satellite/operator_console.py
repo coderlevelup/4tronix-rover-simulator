@@ -61,6 +61,9 @@ IDENTITY_TOOLKIT_SIGN_IN = (
     'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword'
 )
 
+# Active lease renewals: mission_id -> threading.Timer
+_active_leases = {}
+
 # Lazily initialised firebase_admin handles. Kept behind functions so tests
 # can monkeypatch _firestore / _verify_id_token without firebase-admin or
 # real credentials.
@@ -134,6 +137,38 @@ def _now_iso():
 def _expires_iso():
     from datetime import timedelta
     return (datetime.now(timezone.utc) + timedelta(seconds=LEASE_TTL_SECONDS)).isoformat().replace('+00:00', 'Z')
+
+LEASE_RENEW_INTERVAL = 60  # seconds
+
+
+def _start_lease_renewal(mission_id, ref):
+    """Bump leaseExpiresAt every 60 seconds until stopped."""
+    def _renew():
+        try:
+            ref.update({
+                'leaseExpiresAt': _expires_iso(),
+                'statusUpdatedAt': _now_iso(),
+            })
+        except Exception as e:
+            print(f'[lease] Failed to renew lease for {mission_id}: {e}')
+
+        # Reschedule
+        timer = threading.Timer(LEASE_RENEW_INTERVAL, _renew)
+        timer.daemon = True
+        _active_leases[mission_id] = timer
+        timer.start()
+
+    timer = threading.Timer(LEASE_RENEW_INTERVAL, _renew)
+    timer.daemon = True
+    _active_leases[mission_id] = timer
+    timer.start()
+
+
+def _stop_lease_renewal(mission_id):
+    """Cancel the renewal timer for a mission."""
+    timer = _active_leases.pop(mission_id, None)
+    if timer:
+        timer.cancel()
 
 
 
@@ -378,7 +413,7 @@ def api_send_to_rover(mission_id):
         # Release the lock since dispatch failed
         ref.update({'status': 'queued', 'lockOwner': None, 'lockedAt': None, 'leaseExpiresAt': None})
         return err
-
+    _start_lease_renewal(mission_id, ref)
     return jsonify({'status': 'ok', 'missionId': mission_id})
 
 
@@ -443,7 +478,7 @@ def api_rerun(mission_id):
             'leaseExpiresAt': None,
         })
         return err
-
+    _start_lease_renewal(mission_id, ref)  
     return jsonify({'status': 'ok', 'missionId': mission_id})
 
 
@@ -457,6 +492,7 @@ def api_mark_complete(mission_id):
     if mission.get('status') not in ('queued', 'processing'):
         return jsonify({'error': 'Only queued or running missions can be marked complete'}), 400
 
+    _stop_lease_renewal(mission_id)
     ref.update({
         'status': 'completed',
         'completedAt': _now_iso(),
