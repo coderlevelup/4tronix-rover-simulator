@@ -15,6 +15,7 @@
 import { Mission } from '@/core/domain/entities/Mission';
 import { IMissionRepository } from '@/core/domain/repositories/IMissionRepository';
 import { CreateMissionDto } from '@/infrastructure/validation/schemas';
+import { sendMissionStatusEmail } from '../../../infrastructure/email/resendClient';
 
 export interface SubmitMissionResult {
   success: boolean;
@@ -44,6 +45,10 @@ export class MissionService {
         blocklyState: dto.blocklyState,
         status: 'queued',
         submittedAt: new Date().toISOString(),
+      });
+
+      sendMissionStatusEmail(mission, 'queued').catch((err: unknown) => {
+        console.error('Failed to send mission queued email:', err);
       });
 
       return {
@@ -100,6 +105,20 @@ export class MissionService {
    * @returns Updated mission or null if not found
    */
   async updateMission(id: string, updates: Partial<Mission>): Promise<Mission | null> {
-    return this.missionRepository.update(id, updates);
+    const previous = await this.missionRepository.findById(id);
+
+    const updated = await this.missionRepository.update(id, updates);
+
+    try {
+      if (previous && updated && updates.status && updates.status !== previous.status) {
+        await sendMissionStatusEmail(updated, updates.status).catch((err: unknown) => {
+          console.error(`Failed to send mission status email (${updates.status}):`, err);
+        });
+      }
+    } catch (err) {
+      console.error('Error while attempting to send mission status email:', err);
+    }
+
+    return updated;
   }
 }
