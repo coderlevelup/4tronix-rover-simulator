@@ -261,24 +261,24 @@ def _mission_to_dict(doc):
 @operator_bp.route('/api/missions', methods=['GET'])
 @require_operator
 def api_missions():
-    if not _admin_configured():
-        return jsonify({'error': 'Firestore is not configured'}), 503
-    try:
-        docs = (
-            _firestore()
-            .collection(MISSIONS_COLLECTION)
-            # 'DESCENDING' is the value of firestore Query.DESCENDING; using the
-            # string avoids importing google.cloud here.
-            .order_by('submittedAt', direction='DESCENDING')
-            .limit(MISSION_LIST_LIMIT)
-            .stream()
-        )
-        missions = [_mission_to_dict(doc) for doc in docs]
-    except Exception as e:
-        return jsonify({'error': f'Failed to load missions: {e}'}), 502
+    from .mission_store import get_missions
 
-    missions = [m for m in missions if m['status'] != 'cancelled']
-    return jsonify({'missions': missions})
+    missions, last_synced = get_missions()
+
+    # Determine staleness (stale if last sync > 60 seconds ago or never synced)
+    stale = True
+    if last_synced:
+        from datetime import datetime, timezone
+        synced_time = datetime.fromisoformat(last_synced.replace('Z', '+00:00'))
+        age = (datetime.now(timezone.utc) - synced_time).total_seconds()
+        stale = age > 60
+
+    return jsonify({
+        'missions': missions,
+        'stale': stale,
+        'lastSyncedAt': last_synced,
+    })
+
 
 
 def _get_mission_ref(mission_id):

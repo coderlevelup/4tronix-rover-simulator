@@ -319,4 +319,16 @@ if __name__ == '__main__':
     # coming up - those are local and time-critical, this isn't.
     from operator_console import start_polling
     threading.Thread(target=start_polling, daemon=True).start()
+    from mission_store import init_db
+    from sync_worker import start_sync_worker
+
+    init_db()
+    try:
+        firestore_client = operator_console._firestore()
+    except Exception as e:
+        print(f"[satellite] Firestore sync disabled: {e}")
+    else:
+        start_sync_worker(firestore_client, interval=30)
+
     app.run(host='0.0.0.0', port=port, threaded=True, use_reloader=False)
+
