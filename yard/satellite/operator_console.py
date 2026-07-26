@@ -131,6 +131,11 @@ def _rover_url():
 def _now_iso():
     return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
+def _expires_iso():
+    from datetime import timedelta
+    return (datetime.now(timezone.utc) + timedelta(seconds=LEASE_TTL_SECONDS)).isoformat().replace('+00:00', 'Z')
+
+
 
 # Event-day escape hatch: OPERATOR_AUTH=off skips login entirely. Firebase
 # sign-in needs internet, and venue wifi (science centre) can be too flaky to
@@ -288,8 +293,37 @@ def _get_mission_ref(mission_id):
         return None, None
     return ref, snapshot.to_dict() or {}
 
+_acquire_lock = threading.Lock()
+LEASE_TTL_SECONDS = 300  # 5 minutes
 
-def _dispatch_to_rover(mission):
+@firestore.transactional
+def _acquire(transaction, ref, owner, now_iso, expires_iso):
+    snap = ref.get(transaction=transaction)
+    if not snap.exists:
+        return False, 'not-found'
+    data = snap.to_dict() or {}
+
+    if data.get('status') != 'queued':
+        return False, 'not-queued'
+
+    holder = data.get('lockOwner')
+    lease = data.get('leaseExpiresAt')
+    if holder and holder != owner and lease and lease > now_iso:
+        return False, 'locked-by-other'
+
+    transaction.update(ref, {
+        'status': 'processing',
+        'startedAt': now_iso,
+        'statusUpdatedAt': now_iso,
+        'lockOwner': owner,
+        'lockedAt': now_iso,
+        'leaseExpiresAt': expires_iso,
+    })
+    return True, None
+
+
+
+def _dispatch_to_rover(mission, mission_id=None):
     """POST a mission's Python onto the rover queue.
 
     Returns (True, None) on success or (False, response) where response is a
@@ -298,6 +332,8 @@ def _dispatch_to_rover(mission):
     params = {'code': mission.get('code') or ''}
     if mission.get('blocklyState'):
         params['blockly_state'] = mission['blocklyState']
+    if mission_id:
+        params['mission_id'] = mission_id
 
     try:
         resp = requests.post(
@@ -317,46 +353,99 @@ def _dispatch_to_rover(mission):
 @operator_bp.route('/api/missions/<mission_id>/send', methods=['POST'])
 @require_operator
 def api_send_to_rover(mission_id):
-    """Push the mission's Python onto the rover queue; mission -> processing."""
-    ref, mission = _get_mission_ref(mission_id)
-    if ref is None:
-        return jsonify({'error': 'Mission not found'}), 404
-    if mission.get('status') != 'queued':
-        return jsonify({'error': 'Only queued missions can be sent to the rover'}), 400
+    operator = current_operator()
+    owner = operator['uid']
+    now = _now_iso()
+    expires = _expires_iso(now)
 
-    ok, err = _dispatch_to_rover(mission)
+    ref = _firestore().collection(MISSIONS_COLLECTION).document(mission_id)
+
+    with _acquire_lock:
+        transaction = _firestore().transaction()
+        ok, reason = _acquire(transaction, ref, owner, now, expires)
+
     if not ok:
+        messages = {
+            'not-found': ('Mission not found', 404),
+            'not-queued': ('Only queued missions can be sent to the rover', 400),
+            'locked-by-other': ('Mission is locked by another operator', 409),
+        }
+        msg, code = messages.get(reason, ('Lock failed', 500))
+        return jsonify({'error': msg}), code
+
+    ok, err = _dispatch_to_rover(mission, mission_id=mission_id)
+    if not ok:
+        # Release the lock since dispatch failed
+        ref.update({'status': 'queued', 'lockOwner': None, 'lockedAt': None, 'leaseExpiresAt': None})
         return err
 
-    ref.update({'status': 'processing', 'startedAt': _now_iso()})
     return jsonify({'status': 'ok', 'missionId': mission_id})
+
+
+@firestore.transactional
+def _acquire_for_rerun(transaction, ref, owner, now_iso, expires_iso):
+    snap = ref.get(transaction=transaction)
+    if not snap.exists:
+        return False, 'not-found', None
+    data = snap.to_dict() or {}
+
+    if data.get('status') not in ('completed', 'failed'):
+        return False, 'not-terminal', None
+
+    holder = data.get('lockOwner')
+    lease = data.get('leaseExpiresAt')
+    if holder and holder != owner and lease and lease > now_iso:
+        return False, 'locked-by-other', None
+
+    transaction.update(ref, {
+        'status': 'processing',
+        'startedAt': now_iso,
+        'statusUpdatedAt': now_iso,
+        'completedAt': None,
+        'youtubeUrl': None,
+        'lockOwner': owner,
+        'lockedAt': now_iso,
+        'leaseExpiresAt': expires_iso,
+    })
+    return True, None, data
 
 
 @operator_bp.route('/api/missions/<mission_id>/rerun', methods=['POST'])
 @require_operator
 def api_rerun(mission_id):
-    """Re-queue a completed or failed mission on the rover.
+    operator = current_operator()
+    owner = operator['uid']
+    now = _now_iso()
+    expires = _expires_iso()
 
-    Clears the previous run's completion + video so the mission reflects the new
-    run, not stale data from the last one.
-    """
-    ref, mission = _get_mission_ref(mission_id)
-    if ref is None:
-        return jsonify({'error': 'Mission not found'}), 404
-    if mission.get('status') not in ('completed', 'failed'):
-        return jsonify({'error': 'Only completed or failed missions can be rerun'}), 400
+    ref = _firestore().collection(MISSIONS_COLLECTION).document(mission_id)
 
-    ok, err = _dispatch_to_rover(mission)
+    with _acquire_lock:
+        transaction = _firestore().transaction()
+        ok, reason, mission = _acquire_for_rerun(transaction, ref, owner, now, expires)
+
     if not ok:
+        messages = {
+            'not-found': ('Mission not found', 404),
+            'not-terminal': ('Only completed or failed missions can be rerun', 400),
+            'locked-by-other': ('Mission is locked by another operator', 409),
+        }
+        msg, code = messages.get(reason, ('Lock failed', 500))
+        return jsonify({'error': msg}), code
+
+    ok, err = _dispatch_to_rover(mission, mission_id=mission_id)
+
+    if not ok:
+        ref.update({
+            'status': 'failed',
+            'lockOwner': None,
+            'lockedAt': None,
+            'leaseExpiresAt': None,
+        })
         return err
 
-    ref.update({
-        'status': 'processing',
-        'startedAt': _now_iso(),
-        'completedAt': None,
-        'youtubeUrl': None,
-    })
     return jsonify({'status': 'ok', 'missionId': mission_id})
+
 
 
 @operator_bp.route('/api/missions/<mission_id>/complete', methods=['POST'])
@@ -368,8 +457,16 @@ def api_mark_complete(mission_id):
     if mission.get('status') not in ('queued', 'processing'):
         return jsonify({'error': 'Only queued or running missions can be marked complete'}), 400
 
-    ref.update({'status': 'completed', 'completedAt': _now_iso()})
+    ref.update({
+        'status': 'completed',
+        'completedAt': _now_iso(),
+        'statusUpdatedAt': _now_iso(),
+        'lockOwner': None,
+        'lockedAt': None,
+        'leaseExpiresAt': None,
+    })
     return jsonify({'status': 'ok', 'missionId': mission_id})
+
 
 
 @operator_bp.route('/api/missions/<mission_id>/youtube', methods=['POST'])
