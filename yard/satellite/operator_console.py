@@ -53,7 +53,7 @@ operator_bp = Blueprint('operator', __name__, url_prefix='/operator')
 # Timeouts (seconds)
 LOGIN_TIMEOUT = 10.0
 ROVER_TIMEOUT = 5.0
-NOTIFY_TIMEOUT = 3.0
+NOTIFY_TIMEOUT = 10.0
 
 MISSIONS_COLLECTION = 'missions'
 MISSION_LIST_LIMIT = 100
@@ -143,9 +143,9 @@ def _mission_control_url():
 
 def _notify_mission_control(mission_id, status):
     """Best-effort status-email trigger, called after Firestore is already
-    updated. Must never raise or block the operator's request - a learner
-    missing an email is far cheaper than an operator unable to run the rover
-    because mission-control happens to be down.
+    updated. Must never raise - a learner missing an email is far cheaper
+    than an operator unable to run the rover because mission-control happens
+    to be down.
     """
     try:
         requests.post(
@@ -158,6 +158,26 @@ def _notify_mission_control(mission_id, status):
             'Failed to notify mission-control of status change (mission=%s, status=%s)',
             mission_id, status,
         )
+
+
+def _notify_mission_control_async(mission_id, status):
+    """Fire _notify_mission_control on a background thread so a slow or
+    unreachable mission-control - a Cloud Run cold start, or the venue wifi
+    the operator console already has to tolerate - never delays the
+    operator's response. The rover dispatch / Firestore write this follows
+    has already succeeded by the time this is called.
+
+    Flask's app context is thread-local and does not propagate to new
+    threads automatically, so it's captured here (while still on the
+    request's thread) and re-pushed inside the background thread.
+    """
+    app = current_app._get_current_object()
+
+    def run():
+        with app.app_context():
+            _notify_mission_control(mission_id, status)
+
+    threading.Thread(target=run, daemon=True).start()
 
 
 def _now_iso():
@@ -361,7 +381,7 @@ def api_send_to_rover(mission_id):
         return err
 
     ref.update({'status': 'processing', 'startedAt': _now_iso()})
-    _notify_mission_control(mission_id, 'processing')
+    _notify_mission_control_async(mission_id, 'processing')
     return jsonify({'status': 'ok', 'missionId': mission_id})
 
 
@@ -389,7 +409,7 @@ def api_rerun(mission_id):
         'completedAt': None,
         'youtubeUrl': None,
     })
-    _notify_mission_control(mission_id, 'processing')
+    _notify_mission_control_async(mission_id, 'processing')
     return jsonify({'status': 'ok', 'missionId': mission_id})
 
 
@@ -403,7 +423,7 @@ def api_mark_complete(mission_id):
         return jsonify({'error': 'Only queued or running missions can be marked complete'}), 400
 
     ref.update({'status': 'completed', 'completedAt': _now_iso()})
-    _notify_mission_control(mission_id, 'completed')
+    _notify_mission_control_async(mission_id, 'completed')
     return jsonify({'status': 'ok', 'missionId': mission_id})
 
 

@@ -9,8 +9,10 @@ dispatch, and the status transitions written back to Firestore.
 import sys
 import os
 import re
+import threading
 
 import pytest
+from flask import current_app
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from web_server import app as flask_app  # noqa: E402
@@ -103,6 +105,21 @@ class FakeResponse:
         return self._payload
 
 
+class SyncThread:
+    """threading.Thread stand-in that runs its target immediately and
+    synchronously in start(), so tests asserting on side effects of
+    _notify_mission_control_async don't race a real background thread.
+    """
+
+    def __init__(self, target=None, args=(), kwargs=None, daemon=None):
+        self._target = target
+        self._args = args
+        self._kwargs = kwargs or {}
+
+    def start(self):
+        self._target(*self._args, **self._kwargs)
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -150,6 +167,10 @@ def client(missions, monkeypatch):
     # notification never make a real network call. Tests that do care
     # re-monkeypatch this within the test body.
     monkeypatch.setattr(operator_console, '_notify_mission_control', lambda *a, **k: None)
+    # _notify_mission_control_async normally runs on a real background
+    # thread; run it inline instead so assertions right after client.post()
+    # aren't racing it.
+    monkeypatch.setattr(operator_console.threading, 'Thread', SyncThread)
     flask_app.config['TESTING'] = True
     with flask_app.test_client() as c:
         yield c
@@ -596,6 +617,32 @@ def test_notify_mission_control_posts_status_to_the_notify_endpoint(monkeypatch)
     assert calls == [
         ('https://mission-control.example/api/missions/mission-1/notify', {'status': 'completed'}, operator_console.NOTIFY_TIMEOUT),
     ]
+
+
+def test_notify_mission_control_async_runs_on_a_real_background_thread(monkeypatch):
+    """Uses the real threading module (no SyncThread fake) to prove the
+    async wrapper genuinely offloads work rather than running inline, and
+    that it correctly re-establishes the Flask app context on that thread
+    (current_app is thread-local and won't propagate on its own).
+    """
+    done = threading.Event()
+    result = {}
+
+    def fake_notify(mission_id, status):
+        result['thread'] = threading.current_thread()
+        result['args'] = (mission_id, status)
+        result['app'] = current_app._get_current_object()
+        done.set()
+
+    monkeypatch.setattr(operator_console, '_notify_mission_control', fake_notify)
+
+    with flask_app.app_context():
+        operator_console._notify_mission_control_async('mission-1', 'completed')
+        assert done.wait(timeout=2), 'background thread never called _notify_mission_control'
+
+    assert result['thread'] is not threading.current_thread()
+    assert result['args'] == ('mission-1', 'completed')
+    assert result['app'] is flask_app
 
 
 def test_notify_mission_control_swallows_network_errors(monkeypatch):
