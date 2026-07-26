@@ -21,6 +21,7 @@
     "next": "16.2.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "resend": "^6.18.0",
     "zod": "^3.25.76"
   },
   "description": "Learner-facing mission authoring platform for Mars Rover",
