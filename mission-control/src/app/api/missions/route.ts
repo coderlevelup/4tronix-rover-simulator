@@ -11,6 +11,8 @@ import { validateMission } from '@/infrastructure/validation/schemas';
 import { getFirestoreInstance } from '@/infrastructure/persistence/firebase-admin';
 import { FirestoreMissionRepository } from '@/infrastructure/persistence/FirestoreMissionRepository';
 import { MissionService } from '@/core/application/services/MissionService';
+import { MissionNotificationService } from '@/core/application/services/MissionNotificationService';
+import { ResendEmailSender } from '@/infrastructure/email/resend-client';
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -33,7 +35,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const repository = new FirestoreMissionRepository(getFirestoreInstance());
+    const firestore = getFirestoreInstance();
+    const repository = new FirestoreMissionRepository(firestore);
     const service = new MissionService(repository);
     const result = await service.submitMission(validation.data);
 
@@ -43,6 +46,14 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    const historyUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/history`;
+    const notificationService = new MissionNotificationService(
+      new ResendEmailSender(),
+      firestore,
+      historyUrl
+    );
+    await notificationService.notifyStatusChange(result.mission, 'queued');
 
     return NextResponse.json({ success: true, mission: result.mission }, { status: 201 });
   } catch (error) {

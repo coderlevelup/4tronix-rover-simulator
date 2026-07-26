@@ -357,6 +357,7 @@ export class FirestoreMissionRepository implements IMissionRepository {
       yardId: data.yardId as string,
       learnerId: (data.learnerId as string) || (data.sessionId as string),
       sessionId: data.sessionId as string,
+      learnerEmail: data.learnerEmail as string | undefined,
       learnerUid: data.learnerUid as string | undefined,
       name: data.name as string | undefined,
       code: data.code as string,
