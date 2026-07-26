@@ -54,6 +54,18 @@ export interface Mission {
   executionResult?: ExecutionResult;
   executionMetadata?: ExecutionMetadata;
 
+  //Locking (offline-sync lease mechanisms)
+  lockOwner?: string | null;                 // Which rover is currently executing this mission (if any)
+  lockedAt?: string | null;                   // When the mission was locked for execution (if any)
+  leaseExpiresAt?: string | null;             // When the lock lease expires (if any)
+
+  //Review
+  needsReview?: boolean;              // Whether the mission needs review (e.g., for failed missions)
+  reviewReason?: string | null;              // Optional - reason for review (e.g., "syntax error", "failed test case")
+
+  //Confilct Resolution
+  statusUpdatedAt?: string | null;          // When the status was last updated (for conflict resolution)
+
   // Media artifacts
   videoUrl?: string;                 // Google Cloud Storage URL
   youtubeUrl?: string;               // Optional YouTube share URL
