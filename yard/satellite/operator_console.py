@@ -26,6 +26,13 @@ Configuration (environment):
       "MissionID: <id>" in the video description. Either unset disables the
       poll (it logs and no-ops) - manual "attach YouTube URL" still works
       without these.
+  MISSION_CONTROL_URL
+      Optional. Base URL of the mission-control web app, used to fire a
+      best-effort POST /api/missions/<id>/notify after a status change so the
+      learner gets a status email. This console remains fully functional
+      (Firestore is still updated) if mission-control is unreachable or this
+      is unset - the call is fire-and-forget. Defaults to
+      http://localhost:3000.
 
 The module file is named operator_console (not operator) so it does not
 shadow Python's stdlib `operator` module.
@@ -46,6 +53,7 @@ operator_bp = Blueprint('operator', __name__, url_prefix='/operator')
 # Timeouts (seconds)
 LOGIN_TIMEOUT = 10.0
 ROVER_TIMEOUT = 5.0
+NOTIFY_TIMEOUT = 3.0
 
 MISSIONS_COLLECTION = 'missions'
 MISSION_LIST_LIMIT = 100
@@ -126,6 +134,30 @@ def _verify_id_token(id_token):
 def _rover_url():
     getter = current_app.config.get('ROVER_URL_GETTER')
     return getter() if getter else os.environ.get('ROVER_URL', 'http://marspi.local:8523')
+
+
+def _mission_control_url():
+    getter = current_app.config.get('MISSION_CONTROL_URL_GETTER')
+    return getter() if getter else os.environ.get('MISSION_CONTROL_URL', 'http://localhost:3000')
+
+
+def _notify_mission_control(mission_id, status):
+    """Best-effort status-email trigger, called after Firestore is already
+    updated. Must never raise or block the operator's request - a learner
+    missing an email is far cheaper than an operator unable to run the rover
+    because mission-control happens to be down.
+    """
+    try:
+        requests.post(
+            f'{_mission_control_url()}/api/missions/{mission_id}/notify',
+            json={'status': status},
+            timeout=NOTIFY_TIMEOUT,
+        )
+    except requests.exceptions.RequestException:
+        current_app.logger.warning(
+            'Failed to notify mission-control of status change (mission=%s, status=%s)',
+            mission_id, status,
+        )
 
 
 def _now_iso():
@@ -329,6 +361,7 @@ def api_send_to_rover(mission_id):
         return err
 
     ref.update({'status': 'processing', 'startedAt': _now_iso()})
+    _notify_mission_control(mission_id, 'processing')
     return jsonify({'status': 'ok', 'missionId': mission_id})
 
 
@@ -356,6 +389,7 @@ def api_rerun(mission_id):
         'completedAt': None,
         'youtubeUrl': None,
     })
+    _notify_mission_control(mission_id, 'processing')
     return jsonify({'status': 'ok', 'missionId': mission_id})
 
 
@@ -369,6 +403,7 @@ def api_mark_complete(mission_id):
         return jsonify({'error': 'Only queued or running missions can be marked complete'}), 400
 
     ref.update({'status': 'completed', 'completedAt': _now_iso()})
+    _notify_mission_control(mission_id, 'completed')
     return jsonify({'status': 'ok', 'missionId': mission_id})
 
 
