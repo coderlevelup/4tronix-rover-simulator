@@ -274,11 +274,15 @@ def api_missions():
         age = (datetime.now(timezone.utc) - synced_time).total_seconds()
         stale = age > 60
 
+    from .mission_store import outbox_count
+
     return jsonify({
         'missions': missions,
         'stale': stale,
         'lastSyncedAt': last_synced,
+        'pendingWrites': outbox_count(),
     })
+
 
 
 
@@ -346,59 +350,90 @@ def api_send_to_rover(mission_id):
 @operator_bp.route('/api/missions/<mission_id>/rerun', methods=['POST'])
 @require_operator
 def api_rerun(mission_id):
-    """Re-queue a completed or failed mission on the rover.
+    """Re-queue a completed or failed mission on the rover."""
+    from .mission_store import get_mission, write_and_enqueue
 
-    Clears the previous run's completion + video so the mission reflects the new
-    run, not stale data from the last one.
-    """
-    ref, mission = _get_mission_ref(mission_id)
-    if ref is None:
+    mission = get_mission(mission_id)
+    if mission is None:
         return jsonify({'error': 'Mission not found'}), 404
-    if mission.get('status') not in ('completed', 'failed'):
+    if mission['status'] not in ('completed', 'failed'):
         return jsonify({'error': 'Only completed or failed missions can be rerun'}), 400
+
+    now = _now_iso()
+    write_and_enqueue(
+        mission_id=mission_id,
+        mirror_updates={
+            'status': 'processing',
+            'started_at': now,
+            'completed_at': None,
+            'youtube_url': None,
+            'local_dirty': 1,
+        },
+        op='requeue',
+        payload={
+            'status': 'processing',
+            'startedAt': now,
+            'completedAt': None,
+            'youtubeUrl': None,
+            'statusUpdatedAt': now,
+        },
+    )
 
     ok, err = _dispatch_to_rover(mission)
     if not ok:
         return err
 
-    ref.update({
-        'status': 'processing',
-        'startedAt': _now_iso(),
-        'completedAt': None,
-        'youtubeUrl': None,
-    })
     return jsonify({'status': 'ok', 'missionId': mission_id})
+
 
 
 @operator_bp.route('/api/missions/<mission_id>/complete', methods=['POST'])
 @require_operator
 def api_mark_complete(mission_id):
-    ref, mission = _get_mission_ref(mission_id)
-    if ref is None:
+    from .mission_store import get_mission, write_and_enqueue
+
+    mission = get_mission(mission_id)
+    if mission is None:
         return jsonify({'error': 'Mission not found'}), 404
-    if mission.get('status') not in ('queued', 'processing'):
+    if mission['status'] not in ('queued', 'processing'):
         return jsonify({'error': 'Only queued or running missions can be marked complete'}), 400
 
-    ref.update({'status': 'completed', 'completedAt': _now_iso()})
+    now = _now_iso()
+    write_and_enqueue(
+        mission_id=mission_id,
+        mirror_updates={'status': 'completed', 'completed_at': now, 'local_dirty': 1},
+        op='complete',
+        payload={'status': 'completed', 'completedAt': now, 'statusUpdatedAt': now},
+    )
     return jsonify({'status': 'ok', 'missionId': mission_id})
+
 
 
 @operator_bp.route('/api/missions/<mission_id>/youtube', methods=['POST'])
 @require_operator
 def api_attach_youtube(mission_id):
+    from .mission_store import get_mission, write_and_enqueue
+
     data = request.get_json(silent=True) or {}
     url = (data.get('url') or '').strip()
     if not url or not any(p.match(url) for p in YOUTUBE_URL_PATTERNS):
         return jsonify({'error': 'Use a youtube.com/watch?v=... or youtu.be/... URL'}), 400
 
-    ref, mission = _get_mission_ref(mission_id)
-    if ref is None:
+    mission = get_mission(mission_id)
+    if mission is None:
         return jsonify({'error': 'Mission not found'}), 404
-    if mission.get('status') != 'completed':
+    if mission['status'] != 'completed':
         return jsonify({'error': 'Attach the video after the mission is marked complete'}), 400
 
-    ref.update({'youtubeUrl': url})
+    now = _now_iso()
+    write_and_enqueue(
+        mission_id=mission_id,
+        mirror_updates={'youtube_url': url, 'local_dirty': 1},
+        op='youtube',
+        payload={'youtubeUrl': url},
+    )
     return jsonify({'status': 'ok', 'missionId': mission_id})
+
 
 
 @operator_bp.route('/api/health', methods=['GET'])
