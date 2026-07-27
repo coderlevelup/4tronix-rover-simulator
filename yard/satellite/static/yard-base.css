@@ -5,32 +5,66 @@
  * on every page so all five read as one control room.
  */
 
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 :root {
-  --bg: #0b0b0e;
-  --bg-2: #101015;
-  --surface: #16161d;
-  --surface-2: #1c1c25;
-  --surface-3: #22222c;
-  --border: #262631;
-  --border-strong: #37374480;
-  --text: #e9e9ee;
-  --text-dim: #9a9aa7;
-  --text-faint: #6a6a77;
-  --heading: #ffffff;
-  --accent: #f97316;
-  --accent-2: #fb923c;
-  --accent-weak: rgba(249, 115, 22, 0.14);
+  --radius: 1rem;
+
+  --background: oklch(0.24 0.15 50);
+  --foreground: oklch(0.97 0.02 260);
+
+  --card: oklch(0.18 0.05 270);
+  --card-foreground: oklch(0.97 0.02 260);
+  --popover: oklch(0.18 0.05 270);
+  --popover-foreground: oklch(0.97 0.02 260);
+
+  --primary: oklch(0.72 0.19 45);
+  --primary-foreground: oklch(0.16 0.04 270);
+
+  --secondary: oklch(0.28 0.06 270);
+  --secondary-foreground: oklch(0.97 0.02 260);
+  --muted: oklch(0.26 0.04 270);
+  --muted-foreground: oklch(0.75 0.04 260);
+  --accent: oklch(0.74 0.18 175);
+  --accent-foreground: oklch(0.16 0.04 270);
+
+  --destructive: oklch(0.65 0.24 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.32 0.05 270);
+  --input: oklch(0.32 0.05 270);
+  --ring: oklch(0.72 0.19 45);
+
+  --mars: oklch(0.68 0.21 35);
+  --mars-glow: oklch(0.78 0.18 55);
+  --buzz: oklch(0.72 0.21 145);
+  --buzz-glow: oklch(0.85 0.18 155);
+  --cosmic: oklch(0.55 0.22 285);
+  --stardust: oklch(0.92 0.06 95);
+
+  --bg: var(--background);
+  --bg-2: oklch(0.12 0.04 45);
+  --surface: var(--card);
+  --surface-2: var(--popover);
+  --surface-3: var(--muted);
+  --border-strong: color-mix(in oklab, var(--border) 75%, var(--background) 25%);
+  --text: var(--foreground);
+  --text-dim: var(--muted-foreground);
+  --text-faint: oklch(0.75 0.03 270);
+  --heading: var(--foreground);
+  --accent-2: color-mix(in oklab, var(--accent) 70%, var(--primary) 30%);
+  --accent-weak: rgba(249, 115, 22, 0.22);
   --ok: #34d399;
   --warn: #fbbf24;
   --bad: #f87171;
-  --radius: 14px;
-  --mono: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Fredoka", "Baloo 2", system-ui, sans-serif;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans);
   color: var(--text);
   background:
     radial-gradient(900px 480px at 50% -160px, var(--accent-weak), transparent 70%),
@@ -39,6 +73,8 @@ body {
     var(--bg);
   -webkit-font-smoothing: antialiased;
 }
+
+h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0.01em; }
 
 .mono, code, pre { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
@@ -53,15 +89,20 @@ body {
   gap: 1.1rem;
   padding: 0 1.5rem;
   height: 62px;
-  background: color-mix(in srgb, var(--bg-2) 82%, transparent);
+  background: color-mix(in srgb, var(--bg-2) 86%, transparent);
   backdrop-filter: blur(10px) saturate(1.2);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-strong);
 }
 .brand { display: inline-flex; align-items: center; gap: 0.65rem; text-decoration: none; }
 .brand-mark {
-  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
-  background: linear-gradient(140deg, var(--accent-2), #ea580c);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 3px 12px rgba(249, 115, 22, 0.35);
+  width: 30px; height: 30px; border-radius: 12px; flex-shrink: 0;
+  background-color: var(--surface);
+  background-image: url('/static/rover-hero.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 8px 22px rgba(0, 0, 0, 0.22);
 }
 .brand-txt { display: flex; flex-direction: column; line-height: 1.05; }
 .brand-txt b { color: var(--heading); font-size: 0.98rem; font-weight: 700; letter-spacing: 0.01em; }
@@ -72,8 +113,8 @@ body {
   color: var(--text-dim); text-decoration: none; font-size: 0.85rem; font-weight: 500;
   padding: 0.42rem 0.72rem; border-radius: 9px; transition: color 0.15s, background 0.15s;
 }
-.topnav a:hover { color: var(--text); background: var(--surface); }
-.topnav a.active { color: var(--accent); background: var(--accent-weak); font-weight: 600; }
+.topnav a:hover { color: var(--text); background: var(--surface-2); }
+.topnav a.active { color: var(--primary); background: rgba(255, 214, 150, 0.12); font-weight: 600; }
 
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 0.75rem; }
 .op-email { color: var(--text-faint); font-size: 0.78rem; font-family: var(--mono); }
@@ -96,7 +137,7 @@ body {
   color: var(--text-dim); background: var(--surface); border: 1px solid var(--border);
   border-radius: 10px; transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.iconbtn:hover { color: var(--text); border-color: var(--accent); background: var(--surface-2); }
+.iconbtn:hover { color: var(--text); border-color: var(--primary); background: var(--surface-2); }
 .iconbtn svg { width: 18px; height: 18px; }
 
 /* Kiosk home button (code / monitor) */
@@ -106,7 +147,7 @@ body {
   color: var(--text-dim); background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.yard-home:hover { color: var(--text); border-color: var(--accent); background: var(--surface-2); }
+.yard-home:hover { color: var(--text); border-color: var(--primary); background: var(--surface-2); }
 .yard-home svg { width: 22px; height: 22px; }
 
 /* ---- Page shell + hub --------------------------------------------------- */

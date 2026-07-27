@@ -9,8 +9,10 @@ dispatch, and the status transitions written back to Firestore.
 import sys
 import os
 import re
+import threading
 
 import pytest
+from flask import current_app
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from web_server import app as flask_app  # noqa: E402
@@ -104,6 +106,21 @@ class FakeResponse:
         return self._payload
 
 
+class SyncThread:
+    """threading.Thread stand-in that runs its target immediately and
+    synchronously in start(), so tests asserting on side effects of
+    _notify_mission_control_async don't race a real background thread.
+    """
+
+    def __init__(self, target=None, args=(), kwargs=None, daemon=None):
+        self._target = target
+        self._args = args
+        self._kwargs = kwargs or {}
+
+    def start(self):
+        self._target(*self._args, **self._kwargs)
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -152,6 +169,14 @@ def client(missions, monkeypatch, tmp_path):
     # missions.db on disk.
     monkeypatch.setattr(mission_store, 'DB_PATH', str(tmp_path / 'missions.db'))
     mission_store.init_db()
+    # Default to a no-op so tests that don't care about the mission-control
+    # notification never make a real network call. Tests that do care
+    # re-monkeypatch this within the test body.
+    monkeypatch.setattr(operator_console, '_notify_mission_control', lambda *a, **k: None)
+    # _notify_mission_control_async normally runs on a real background
+    # thread; run it inline instead so assertions right after client.post()
+    # aren't racing it.
+    monkeypatch.setattr(operator_console.threading, 'Thread', SyncThread)
     flask_app.config['TESTING'] = True
     with flask_app.test_client() as c:
         yield c
@@ -346,6 +371,55 @@ def test_send_404s_for_unknown_mission(client):
     assert client.post('/operator/api/missions/nope/send').status_code == 404
 
 
+def test_send_notifies_mission_control_after_marking_processing(client, missions, monkeypatch):
+    sign_in(client)
+    monkeypatch.setattr(operator_console.requests, 'post', lambda *a, **k: FakeResponse(200, {}))
+
+    calls = []
+    monkeypatch.setattr(
+        operator_console, '_notify_mission_control',
+        lambda mission_id, status: calls.append((mission_id, status)),
+    )
+
+    resp = client.post('/operator/api/missions/q1/send')
+    assert resp.status_code == 200
+    assert calls == [('q1', 'processing')]
+
+
+def test_send_does_not_notify_when_rover_dispatch_fails(client, monkeypatch):
+    sign_in(client)
+
+    def fake_post(*a, **k):
+        raise operator_console.requests.exceptions.ConnectionError()
+
+    monkeypatch.setattr(operator_console.requests, 'post', fake_post)
+
+    calls = []
+    monkeypatch.setattr(
+        operator_console, '_notify_mission_control',
+        lambda mission_id, status: calls.append((mission_id, status)),
+    )
+
+    resp = client.post('/operator/api/missions/q1/send')
+    assert resp.status_code == 503
+    assert calls == []
+
+
+def test_rerun_notifies_mission_control(client, missions, monkeypatch):
+    sign_in(client)
+    monkeypatch.setattr(operator_console.requests, 'post', lambda *a, **k: FakeResponse(200, {}))
+
+    calls = []
+    monkeypatch.setattr(
+        operator_console, '_notify_mission_control',
+        lambda mission_id, status: calls.append((mission_id, status)),
+    )
+
+    resp = client.post('/operator/api/missions/c1/rerun')
+    assert resp.status_code == 200
+    assert calls == [('c1', 'processing')]
+
+
 # ---------------------------------------------------------------------------
 # Complete + YouTube
 # ---------------------------------------------------------------------------
@@ -356,6 +430,19 @@ def test_complete_marks_mission_completed(client, missions):
     assert resp.status_code == 200
     assert missions['p1']['status'] == 'completed'
     assert 'completedAt' in missions['p1']
+
+
+def test_complete_notifies_mission_control(client, missions, monkeypatch):
+    sign_in(client)
+    calls = []
+    monkeypatch.setattr(
+        operator_console, '_notify_mission_control',
+        lambda mission_id, status: calls.append((mission_id, status)),
+    )
+
+    resp = client.post('/operator/api/missions/p1/complete')
+    assert resp.status_code == 200
+    assert calls == [('p1', 'completed')]
 
 
 def test_complete_rejects_terminal_missions(client, missions):
@@ -586,3 +673,66 @@ def test_start_polling_reschedules_even_when_check_raises(monkeypatch):
     operator_console.start_polling()
 
     assert scheduled == [300]
+
+
+# ---------------------------------------------------------------------------
+# mission-control notification
+# ---------------------------------------------------------------------------
+
+def test_notify_mission_control_posts_status_to_the_notify_endpoint(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        operator_console.requests, 'post',
+        lambda url, json=None, timeout=None: calls.append((url, json, timeout)) or FakeResponse(200, {}),
+    )
+    monkeypatch.setenv('MISSION_CONTROL_URL', 'https://mission-control.example')
+
+    with flask_app.app_context():
+        operator_console._notify_mission_control('mission-1', 'completed')
+
+    assert calls == [
+        ('https://mission-control.example/api/missions/mission-1/notify', {'status': 'completed'}, operator_console.NOTIFY_TIMEOUT),
+    ]
+
+
+def test_notify_mission_control_async_runs_on_a_real_background_thread(monkeypatch):
+    """Uses the real threading module (no SyncThread fake) to prove the
+    async wrapper genuinely offloads work rather than running inline, and
+    that it correctly re-establishes the Flask app context on that thread
+    (current_app is thread-local and won't propagate on its own).
+    """
+    done = threading.Event()
+    result = {}
+
+    def fake_notify(mission_id, status):
+        result['thread'] = threading.current_thread()
+        result['args'] = (mission_id, status)
+        result['app'] = current_app._get_current_object()
+        done.set()
+
+    monkeypatch.setattr(operator_console, '_notify_mission_control', fake_notify)
+
+    with flask_app.app_context():
+        operator_console._notify_mission_control_async('mission-1', 'completed')
+        assert done.wait(timeout=2), 'background thread never called _notify_mission_control'
+
+    assert result['thread'] is not threading.current_thread()
+    assert result['args'] == ('mission-1', 'completed')
+    assert result['app'] is flask_app
+
+
+def test_notify_mission_control_swallows_network_errors(monkeypatch):
+    def fake_post(*a, **k):
+        raise operator_console.requests.exceptions.ConnectionError()
+
+    monkeypatch.setattr(operator_console.requests, 'post', fake_post)
+
+    with flask_app.app_context():
+        operator_console._notify_mission_control('mission-1', 'completed')  # must not raise
+
+
+def test_mission_control_url_defaults_to_localhost(monkeypatch):
+    monkeypatch.delenv('MISSION_CONTROL_URL', raising=False)
+
+    with flask_app.app_context():
+        assert operator_console._mission_control_url() == 'http://localhost:3000'

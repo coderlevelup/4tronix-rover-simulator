@@ -5,15 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Operator Console</title>
     <link rel="stylesheet" href="/static/yard-base.css">
+    <script src="/static/yard-cache.js"></script>
     <style>
         :root {
             --fs-body: 0.9rem;
             --fs-sm: 0.8rem;
             --fs-xs: 0.72rem;
-            --accent-select: #60a5fa;
+            --accent-select: var(--primary);
         }
-        body { min-height: 100vh; }
-        :focus-visible { outline: 2px solid var(--accent-select); outline-offset: 2px; border-radius: 4px; }
+        body { min-height: 100vh; background: var(--background); color: var(--foreground); }
+        :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
 
         .wrap { max-width: 920px; margin: 0 auto; padding: 1.9rem 1.5rem 3rem; }
 
@@ -29,27 +30,30 @@
         h1 { font-size: 1.5rem; font-weight: 600; color: var(--heading, #fff); }
         .subtitle { font-size: var(--fs-sm); color: var(--text-faint, #666); }
 
-        /* ---------- Status pill (shared) ---------- */
-        .status-pill {
+        /* ---------- Status badge: icon + text + color, never color alone ---------- */
+        .status-badge {
             display: inline-flex;
             align-items: center;
-            gap: 0.3rem;
+            gap: 0.35rem;
             border-radius: 999px;
             font-size: 0.68rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            padding: 0.2rem 0.6rem;
+            padding: 0.28rem 0.65rem 0.28rem 0.55rem;
             border: 1px solid var(--border);
             background: var(--surface-3, #222);
             color: var(--text-faint, #888);
             flex-shrink: 0;
+            white-space: nowrap;
         }
-        .status-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
-        .status-pill[data-tone="ok"]   { color: var(--ok);   background: rgba(52, 211, 153, 0.1);  border-color: rgba(52, 211, 153, 0.35); }
-        .status-pill[data-tone="warn"] { color: var(--warn); background: rgba(251, 191, 36, 0.1);  border-color: rgba(251, 191, 36, 0.35); }
-        .status-pill[data-tone="bad"]  { color: var(--bad);  background: rgba(248, 113, 113, 0.1); border-color: rgba(248, 113, 113, 0.35); }
-        .status-pill[data-tone="info"] { color: var(--accent-select); background: rgba(96, 165, 250, 0.1); border-color: rgba(96, 165, 250, 0.35); }
+        .status-badge svg { width: 13px; height: 13px; flex-shrink: 0; }
+        .status-badge[data-tone="ok"]   { color: var(--ok);   background: rgba(52, 211, 153, 0.1);  border-color: rgba(52, 211, 153, 0.35); }
+        .status-badge[data-tone="warn"] { color: var(--warn); background: rgba(251, 191, 36, 0.1);  border-color: rgba(251, 191, 36, 0.35); }
+        .status-badge[data-tone="bad"]  { color: var(--bad);  background: rgba(248, 113, 113, 0.1); border-color: rgba(248, 113, 113, 0.35); }
+        .status-badge[data-tone="info"] { color: var(--accent); background: rgba(118, 255, 221, 0.1); border-color: rgba(118, 255, 221, 0.25); }
+
+        .toolbar-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.9rem; flex-wrap: wrap; }
 
         .search-box {
             display: flex;
@@ -59,10 +63,10 @@
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 0.45rem 0.7rem;
-            margin-bottom: 1rem;
-            max-width: 360px;
+            flex: 1 1 240px;
+            min-width: 200px;
         }
-        .search-box:focus-within { border-color: var(--accent-select); }
+        .search-box:focus-within { border-color: var(--primary); }
         .search-box svg { width: 16px; height: 16px; color: var(--text-faint, #666); flex-shrink: 0; }
         .search-box input {
             flex: 1;
@@ -82,30 +86,53 @@
             padding: 0 0.2rem;
             display: none;
             border-radius: 4px;
+            min-width: 32px;
+            min-height: 32px;
         }
         .search-box .clear-search.visible { display: block; }
         .search-box .clear-search:hover { color: var(--text, #ccc); }
 
-        .toolbar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-        .toolbar a, .toolbar button {
+        .sort-select {
             background: var(--surface-2, #1a1a1a);
             border: 1px solid var(--border);
             border-radius: 8px;
-            color: var(--text-dim, #ccc);
+            color: var(--text, #e0e0e0);
             font-size: var(--fs-sm);
-            padding: 0.45rem 0.8rem;
-            text-decoration: none;
+            padding: 0.55rem 2.2rem 0.55rem 0.9rem;
+            min-height: 44px;
+            appearance: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+            flex-shrink: 0;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.7rem center;
+            background-size: 15px;
+        }
+        .sort-select:hover { border-color: var(--border-strong); }
+        .sort-select:focus-visible { border-color: var(--primary); }
+
+        .filter-pills { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .pill {
+            background: var(--surface-2, #1a1a1a);
+            border: 1px solid var(--border);
+            color: var(--text-faint, #888);
+            border-radius: 999px;
+            padding: 0.45rem 1rem;
+            min-height: 38px;
+            font-size: var(--fs-sm);
+            font-weight: 600;
             cursor: pointer;
         }
-        .toolbar a:hover, .toolbar button:hover { border-color: var(--border-strong); }
-
+        .pill:hover { border-color: var(--border-strong); color: var(--text-dim, #ccc); }
+        .pill[aria-pressed="true"] { background: rgba(96, 165, 250, 0.12); border-color: var(--ring, #60a5fa); color: var(--text, #fff); }
 
         .mission {
-            background: var(--surface-2, #1a1a1a);
+            background: var(--surface-2);
             border: 1px solid var(--border);
             border-radius: 12px;
             margin-bottom: 0.9rem;
-            overflow: hidden;
+            overflow: visible;
         }
 
         .mission-head {
@@ -121,16 +148,18 @@
         .mission-meta { font-size: var(--fs-xs); color: var(--text-faint, #666); font-family: ui-monospace, monospace; }
 
         pre {
-            background: var(--surface-3, #111);
-            color: var(--text-dim, #d0d0d0);
-            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            background: var(--surface-3);
+            color: var(--text-dim);
+            font-family: var(--mono);
             font-size: var(--fs-sm);
             line-height: 1.5;
             padding: 0.9rem 1rem;
             max-height: 180px;
             overflow: auto;
+            border-radius: 0;
         }
 
+        /* ---------- Actions row: all buttons inline, primary given the most visual weight ---------- */
         .mission-actions {
             display: flex;
             align-items: center;
@@ -139,6 +168,7 @@
             padding: 0.75rem 1rem;
             border-top: 1px solid var(--border);
         }
+
         .btn {
             border: 1px solid var(--border);
             border-radius: 8px;
@@ -146,29 +176,38 @@
             color: var(--text-dim, #ccc);
             font-size: var(--fs-sm);
             font-weight: 600;
-            padding: 0.5rem 0.9rem;
+            padding: 0.6rem 0.95rem;
+            min-height: 44px;
             cursor: pointer;
+            line-height: 1.2;
         }
         .btn:hover { border-color: var(--border-strong); }
         .btn:disabled { opacity: 0.5; cursor: default; }
-        .btn.primary { background: #f97316; border-color: #f97316; color: #fff; }
-        .btn.primary:hover:not(:disabled) { background: #ea580c; }
+        .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); font-weight: 700; }
+        .btn.primary:hover:not(:disabled) { background: var(--mars); }
         .btn.success { background: rgba(52, 211, 153, 0.15); border-color: rgba(52, 211, 153, 0.4); color: var(--ok); }
+        a.btn.primary { display: inline-flex; align-items: center; text-decoration: none; }
 
-        .mission-actions input {
-            flex: 1;
-            min-width: 200px;
+        .field-group { display: flex; flex-direction: column; gap: 0.3rem; flex: 1 1 220px; min-width: 200px; }
+        .field-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        .field-group input {
+            width: 100%;
             background: var(--surface-3, #111);
             border: 1px solid var(--border);
             border-radius: 8px;
             color: var(--text, #e0e0e0);
             font-size: var(--fs-sm);
-            padding: 0.5rem 0.75rem;
+            padding: 0.6rem 0.75rem;
+            min-height: 44px;
             outline: none;
+            box-sizing: border-box;
         }
-        .mission-actions input:focus-visible { border-color: #f97316; }
+        .field-group input:focus-visible { border-color: var(--primary); }
+        .field-group input.invalid { border-color: var(--bad); }
+        .field-group input.valid { border-color: var(--ok); }
+        .field-error { color: var(--bad); font-size: var(--fs-xs); min-height: 1em; }
+        .field-hint { color: var(--text-faint, #666); font-size: var(--fs-xs); min-height: 1em; }
 
-        .action-error { width: 100%; color: var(--bad); font-size: var(--fs-xs); }
         .yt-link { color: var(--ok); font-size: var(--fs-sm); text-decoration: none; border-radius: 4px; }
         .yt-link:hover { text-decoration: underline; }
 
@@ -190,8 +229,88 @@
             margin-bottom: 0.9rem;
         }
         .net-banner.visible { display: flex; }
-        .net-banner.stale { color: #fbbf24; background: #451a03; border: 1px solid #b45309; }
-        .net-banner.offline { color: #f87171; background: #450a0a; border: 1px solid #b91c1c; }
+        .net-banner.stale { color: var(--warn); background: rgba(251, 191, 36, 0.14); border: 1px solid rgba(251, 191, 36, 0.3); }
+        .net-banner.offline { color: var(--bad); background: rgba(248, 113, 113, 0.14); border: 1px solid rgba(248, 113, 113, 0.35); }
+
+        /* ---------- Confirmation modal ---------- */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            display: flex; align-items: center; justify-content: center;
+            padding: 1.25rem;
+            z-index: 100;
+        }
+        .modal-overlay[hidden] { display: none; }
+        .modal {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            max-width: 400px;
+            width: 100%;
+            padding: 1.4rem;
+        }
+        .modal h2 { font-size: 1.05rem; color: var(--heading, #fff); margin-bottom: 0.5rem; }
+        .modal p { font-size: var(--fs-sm); color: var(--text-dim, #ccc); line-height: 1.5; margin-bottom: 1.2rem; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; flex-wrap: wrap; }
+        .modal-actions .btn { min-width: 44px; }
+        .modal-actions .btn.danger { background: rgba(248, 113, 113, 0.15); border-color: rgba(248, 113, 113, 0.4); color: var(--bad); }
+
+        /* ---------- Feedback message box (toast) ---------- */
+        .toast-stack {
+            position: fixed;
+            bottom: 1.25rem;
+            right: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+            z-index: 200;
+            max-width: 360px;
+        }
+        .toast {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.6rem;
+            border-radius: 10px;
+            padding: 0.75rem 0.85rem;
+            border: 1px solid var(--border);
+            background: var(--surface-2);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+            font-size: var(--fs-sm);
+            animation: toast-in 0.18s ease-out;
+        }
+        .toast svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 0.1rem; }
+        .toast[data-tone="success"] svg, .toast[data-tone="success"] { color: var(--ok); }
+        .toast[data-tone="error"] svg, .toast[data-tone="error"] { color: var(--bad); }
+        .toast[data-tone="success"] { border-color: rgba(52, 211, 153, 0.4); }
+        .toast[data-tone="error"] { border-color: rgba(248, 113, 113, 0.4); }
+        .toast-msg { flex: 1; color: var(--text, #e0e0e0); line-height: 1.4; }
+        .toast-close {
+            background: none; border: none;
+            color: var(--text-faint, #888);
+            cursor: pointer;
+            font-size: 1rem;
+            line-height: 1;
+            padding: 0.15rem;
+            min-width: 32px; min-height: 32px;
+            flex-shrink: 0;
+        }
+        .toast-close:hover { color: var(--text, #ccc); }
+        @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 640px) {
+            .toast-stack { left: 1rem; right: 1rem; bottom: 1rem; max-width: none; }
+        }
+
+        /* ---------- Responsive: yard-in-hand, one thumb ---------- */
+        @media (max-width: 640px) {
+            .wrap { padding: 1.25rem 1rem 2.5rem; }
+            .toolbar-row { flex-direction: column; align-items: stretch; }
+            .search-box { min-width: 0; }
+            .sort-select { width: 100%; }
+            .mission-actions { flex-direction: column; align-items: stretch; }
+            .mission-actions .btn, .mission-actions a.btn { width: 100%; text-align: center; }
+            .mission-actions .field-group { width: 100%; }
+        }
     </style>
 </head>
 <body>
@@ -202,26 +321,79 @@
             <h1 class="page-title">Operator Console</h1>
         </div>
 
-        <div class="search-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="searchInput" placeholder="Search missions by name or yard ID&hellip;" autocomplete="off">
-            <button class="clear-search" id="clearSearch" title="Clear search" aria-label="Clear search">&times;</button>
+        <div class="toolbar-row">
+            <div class="search-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="searchInput" placeholder="Search missions by name or yard ID&hellip;" autocomplete="off">
+                <button class="clear-search" id="clearSearch" title="Clear search" aria-label="Clear search">&times;</button>
+            </div>
+            <select class="sort-select" id="sortSelect" aria-label="Sort missions">
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+            </select>
         </div>
 
-        <div class="net-banner" id="netBanner"></div>
-        <!-- stages/stations UI removed -->
-        <div id="missions"></div>
+        <div class="filter-pills" role="group" aria-label="Filter missions by status">
+            <button class="pill" data-status="all" aria-pressed="true">All</button>
+            <button class="pill" data-status="queued" aria-pressed="false">Queued</button>
+            <button class="pill" data-status="processing" aria-pressed="false">Running</button>
+            <button class="pill" data-status="completed" aria-pressed="false">Completed</button>
+            <button class="pill" data-status="failed" aria-pressed="false">Failed</button>
+        </div>
+
+        <div class="net-banner" id="netBanner" role="status" aria-live="polite"></div>
+        <div id="missions" aria-live="polite"></div>
+    </div>
+
+    <!-- Feedback message box: pops up for action success/failure instead of inline row text -->
+    <div class="toast-stack" id="toastStack"></div>
+
+    <!-- Confirmation modal: shared by every irreversible action (Mark Complete, Rerun) -->
+    <div class="modal-overlay" id="confirmOverlay" hidden>
+        <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmBody">
+            <h2 id="confirmTitle"></h2>
+            <p id="confirmBody"></p>
+            <div class="modal-actions">
+                <button class="btn" id="confirmCancel">Cancel</button>
+                <button class="btn danger" id="confirmOk"></button>
+            </div>
+        </div>
     </div>
 
     <script>
-        let stage = 'all';
         let missions = [];
         let missionsJson = null;
         let hasLoadedOnce = false;
         let searchQuery = '';
+        let statusFilter = 'all';
+        let sortOrder = 'newest';
         const drafts = {};
 
-        const STATUS_TONE = { queued: 'info', processing: 'warn', completed: 'ok', failed: 'bad' };
+        const STATUS_META = {
+            queued:     { label: 'Queued',      tone: 'info', icon: 'clock' },
+            processing: { label: 'In Progress', tone: 'warn', icon: 'play' },
+            completed:  { label: 'Completed',   tone: 'ok',   icon: 'check' },
+            failed:     { label: 'Failed',      tone: 'bad',  icon: 'alert' },
+        };
+        const ICONS = {
+            clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+            play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4V8z"/></svg>',
+            check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>',
+            alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+        };
+
+        const CONFIRM_COPY = {
+            complete: {
+                title: 'Mark mission complete?',
+                body: 'This marks the mission as completed and cannot be undone.',
+                confirmLabel: 'Mark complete',
+            },
+            rerun: {
+                title: 'Rerun this mission?',
+                body: 'This clears the completed status and any attached video, and sends the mission back into the queue. This cannot be undone.',
+                confirmLabel: 'Rerun',
+            },
+        };
 
         const missionsEl = document.getElementById('missions');
         const netBanner = document.getElementById('netBanner');
@@ -238,7 +410,15 @@
             return haystack.includes(searchQuery);
         }
 
+        function matchesStatusFilter(m) {
+            return statusFilter === 'all' || m.status === statusFilter;
+        }
 
+        function sortMissions(list) {
+            const sorted = list.slice().sort((a, b) => new Date(a.submittedAt || 0) - new Date(b.submittedAt || 0));
+            if (sortOrder === 'newest') sorted.reverse();
+            return sorted;
+        }
 
         function relTime(iso) {
             if (!iso) return '';
@@ -250,32 +430,45 @@
             return Math.round(hrs / 24) + 'd ago';
         }
 
-
-
         function esc(s) {
             return (s || '').replace(/[&<>"']/g, c => ({
                 '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
             })[c]);
         }
 
-        function actionsFor(m) {
+        function statusBadge(status) {
+            const meta = STATUS_META[status] || { label: status, tone: '', icon: 'alert' };
+            return `<span class="status-badge" data-tone="${meta.tone}">${ICONS[meta.icon]}<span>${esc(meta.label)}</span></span>`;
+        }
+
+        function isValidYoutubeUrl(v) {
+            return /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=[\w-]{6,}|youtu\.be\/[\w-]{6,})/i.test(v.trim());
+        }
+
+        // Returns the full row of action buttons for a mission, in display order.
+        // The first/primary action gets the .primary style; the rest render as
+        // plain buttons right alongside it (no overflow menu).
+        function buildActions(m) {
             if (m.status === 'queued') {
                 return `<button class="btn primary" data-act="send" data-id="${m.id}">Send to rover</button>
                         <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>
-                        <button class="btn" data-act="complete" data-id="${m.id}">Mark complete</button>`;
+                        <button class="btn" data-act="complete" data-id="${m.id}" data-confirm="true">Mark complete</button>`;
             }
             if (m.status === 'processing') {
-                return `<button class="btn success" data-act="complete" data-id="${m.id}">Mark complete</button>
+                return `<button class="btn success" data-act="complete" data-id="${m.id}" data-confirm="true">Mark complete</button>
                         <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>${m.blocklyState ? `<button class="btn" data-act="copyblocks" data-id="${m.id}">Copy blocks</button>` : ''}`;
             }
             if (m.status === 'completed' && !m.youtubeUrl) {
-                return `<input type="url" placeholder="https://youtube.com/watch?v=..." value="${esc(drafts[m.id] || '')}" data-draft="${m.id}">
-                        <button class="btn primary" data-act="youtube" data-id="${m.id}">Attach video</button>
-                        <button class="btn" data-act="rerun" data-id="${m.id}">Rerun</button>`;
+                return `<div class="field-group">
+                            <input type="url" inputmode="url" placeholder="https://youtube.com/watch?v=..." value="${esc(drafts[m.id] || '')}" data-draft="${m.id}" data-yt-validate="${m.id}" aria-describedby="yt-err-${m.id}">
+                            <div class="field-error" id="yt-err-${m.id}"></div>
+                        </div>
+                        <button class="btn primary" data-act="youtube" data-id="${m.id}" disabled>Attach video</button>
+                        <button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Rerun</button>`;
             }
             if (m.status === 'completed') {
                 return `<a class="yt-link" href="${esc(m.youtubeUrl)}" target="_blank" rel="noopener">Video attached &#8599;</a>
-                        <button class="btn" data-act="rerun" data-id="${m.id}">Rerun</button>`;
+                        <button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Rerun</button>`;
             }
             if (m.status === 'failed') {
                 return `<button class="btn primary" data-act="rerun" data-id="${m.id}">Rerun</button>
@@ -285,15 +478,15 @@
         }
 
         function render() {
-            const visible = missions
-                .filter(m => stage === 'all' || m.status === stage)
-                .filter(matchesSearch);
+            const visible = sortMissions(missions.filter(matchesSearch).filter(matchesStatusFilter));
             if (visible.length === 0) {
                 missionsEl.innerHTML = !hasLoadedOnce
                     ? '<div class="empty">Loading missions&hellip;</div>'
                     : searchQuery
                         ? `<div class="empty">No missions match "${esc(searchQuery)}".</div>`
-                        : '<div class="empty">Nothing here. New submissions land automatically.</div>';
+                        : statusFilter !== 'all'
+                            ? `<div class="empty">No ${esc(STATUS_META[statusFilter] ? STATUS_META[statusFilter].label.toLowerCase() : statusFilter)} missions.</div>`
+                            : '<div class="empty">Nothing here. New submissions land automatically.</div>';
                 return;
             }
             missionsEl.innerHTML = visible.map(m => `
@@ -303,30 +496,134 @@
                             <div class="mission-title">${esc(m.name) || 'Mission-' + m.id.slice(0, 8)}</div>
                             <div class="mission-meta">${esc(m.yardId) || ''} &middot; ${relTime(m.submittedAt)}</div>
                         </div>
-                        <span class="status-pill" data-tone="${STATUS_TONE[m.status] || ''}">${m.status === 'processing' ? 'running' : esc(m.status)}</span>
+                        ${statusBadge(m.status)}
                     </div>
                     <pre>${esc((m.code || '').trim()) || '# No code'}</pre>
-                    <div class="mission-actions" data-mission="${m.id}">${actionsFor(m)}</div>
+                    <div class="mission-actions" data-mission="${m.id}">${buildActions(m)}</div>
                 </div>`).join('');
 
             missionsEl.querySelectorAll('input[data-draft]').forEach(el => {
                 el.oninput = () => { drafts[el.dataset.draft] = el.value; };
             });
+
+            missionsEl.querySelectorAll('input[data-yt-validate]').forEach(el => {
+                const id = el.dataset.ytValidate;
+                const run = () => validateYoutubeField(id);
+                el.addEventListener('input', run);
+                el.addEventListener('blur', run);
+                validateYoutubeField(id); // set initial button/error state
+            });
+
             missionsEl.querySelectorAll('button[data-act]').forEach(el => {
-                el.onclick = () => act(el.dataset.act, el.dataset.id, el);
+                el.onclick = () => handleAction(el);
             });
         }
 
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeConfirm();
+        });
+
+        function validateYoutubeField(id) {
+            const input = missionsEl.querySelector(`input[data-yt-validate="${id}"]`);
+            if (!input) return;
+            const errEl = document.getElementById('yt-err-' + id);
+            const btn = missionsEl.querySelector(`button[data-act="youtube"][data-id="${id}"]`);
+            const val = input.value.trim();
+            let msg = '';
+            if (val !== '' && !isValidYoutubeUrl(val)) msg = 'Please enter a valid YouTube URL.';
+            input.classList.toggle('invalid', !!msg);
+            input.classList.toggle('valid', val !== '' && !msg);
+            if (errEl) errEl.textContent = msg;
+            if (btn) btn.disabled = !(val !== '' && !msg);
+        }
+
+        // ---------- Feedback message box (toast) ----------
+        const toastStack = document.getElementById('toastStack');
+        const TOAST_ICON = { success: ICONS.check, error: ICONS.alert };
+
+        function missionLabel(missionId) {
+            const m = missions.find(x => x.id === missionId);
+            if (!m) return '';
+            return m.name || ('Mission-' + m.id.slice(0, 8));
+        }
+
+        function showToast(tone, message) {
+            const el = document.createElement('div');
+            el.className = 'toast';
+            el.dataset.tone = tone;
+            el.setAttribute('role', tone === 'error' ? 'alert' : 'status');
+            el.innerHTML = `${TOAST_ICON[tone]}<div class="toast-msg"></div><button class="toast-close" aria-label="Dismiss notification">&times;</button>`;
+            el.querySelector('.toast-msg').textContent = message;
+            const remove = () => { if (el.parentNode) el.remove(); };
+            el.querySelector('.toast-close').onclick = remove;
+            toastStack.appendChild(el);
+            while (toastStack.children.length > 4) toastStack.removeChild(toastStack.firstChild); // avoid an unbounded stack
+            setTimeout(remove, tone === 'error' ? 6000 : 3000);
+        }
+
         function showError(missionId, message) {
-            const row = missionsEl.querySelector(`.mission-actions[data-mission="${missionId}"]`);
-            if (!row) return;
-            let err = row.querySelector('.action-error');
-            if (!err) {
-                err = document.createElement('div');
-                err.className = 'action-error';
-                row.appendChild(err);
+            const label = missionLabel(missionId);
+            showToast('error', label ? `${label}: ${message}` : message);
+        }
+
+        function showSuccess(missionId, message) {
+            const label = missionLabel(missionId);
+            showToast('success', label ? `${label} — ${message}` : message);
+        }
+
+        // ---------- Confirmation modal ----------
+        const confirmOverlay = document.getElementById('confirmOverlay');
+        const confirmTitle = document.getElementById('confirmTitle');
+        const confirmBody = document.getElementById('confirmBody');
+        const confirmCancel = document.getElementById('confirmCancel');
+        const confirmOk = document.getElementById('confirmOk');
+        let confirmReturnFocus = null;
+        let confirmPending = false;
+
+        function openConfirm(copy, onConfirm) {
+            confirmTitle.textContent = copy.title;
+            confirmBody.textContent = copy.body;
+            confirmOk.textContent = copy.confirmLabel;
+            confirmPending = false;
+            confirmOk.disabled = false;
+            confirmReturnFocus = document.activeElement;
+            confirmOverlay.hidden = false;
+            confirmCancel.focus(); // default focus is Cancel, not the destructive action
+            confirmOk.onclick = () => {
+                if (confirmPending) return; // prevent accidental double-clicks
+                confirmPending = true;
+                confirmOk.disabled = true;
+                closeConfirm();
+                onConfirm();
+            };
+        }
+
+        function closeConfirm() {
+            if (confirmOverlay.hidden) return;
+            confirmOverlay.hidden = true;
+            if (confirmReturnFocus && confirmReturnFocus.focus) confirmReturnFocus.focus();
+        }
+
+        confirmCancel.onclick = closeConfirm;
+        confirmOverlay.addEventListener('click', (e) => { if (e.target === confirmOverlay) closeConfirm(); });
+        confirmOverlay.addEventListener('keydown', (e) => {
+            if (e.key !== 'Tab') return;
+            const focusables = [confirmCancel, confirmOk];
+            const idx = focusables.indexOf(document.activeElement);
+            e.preventDefault();
+            const next = e.shiftKey ? (idx <= 0 ? 1 : 0) : (idx === 1 ? 0 : 1);
+            focusables[next].focus();
+        });
+
+        function handleAction(btn) {
+            const action = btn.dataset.act;
+            const missionId = btn.dataset.id;
+            if (btn.dataset.confirm === 'true') {
+                const copy = CONFIRM_COPY[action] || { title: 'Are you sure?', body: 'This action cannot be undone.', confirmLabel: 'Confirm' };
+                openConfirm(copy, () => act(action, missionId, btn));
+            } else {
+                act(action, missionId, btn);
             }
-            err.textContent = message;
         }
 
         async function fetchWithTimeout(url, opts, timeoutMs) {
@@ -373,6 +670,13 @@
             }
         }
 
+        const SUCCESS_MESSAGE = {
+            send: 'Mission sent to rover.',
+            complete: 'Mission marked complete.',
+            youtube: 'Video attached.',
+            rerun: 'Mission queued for rerun.',
+        };
+
         async function act(action, missionId, btn) {
             if (action === 'copy' || action === 'copyblocks') {
                 const m = missions.find(x => x.id === missionId);
@@ -403,6 +707,7 @@
                 data = await resp.json().catch(() => ({}));
                 if (!resp.ok) throw new Error(data.error || `Failed (HTTP ${resp.status})`);
                 delete drafts[missionId];
+                if (SUCCESS_MESSAGE[action]) showSuccess(missionId, SUCCESS_MESSAGE[action]);
                 missionsPoller.refreshNow().catch(() => {});
             } catch (err) {
                 btn.disabled = false;
@@ -470,6 +775,20 @@
             clearSearchBtn.classList.remove('visible');
             render();
             searchInput.focus();
+        });
+
+        const sortSelect = document.getElementById('sortSelect');
+        sortSelect.addEventListener('change', () => {
+            sortOrder = sortSelect.value;
+            render();
+        });
+
+        document.querySelectorAll('.pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                statusFilter = pill.dataset.status;
+                document.querySelectorAll('.pill').forEach(p => p.setAttribute('aria-pressed', p === pill ? 'true' : 'false'));
+                render();
+            });
         });
     </script>
 </body>
