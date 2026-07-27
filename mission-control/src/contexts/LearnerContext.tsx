@@ -28,6 +28,53 @@ interface LearnerContextType {
 
 const LearnerContext = createContext<LearnerContextType | undefined>(undefined);
 
+/** Set by MissionWorkspace on every successful submit. */
+const LATEST_MISSION_KEY = 'rover-latest-mission-id';
+
+/**
+ * The email prompt opens *after* a mission is submitted, so a first-time
+ * learner's mission is written with no learnerEmail on it. Since
+ * MissionNotificationService gates on that field, that mission would otherwise
+ * stay silent for its whole lifecycle - including the completion email, which
+ * is the one the learner was just promised.
+ *
+ * Stamp the address onto the mission they have in flight, then fire the queued
+ * email that was skipped at submit time. Best-effort: the learner's email is
+ * already saved by the time this runs, so a failure here costs one notification,
+ * not the address.
+ */
+async function backfillLatestMissionEmail(email: string): Promise<void> {
+  let missionId: string | null = null;
+
+  try {
+    missionId = localStorage.getItem(LATEST_MISSION_KEY);
+  } catch {
+    return; // localStorage unavailable - nothing to backfill against
+  }
+
+  if (!missionId) return;
+
+  try {
+    const db = getFirestoreClient();
+    const missionRef = doc(db, 'missions', missionId);
+    const snapshot = await getDoc(missionRef);
+
+    // Already stamped (e.g. the learner re-saved the same address from the
+    // history page) - the queued email has been sent, don't send it twice.
+    if (!snapshot.exists() || snapshot.data().learnerEmail) return;
+
+    await updateDoc(missionRef, { learnerEmail: email });
+
+    await fetch(`/api/missions/${missionId}/notify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'queued' }),
+    });
+  } catch (error) {
+    console.warn('Failed to backfill learner email onto pending mission:', error);
+  }
+}
+
 export function LearnerProvider({ children }: { children: ReactNode }) {
   const [learner, setLearner] = useState<Learner | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -64,6 +111,8 @@ export function LearnerProvider({ children }: { children: ReactNode }) {
     }
     setLearnerEmailState(email);
     setShowEmailPrompt(false);
+
+    if (email) await backfillLatestMissionEmail(email);
 
     if (!sessionId) return;
 
