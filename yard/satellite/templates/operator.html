@@ -52,6 +52,8 @@
         .status-badge[data-tone="bad"]  { color: var(--bad);  background: rgba(248, 113, 113, 0.1); border-color: rgba(248, 113, 113, 0.35); }
         .status-badge[data-tone="info"] { color: var(--accent); background: rgba(118, 255, 221, 0.1); border-color: rgba(118, 255, 221, 0.25); }
 
+        .toolbar-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.9rem; flex-wrap: wrap; }
+
         .search-box {
             display: flex;
             align-items: center;
@@ -60,8 +62,8 @@
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 0.45rem 0.7rem;
-            margin-bottom: 1rem;
-            max-width: 360px;
+            flex: 1 1 240px;
+            min-width: 200px;
         }
         .search-box:focus-within { border-color: var(--primary); }
         .search-box svg { width: 16px; height: 16px; color: var(--text-faint, #666); flex-shrink: 0; }
@@ -88,6 +90,41 @@
         }
         .search-box .clear-search.visible { display: block; }
         .search-box .clear-search:hover { color: var(--text, #ccc); }
+
+        .sort-select {
+            background: var(--surface-2, #1a1a1a);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text, #e0e0e0);
+            font-size: var(--fs-sm);
+            padding: 0.55rem 2.2rem 0.55rem 0.9rem;
+            min-height: 44px;
+            appearance: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+            flex-shrink: 0;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.7rem center;
+            background-size: 15px;
+        }
+        .sort-select:hover { border-color: var(--border-strong); }
+        .sort-select:focus-visible { border-color: var(--primary); }
+
+        .filter-pills { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .pill {
+            background: var(--surface-2, #1a1a1a);
+            border: 1px solid var(--border);
+            color: var(--text-faint, #888);
+            border-radius: 999px;
+            padding: 0.45rem 1rem;
+            min-height: 38px;
+            font-size: var(--fs-sm);
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .pill:hover { border-color: var(--border-strong); color: var(--text-dim, #ccc); }
+        .pill[aria-pressed="true"] { background: rgba(96, 165, 250, 0.12); border-color: var(--ring, #60a5fa); color: var(--text, #fff); }
 
         .mission {
             background: var(--surface-2);
@@ -121,6 +158,7 @@
             border-radius: 0;
         }
 
+        /* ---------- Actions row: all buttons inline, primary given the most visual weight ---------- */
         /* ---------- Actions row: one obvious primary action + a kebab for the rest ---------- */
         .mission-actions {
             display: flex;
@@ -265,6 +303,61 @@
         .modal-actions .btn { min-width: 44px; }
         .modal-actions .btn.danger { background: rgba(248, 113, 113, 0.15); border-color: rgba(248, 113, 113, 0.4); color: var(--bad); }
 
+        /* ---------- Feedback message box (toast) ---------- */
+        .toast-stack {
+            position: fixed;
+            bottom: 1.25rem;
+            right: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+            z-index: 200;
+            max-width: 360px;
+        }
+        .toast {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.6rem;
+            border-radius: 10px;
+            padding: 0.75rem 0.85rem;
+            border: 1px solid var(--border);
+            background: var(--surface-2);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+            font-size: var(--fs-sm);
+            animation: toast-in 0.18s ease-out;
+        }
+        .toast svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 0.1rem; }
+        .toast[data-tone="success"] svg, .toast[data-tone="success"] { color: var(--ok); }
+        .toast[data-tone="error"] svg, .toast[data-tone="error"] { color: var(--bad); }
+        .toast[data-tone="success"] { border-color: rgba(52, 211, 153, 0.4); }
+        .toast[data-tone="error"] { border-color: rgba(248, 113, 113, 0.4); }
+        .toast-msg { flex: 1; color: var(--text, #e0e0e0); line-height: 1.4; }
+        .toast-close {
+            background: none; border: none;
+            color: var(--text-faint, #888);
+            cursor: pointer;
+            font-size: 1rem;
+            line-height: 1;
+            padding: 0.15rem;
+            min-width: 32px; min-height: 32px;
+            flex-shrink: 0;
+        }
+        .toast-close:hover { color: var(--text, #ccc); }
+        @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 640px) {
+            .toast-stack { left: 1rem; right: 1rem; bottom: 1rem; max-width: none; }
+        }
+
+        /* ---------- Responsive: yard-in-hand, one thumb ---------- */
+        @media (max-width: 640px) {
+            .wrap { padding: 1.25rem 1rem 2.5rem; }
+            .toolbar-row { flex-direction: column; align-items: stretch; }
+            .search-box { min-width: 0; }
+            .sort-select { width: 100%; }
+            .mission-actions { flex-direction: column; align-items: stretch; }
+            .mission-actions .btn, .mission-actions a.btn { width: 100%; text-align: center; }
+            .mission-actions .field-group { width: 100%; }
         /* ---------- Responsive: yard-in-hand, one thumb ---------- */
         @media (max-width: 640px) {
             .wrap { padding: 1.25rem 1rem 2.5rem; }
@@ -286,15 +379,32 @@
             <h1 class="page-title">Operator Console</h1>
         </div>
 
-        <div class="search-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="searchInput" placeholder="Search missions by name or yard ID&hellip;" autocomplete="off">
-            <button class="clear-search" id="clearSearch" title="Clear search" aria-label="Clear search">&times;</button>
+        <div class="toolbar-row">
+            <div class="search-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="searchInput" placeholder="Search missions by name or yard ID&hellip;" autocomplete="off">
+                <button class="clear-search" id="clearSearch" title="Clear search" aria-label="Clear search">&times;</button>
+            </div>
+            <select class="sort-select" id="sortSelect" aria-label="Sort missions">
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+            </select>
+        </div>
+
+        <div class="filter-pills" role="group" aria-label="Filter missions by status">
+            <button class="pill" data-status="all" aria-pressed="true">All</button>
+            <button class="pill" data-status="queued" aria-pressed="false">Queued</button>
+            <button class="pill" data-status="processing" aria-pressed="false">Running</button>
+            <button class="pill" data-status="completed" aria-pressed="false">Completed</button>
+            <button class="pill" data-status="failed" aria-pressed="false">Failed</button>
         </div>
 
         <div class="net-banner" id="netBanner" role="status" aria-live="polite"></div>
         <div id="missions" aria-live="polite"></div>
     </div>
+
+    <!-- Feedback message box: pops up for action success/failure instead of inline row text -->
+    <div class="toast-stack" id="toastStack"></div>
 
     <!-- Confirmation modal: shared by every irreversible action (Mark Complete, Rerun) -->
     <div class="modal-overlay" id="confirmOverlay" hidden>
@@ -313,6 +423,8 @@
         let missionsJson = null;
         let hasLoadedOnce = false;
         let searchQuery = '';
+        let statusFilter = 'all';
+        let sortOrder = 'newest';
         const drafts = {};
 
         const STATUS_META = {
@@ -332,11 +444,13 @@
             complete: {
                 title: 'Mark mission complete?',
                 body: 'This marks the mission as completed and cannot be undone.',
+                confirmLabel: 'Mark complete',
                 confirmLabel: 'Complete mission',
             },
             rerun: {
                 title: 'Rerun this mission?',
                 body: 'This clears the completed status and any attached video, and sends the mission back into the queue. This cannot be undone.',
+                confirmLabel: 'Rerun',
                 confirmLabel: 'Rerun mission',
             },
         };
@@ -354,6 +468,16 @@
             if (!searchQuery) return true;
             const haystack = `${m.name || ''} ${m.yardId || ''}`.toLowerCase();
             return haystack.includes(searchQuery);
+        }
+
+        function matchesStatusFilter(m) {
+            return statusFilter === 'all' || m.status === statusFilter;
+        }
+
+        function sortMissions(list) {
+            const sorted = list.slice().sort((a, b) => new Date(a.submittedAt || 0) - new Date(b.submittedAt || 0));
+            if (sortOrder === 'newest') sorted.reverse();
+            return sorted;
         }
 
         function relTime(iso) {
@@ -381,6 +505,30 @@
             return /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=[\w-]{6,}|youtu\.be\/[\w-]{6,})/i.test(v.trim());
         }
 
+        // Returns the full row of action buttons for a mission, in display order.
+        // The first/primary action gets the .primary style; the rest render as
+        // plain buttons right alongside it (no overflow menu).
+        function buildActions(m) {
+            if (m.status === 'queued') {
+                return `<button class="btn primary" data-act="send" data-id="${m.id}">Send to rover</button>
+                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>
+                        <button class="btn" data-act="complete" data-id="${m.id}" data-confirm="true">Mark complete</button>`;
+            }
+            if (m.status === 'processing') {
+                return `<button class="btn success" data-act="complete" data-id="${m.id}" data-confirm="true">Mark complete</button>
+                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>${m.blocklyState ? `<button class="btn" data-act="copyblocks" data-id="${m.id}">Copy blocks</button>` : ''}`;
+            }
+            if (m.status === 'completed' && !m.youtubeUrl) {
+                return `<div class="field-group">
+                            <input type="url" inputmode="url" placeholder="https://youtube.com/watch?v=..." value="${esc(drafts[m.id] || '')}" data-draft="${m.id}" data-yt-validate="${m.id}" aria-describedby="yt-err-${m.id}">
+                            <div class="field-error" id="yt-err-${m.id}"></div>
+                        </div>
+                        <button class="btn primary" data-act="youtube" data-id="${m.id}" disabled>Attach video</button>
+                        <button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Rerun</button>`;
+            }
+            if (m.status === 'completed') {
+                return `<a class="yt-link" href="${esc(m.youtubeUrl)}" target="_blank" rel="noopener">Video attached &#8599;</a>
+                        <button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Rerun</button>`;
         // Builds { primaryHtml, secondary: [{act, label, confirm, danger}] } for a mission,
         // per the "one obvious next action, everything else in the overflow menu" rule.
         function buildActions(m) {
@@ -450,13 +598,16 @@
         }
 
         function render() {
+            const visible = sortMissions(missions.filter(matchesSearch).filter(matchesStatusFilter));
             const visible = missions.filter(matchesSearch);
             if (visible.length === 0) {
                 missionsEl.innerHTML = !hasLoadedOnce
                     ? '<div class="empty">Loading missions&hellip;</div>'
                     : searchQuery
                         ? `<div class="empty">No missions match "${esc(searchQuery)}".</div>`
-                        : '<div class="empty">Nothing here. New submissions land automatically.</div>';
+                        : statusFilter !== 'all'
+                            ? `<div class="empty">No ${esc(STATUS_META[statusFilter] ? STATUS_META[statusFilter].label.toLowerCase() : statusFilter)} missions.</div>`
+                            : '<div class="empty">Nothing here. New submissions land automatically.</div>';
                 return;
             }
             missionsEl.innerHTML = visible.map(m => `
@@ -469,6 +620,7 @@
                         ${statusBadge(m.status)}
                     </div>
                     <pre>${esc((m.code || '').trim()) || '# No code'}</pre>
+                    <div class="mission-actions" data-mission="${m.id}">${buildActions(m)}</div>
                     <div class="mission-actions" data-mission="${m.id}">${renderActionsMarkup(m)}</div>
                 </div>`).join('');
 
@@ -486,6 +638,11 @@
 
             missionsEl.querySelectorAll('button[data-act]').forEach(el => {
                 el.onclick = () => handleAction(el);
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeConfirm();
             });
 
             missionsEl.querySelectorAll('button[data-menu-toggle]').forEach(el => {
@@ -531,6 +688,38 @@
             if (btn) btn.disabled = !(val !== '' && !msg);
         }
 
+        // ---------- Feedback message box (toast) ----------
+        const toastStack = document.getElementById('toastStack');
+        const TOAST_ICON = { success: ICONS.check, error: ICONS.alert };
+
+        function missionLabel(missionId) {
+            const m = missions.find(x => x.id === missionId);
+            if (!m) return '';
+            return m.name || ('Mission-' + m.id.slice(0, 8));
+        }
+
+        function showToast(tone, message) {
+            const el = document.createElement('div');
+            el.className = 'toast';
+            el.dataset.tone = tone;
+            el.setAttribute('role', tone === 'error' ? 'alert' : 'status');
+            el.innerHTML = `${TOAST_ICON[tone]}<div class="toast-msg"></div><button class="toast-close" aria-label="Dismiss notification">&times;</button>`;
+            el.querySelector('.toast-msg').textContent = message;
+            const remove = () => { if (el.parentNode) el.remove(); };
+            el.querySelector('.toast-close').onclick = remove;
+            toastStack.appendChild(el);
+            while (toastStack.children.length > 4) toastStack.removeChild(toastStack.firstChild); // avoid an unbounded stack
+            setTimeout(remove, tone === 'error' ? 6000 : 3000);
+        }
+
+        function showError(missionId, message) {
+            const label = missionLabel(missionId);
+            showToast('error', label ? `${label}: ${message}` : message);
+        }
+
+        function showSuccess(missionId, message) {
+            const label = missionLabel(missionId);
+            showToast('success', label ? `${label} — ${message}` : message);
         function showError(missionId, message) {
             const row = missionsEl.querySelector(`.mission-actions[data-mission="${missionId}"]`);
             if (!row) return;
@@ -763,6 +952,20 @@
             clearSearchBtn.classList.remove('visible');
             render();
             searchInput.focus();
+        });
+
+        const sortSelect = document.getElementById('sortSelect');
+        sortSelect.addEventListener('change', () => {
+            sortOrder = sortSelect.value;
+            render();
+        });
+
+        document.querySelectorAll('.pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                statusFilter = pill.dataset.status;
+                document.querySelectorAll('.pill').forEach(p => p.setAttribute('aria-pressed', p === pill ? 'true' : 'false'));
+                render();
+            });
         });
     </script>
 </body>
