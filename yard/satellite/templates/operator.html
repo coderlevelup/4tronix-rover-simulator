@@ -379,12 +379,12 @@
             complete: {
                 title: 'Mark mission complete?',
                 body: 'This marks the mission as completed and cannot be undone.',
-                confirmLabel: 'Complete mission',
+                confirmLabel: 'Mark complete',
             },
             rerun: {
                 title: 'Rerun this mission?',
                 body: 'This clears the completed status and any attached video, and sends the mission back into the queue. This cannot be undone.',
-                confirmLabel: 'Rerun mission',
+                confirmLabel: 'Rerun',
             },
         };
 
@@ -433,7 +433,7 @@
         function buildActions(m) {
             if (m.status === 'queued') {
                 return {
-                    primaryHtml: `<button class="btn primary" data-act="send" data-id="${m.id}">Start mission</button>`,
+                    primaryHtml: `<button class="btn primary" data-act="send" data-id="${m.id}">Send to rover</button>`,
                     secondary: [
                         { act: 'copy', label: 'Copy code' },
                         { act: 'complete', label: 'Mark complete', confirm: true },
@@ -442,7 +442,7 @@
             }
             if (m.status === 'processing') {
                 return {
-                    primaryHtml: `<button class="btn primary" data-act="complete" data-id="${m.id}" data-confirm="true">Complete mission</button>`,
+                    primaryHtml: `<button class="btn primary success" data-act="complete" data-id="${m.id}" data-confirm="true">Mark complete</button>`,
                     secondary: [
                         { act: 'copy', label: 'Copy code' },
                         ...(m.blocklyState ? [{ act: 'copyblocks', label: 'Copy blocks' }] : []),
@@ -460,21 +460,21 @@
                             <button class="btn primary" data-act="youtube" data-id="${m.id}" disabled>Attach video</button>
                         </div>`,
                     secondary: [
-                        { act: 'rerun', label: 'Rerun mission', confirm: true, danger: true },
+                        { act: 'rerun', label: 'Rerun', confirm: true, danger: true },
                     ],
                 };
             }
             if (m.status === 'completed') {
                 return {
-                    primaryHtml: `<a class="btn primary yt-link" href="${esc(m.youtubeUrl)}" target="_blank" rel="noopener">View details &#8599;</a>`,
+                    primaryHtml: `<a class="btn primary yt-link" href="${esc(m.youtubeUrl)}" target="_blank" rel="noopener">Video attached &#8599;</a>`,
                     secondary: [
-                        { act: 'rerun', label: 'Rerun mission', confirm: true, danger: true },
+                        { act: 'rerun', label: 'Rerun', confirm: true, danger: true },
                     ],
                 };
             }
             if (m.status === 'failed') {
                 return {
-                    primaryHtml: `<button class="btn primary" data-act="rerun" data-id="${m.id}">Retry mission</button>`,
+                    primaryHtml: `<button class="btn primary" data-act="rerun" data-id="${m.id}">Rerun</button>`,
                     secondary: [
                         { act: 'copy', label: 'Copy code' },
                         ...(m.blocklyState ? [{ act: 'copyblocks', label: 'Copy blocks' }] : []),
