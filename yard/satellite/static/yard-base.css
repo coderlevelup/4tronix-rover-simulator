@@ -10,12 +10,12 @@
 :root {
   --radius: 1rem;
 
-  --background: oklch(0.16 0.04 270);
+  --background: oklch(0.24 0.15 50);
   --foreground: oklch(0.97 0.02 260);
 
-  --card: oklch(0.21 0.05 270);
+  --card: oklch(0.18 0.05 270);
   --card-foreground: oklch(0.97 0.02 260);
-  --popover: oklch(0.21 0.05 270);
+  --popover: oklch(0.18 0.05 270);
   --popover-foreground: oklch(0.97 0.02 260);
 
   --primary: oklch(0.72 0.19 45);
@@ -42,7 +42,7 @@
   --stardust: oklch(0.92 0.06 95);
 
   --bg: var(--background);
-  --bg-2: oklch(0.13 0.04 270);
+  --bg-2: oklch(0.12 0.04 45);
   --surface: var(--card);
   --surface-2: var(--popover);
   --surface-3: var(--muted);
@@ -52,7 +52,7 @@
   --text-faint: oklch(0.75 0.03 270);
   --heading: var(--foreground);
   --accent-2: color-mix(in oklab, var(--accent) 70%, var(--primary) 30%);
-  --accent-weak: rgba(249, 115, 22, 0.14);
+  --accent-weak: rgba(249, 115, 22, 0.22);
   --ok: #34d399;
   --warn: #fbbf24;
   --bad: #f87171;
@@ -95,9 +95,14 @@ h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0
 }
 .brand { display: inline-flex; align-items: center; gap: 0.65rem; text-decoration: none; }
 .brand-mark {
-  width: 26px; height: 26px; border-radius: 10px; flex-shrink: 0;
-  background: linear-gradient(140deg, var(--primary), var(--accent-2));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 6px 20px rgba(0, 0, 0, 0.22);
+  width: 30px; height: 30px; border-radius: 12px; flex-shrink: 0;
+  background-color: var(--surface);
+  background-image: url('/static/rover-hero.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 8px 22px rgba(0, 0, 0, 0.22);
 }
 .brand-txt { display: flex; flex-direction: column; line-height: 1.05; }
 .brand-txt b { color: var(--heading); font-size: 0.98rem; font-weight: 700; letter-spacing: 0.01em; }
