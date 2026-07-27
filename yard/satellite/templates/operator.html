@@ -358,11 +358,7 @@
             .mission-actions { flex-direction: column; align-items: stretch; }
             .mission-actions .btn, .mission-actions a.btn { width: 100%; text-align: center; }
             .mission-actions .field-group { width: 100%; }
-        /* ---------- Responsive: yard-in-hand, one thumb ---------- */
-        @media (max-width: 640px) {
-            .wrap { padding: 1.25rem 1rem 2.5rem; }
             .search-box { max-width: 100%; }
-            .mission-actions { flex-direction: column; align-items: stretch; }
             .primary-action { width: 100%; }
             .primary-action .btn, .primary-action a.btn { width: 100%; text-align: center; }
             .field-row { flex-direction: column; align-items: stretch; }
@@ -505,30 +501,6 @@
             return /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=[\w-]{6,}|youtu\.be\/[\w-]{6,})/i.test(v.trim());
         }
 
-        // Returns the full row of action buttons for a mission, in display order.
-        // The first/primary action gets the .primary style; the rest render as
-        // plain buttons right alongside it (no overflow menu).
-        function buildActions(m) {
-            if (m.status === 'queued') {
-                return `<button class="btn primary" data-act="send" data-id="${m.id}">Send to rover</button>
-                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>
-                        <button class="btn" data-act="complete" data-id="${m.id}" data-confirm="true">Mark complete</button>`;
-            }
-            if (m.status === 'processing') {
-                return `<button class="btn success" data-act="complete" data-id="${m.id}" data-confirm="true">Mark complete</button>
-                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>${m.blocklyState ? `<button class="btn" data-act="copyblocks" data-id="${m.id}">Copy blocks</button>` : ''}`;
-            }
-            if (m.status === 'completed' && !m.youtubeUrl) {
-                return `<div class="field-group">
-                            <input type="url" inputmode="url" placeholder="https://youtube.com/watch?v=..." value="${esc(drafts[m.id] || '')}" data-draft="${m.id}" data-yt-validate="${m.id}" aria-describedby="yt-err-${m.id}">
-                            <div class="field-error" id="yt-err-${m.id}"></div>
-                        </div>
-                        <button class="btn primary" data-act="youtube" data-id="${m.id}" disabled>Attach video</button>
-                        <button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Rerun</button>`;
-            }
-            if (m.status === 'completed') {
-                return `<a class="yt-link" href="${esc(m.youtubeUrl)}" target="_blank" rel="noopener">Video attached &#8599;</a>
-                        <button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Rerun</button>`;
         // Builds { primaryHtml, secondary: [{act, label, confirm, danger}] } for a mission,
         // per the "one obvious next action, everything else in the overflow menu" rule.
         function buildActions(m) {
@@ -599,7 +571,6 @@
 
         function render() {
             const visible = sortMissions(missions.filter(matchesSearch).filter(matchesStatusFilter));
-            const visible = missions.filter(matchesSearch);
             if (visible.length === 0) {
                 missionsEl.innerHTML = !hasLoadedOnce
                     ? '<div class="empty">Loading missions&hellip;</div>'
@@ -660,8 +631,6 @@
                     }
                 };
             });
-        }
-
         function closeAllMenus() {
             missionsEl.querySelectorAll('.action-menu').forEach(m => { m.hidden = true; });
             missionsEl.querySelectorAll('.kebab-btn').forEach(b => b.setAttribute('aria-expanded', 'false'));
@@ -712,14 +681,16 @@
             setTimeout(remove, tone === 'error' ? 6000 : 3000);
         }
 
-        function showError(missionId, message) {
+        function showToastError(missionId, message) {
             const label = missionLabel(missionId);
             showToast('error', label ? `${label}: ${message}` : message);
         }
 
-        function showSuccess(missionId, message) {
+        function showToastSuccess(missionId, message) {
             const label = missionLabel(missionId);
             showToast('success', label ? `${label} — ${message}` : message);
+        }
+
         function showError(missionId, message) {
             const row = missionsEl.querySelector(`.mission-actions[data-mission="${missionId}"]`);
             if (!row) return;
