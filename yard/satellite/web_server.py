@@ -10,8 +10,18 @@ import os
 import json
 import logging
 import socket
+import threading
+from pathlib import Path
+
 import requests
+from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context, session, redirect
+
+# Load this file's own .env before anything below reads os.environ - Flask
+# has no built-in equivalent of Next.js's automatic .env loading. Load by
+# explicit path (not the default upward search) so this never picks up a
+# different .env from a parent directory (e.g. mission-control's).
+load_dotenv(Path(__file__).resolve().parent / '.env')
 
 CAMERA_PORT = int(os.environ.get('CAMERA_PORT', 8890))
 
@@ -304,4 +314,9 @@ if __name__ == '__main__':
     print(f"[satellite] rover url {ROVER_URL}")
     import flask.cli
     flask.cli.show_server_banner = lambda *args, **kwargs: None
+    # Run the YouTube-poll loop in the background so a slow/unreachable
+    # YouTube API call can't delay the tablet/monitor/rover proxy from
+    # coming up - those are local and time-critical, this isn't.
+    from operator_console import start_polling
+    threading.Thread(target=start_polling, daemon=True).start()
     app.run(host='0.0.0.0', port=port, threaded=True, use_reloader=False)

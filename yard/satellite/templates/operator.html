@@ -159,14 +159,18 @@
         }
 
         /* ---------- Actions row: all buttons inline, primary given the most visual weight ---------- */
+        /* ---------- Actions row: one obvious primary action + a kebab for the rest ---------- */
         .mission-actions {
             display: flex;
-            align-items: center;
-            gap: 0.5rem;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.6rem;
             flex-wrap: wrap;
             padding: 0.75rem 1rem;
             border-top: 1px solid var(--border);
+            position: relative;
         }
+        .primary-action { display: flex; align-items: center; gap: 0.5rem; flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
 
         .btn {
             border: 1px solid var(--border);
@@ -207,8 +211,53 @@
         .field-error { color: var(--bad); font-size: var(--fs-xs); min-height: 1em; }
         .field-hint { color: var(--text-faint, #666); font-size: var(--fs-xs); min-height: 1em; }
 
+        .action-error { width: 100%; color: var(--bad); font-size: var(--fs-xs); }
+        .action-success { width: 100%; color: var(--ok); font-size: var(--fs-xs); }
         .yt-link { color: var(--ok); font-size: var(--fs-sm); text-decoration: none; border-radius: 4px; }
         .yt-link:hover { text-decoration: underline; }
+
+        /* ---------- Secondary / overflow menu ---------- */
+        .secondary-actions { position: relative; flex-shrink: 0; }
+        .kebab-btn {
+            width: 44px; height: 44px;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: var(--surface-3, #222);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-dim, #ccc);
+            font-size: 1.2rem;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .kebab-btn:hover { border-color: var(--border-strong); }
+        .action-menu {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 6px);
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            min-width: 180px;
+            padding: 0.35rem;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+            z-index: 30;
+        }
+        .action-menu[hidden] { display: none; }
+        .action-menu button {
+            display: block;
+            width: 100%;
+            text-align: left;
+            background: none;
+            border: none;
+            color: var(--text-dim, #ccc);
+            font-size: var(--fs-sm);
+            padding: 0.65rem 0.7rem;
+            min-height: 44px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .action-menu button:hover, .action-menu button:focus-visible { background: var(--surface-3); color: var(--text, #fff); }
+        .action-menu button[data-danger="true"] { color: var(--bad); }
 
         .empty {
             text-align: center;
@@ -309,6 +358,16 @@
             .mission-actions { flex-direction: column; align-items: stretch; }
             .mission-actions .btn, .mission-actions a.btn { width: 100%; text-align: center; }
             .mission-actions .field-group { width: 100%; }
+        /* ---------- Responsive: yard-in-hand, one thumb ---------- */
+        @media (max-width: 640px) {
+            .wrap { padding: 1.25rem 1rem 2.5rem; }
+            .search-box { max-width: 100%; }
+            .mission-actions { flex-direction: column; align-items: stretch; }
+            .primary-action { width: 100%; }
+            .primary-action .btn, .primary-action a.btn { width: 100%; text-align: center; }
+            .field-row { flex-direction: column; align-items: stretch; }
+            .field-row .btn { width: 100%; }
+            .secondary-actions { align-self: flex-end; }
         }
     </style>
 </head>
@@ -386,11 +445,13 @@
                 title: 'Mark mission complete?',
                 body: 'This marks the mission as completed and cannot be undone.',
                 confirmLabel: 'Mark complete',
+                confirmLabel: 'Complete mission',
             },
             rerun: {
                 title: 'Rerun this mission?',
                 body: 'This clears the completed status and any attached video, and sends the mission back into the queue. This cannot be undone.',
                 confirmLabel: 'Rerun',
+                confirmLabel: 'Rerun mission',
             },
         };
 
@@ -468,16 +529,77 @@
             if (m.status === 'completed') {
                 return `<a class="yt-link" href="${esc(m.youtubeUrl)}" target="_blank" rel="noopener">Video attached &#8599;</a>
                         <button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Rerun</button>`;
+        // Builds { primaryHtml, secondary: [{act, label, confirm, danger}] } for a mission,
+        // per the "one obvious next action, everything else in the overflow menu" rule.
+        function buildActions(m) {
+            if (m.status === 'queued') {
+                return {
+                    primaryHtml: `<button class="btn primary" data-act="send" data-id="${m.id}">Start mission</button>`,
+                    secondary: [
+                        { act: 'copy', label: 'Copy code' },
+                        { act: 'complete', label: 'Mark complete', confirm: true },
+                    ],
+                };
+            }
+            if (m.status === 'processing') {
+                return {
+                    primaryHtml: `<button class="btn primary" data-act="complete" data-id="${m.id}" data-confirm="true">Complete mission</button>`,
+                    secondary: [
+                        { act: 'copy', label: 'Copy code' },
+                        ...(m.blocklyState ? [{ act: 'copyblocks', label: 'Copy blocks' }] : []),
+                    ],
+                };
+            }
+            if (m.status === 'completed' && !m.youtubeUrl) {
+                return {
+                    primaryHtml: `
+                        <div class="field-row" style="width:100%">
+                            <div class="field-group">
+                                <input type="url" inputmode="url" placeholder="https://youtube.com/watch?v=..." value="${esc(drafts[m.id] || '')}" data-draft="${m.id}" data-yt-validate="${m.id}" aria-describedby="yt-err-${m.id}">
+                                <div class="field-error" id="yt-err-${m.id}"></div>
+                            </div>
+                            <button class="btn primary" data-act="youtube" data-id="${m.id}" disabled>Attach video</button>
+                        </div>`,
+                    secondary: [
+                        { act: 'rerun', label: 'Rerun mission', confirm: true, danger: true },
+                    ],
+                };
+            }
+            if (m.status === 'completed') {
+                return {
+                    primaryHtml: `<a class="btn primary yt-link" href="${esc(m.youtubeUrl)}" target="_blank" rel="noopener">View details &#8599;</a>`,
+                    secondary: [
+                        { act: 'rerun', label: 'Rerun mission', confirm: true, danger: true },
+                    ],
+                };
             }
             if (m.status === 'failed') {
-                return `<button class="btn primary" data-act="rerun" data-id="${m.id}">Rerun</button>
-                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>${m.blocklyState ? `<button class="btn" data-act="copyblocks" data-id="${m.id}">Copy blocks</button>` : ''}`;
+                return {
+                    primaryHtml: `<button class="btn primary" data-act="rerun" data-id="${m.id}">Retry mission</button>`,
+                    secondary: [
+                        { act: 'copy', label: 'Copy code' },
+                        ...(m.blocklyState ? [{ act: 'copyblocks', label: 'Copy blocks' }] : []),
+                    ],
+                };
             }
-            return '';
+            return { primaryHtml: '', secondary: [] };
+        }
+
+        function renderActionsMarkup(m) {
+            const { primaryHtml, secondary } = buildActions(m);
+            const menu = secondary.length ? `
+                <div class="secondary-actions">
+                    <button class="kebab-btn" data-menu-toggle="${m.id}" aria-haspopup="true" aria-expanded="false" aria-label="More actions for ${esc(m.name) || 'this mission'}">&#8942;</button>
+                    <div class="action-menu" id="menu-${m.id}" role="menu" hidden>
+                        ${secondary.map(it => `<button role="menuitem" data-act="${it.act}" data-id="${m.id}" ${it.confirm ? 'data-confirm="true"' : ''} ${it.danger ? 'data-danger="true"' : ''}>${esc(it.label)}</button>`).join('')}
+                    </div>
+                </div>` : '';
+            return `<div class="primary-action">${primaryHtml}</div>${menu}`;
         }
 
         function render() {
             const visible = sortMissions(missions.filter(matchesSearch).filter(matchesStatusFilter));
+            const visible = missions.filter(matchesSearch);
             if (visible.length === 0) {
                 missionsEl.innerHTML = !hasLoadedOnce
                     ? '<div class="empty">Loading missions&hellip;</div>'
@@ -499,6 +621,7 @@
                     </div>
                     <pre>${esc((m.code || '').trim()) || '# No code'}</pre>
                     <div class="mission-actions" data-mission="${m.id}">${buildActions(m)}</div>
+                    <div class="mission-actions" data-mission="${m.id}">${renderActionsMarkup(m)}</div>
                 </div>`).join('');
 
             missionsEl.querySelectorAll('input[data-draft]').forEach(el => {
@@ -520,6 +643,35 @@
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeConfirm();
+            });
+
+            missionsEl.querySelectorAll('button[data-menu-toggle]').forEach(el => {
+                el.onclick = (e) => {
+                    e.stopPropagation();
+                    const id = el.dataset.menuToggle;
+                    const menu = document.getElementById('menu-' + id);
+                    const isOpen = !menu.hidden;
+                    closeAllMenus();
+                    if (!isOpen) {
+                        menu.hidden = false;
+                        el.setAttribute('aria-expanded', 'true');
+                        const first = menu.querySelector('button');
+                        if (first) first.focus();
+                    }
+                };
+            });
+        }
+
+        function closeAllMenus() {
+            missionsEl.querySelectorAll('.action-menu').forEach(m => { m.hidden = true; });
+            missionsEl.querySelectorAll('.kebab-btn').forEach(b => b.setAttribute('aria-expanded', 'false'));
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.secondary-actions')) closeAllMenus();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { closeAllMenus(); closeConfirm(); }
         });
 
         function validateYoutubeField(id) {
@@ -568,6 +720,31 @@
         function showSuccess(missionId, message) {
             const label = missionLabel(missionId);
             showToast('success', label ? `${label} — ${message}` : message);
+        function showError(missionId, message) {
+            const row = missionsEl.querySelector(`.mission-actions[data-mission="${missionId}"]`);
+            if (!row) return;
+            clearFeedback(row);
+            const err = document.createElement('div');
+            err.className = 'action-error';
+            err.setAttribute('role', 'alert');
+            err.textContent = message;
+            row.appendChild(err);
+        }
+
+        function showSuccess(missionId, message) {
+            const row = missionsEl.querySelector(`.mission-actions[data-mission="${missionId}"]`);
+            if (!row) return;
+            clearFeedback(row);
+            const ok = document.createElement('div');
+            ok.className = 'action-success';
+            ok.setAttribute('role', 'status');
+            ok.textContent = message;
+            row.appendChild(ok);
+            setTimeout(() => { if (ok.parentNode) ok.remove(); }, 3000);
+        }
+
+        function clearFeedback(row) {
+            row.querySelectorAll('.action-error, .action-success').forEach(el => el.remove());
         }
 
         // ---------- Confirmation modal ----------
@@ -617,6 +794,7 @@
         function handleAction(btn) {
             const action = btn.dataset.act;
             const missionId = btn.dataset.id;
+            closeAllMenus();
             if (btn.dataset.confirm === 'true') {
                 const copy = CONFIRM_COPY[action] || { title: 'Are you sure?', body: 'This action cannot be undone.', confirmLabel: 'Confirm' };
                 openConfirm(copy, () => act(action, missionId, btn));

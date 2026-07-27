@@ -1,35 +1,50 @@
 /**
- * POST /api/missions - server-side mission submission (Tasks 40 & 41).
+ * POST /api/missions/[id]/notify
  *
- * Validates the payload (schema + command allowlist) before persisting, so
- * submission can be trusted even if it bypasses the client UI. The client may
- * still submit directly via the repository, but this endpoint is the safe path.
+ * Best-effort status-change email trigger for callers that update mission
+ * status directly in Firestore instead of through PATCH /api/missions/[id]
+ * (the yard operator console, which must keep working even if this app is
+ * unreachable). This route sends the notification only - it never touches
+ * persistence, since the caller has already written the new status itself.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { validateMission } from '@/infrastructure/validation/schemas';
+import { z } from 'zod';
 import { getFirestoreInstance } from '@/infrastructure/persistence/firebase-admin';
 import { FirestoreMissionRepository } from '@/infrastructure/persistence/FirestoreMissionRepository';
 import { MissionService } from '@/core/application/services/MissionService';
 import { MissionNotificationService } from '@/core/application/services/MissionNotificationService';
 import { ResendEmailSender } from '@/infrastructure/email/resend-client';
 
-export async function POST(request: NextRequest) {
+const notifyRequestSchema = z.object({
+  status: z.enum(['queued', 'processing', 'completed', 'failed', 'cancelled']),
+});
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
   let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json(
       { success: false, error: 'Invalid JSON body' },
-      { status: 500 }
+      { status: 400 }
     );
   }
 
-  // Phase 1 + 2: schema and command-allowlist validation
-  const validation = validateMission(body);
-  if (!validation.success || !validation.data) {
+  const validation = notifyRequestSchema.safeParse(body);
+  if (!validation.success) {
+    const errors = validation.error.errors.map((err) => {
+      const path = err.path.join('.');
+      return `${path}: ${err.message}`;
+    });
+
     return NextResponse.json(
-      { success: false, error: 'Validation failed', details: validation.errors ?? [] },
+      { success: false, error: 'Validation failed', details: errors },
       { status: 400 }
     );
   }
@@ -38,12 +53,12 @@ export async function POST(request: NextRequest) {
     const firestore = getFirestoreInstance();
     const repository = new FirestoreMissionRepository(firestore);
     const service = new MissionService(repository);
-    const result = await service.submitMission(validation.data);
+    const mission = await service.getMissionById(id);
 
-    if (!result.success || !result.mission) {
+    if (!mission) {
       return NextResponse.json(
-        { success: false, error: result.error ?? 'Failed to submit mission' },
-        { status: 500 }
+        { success: false, error: 'Mission not found' },
+        { status: 404 }
       );
     }
 
@@ -53,9 +68,10 @@ export async function POST(request: NextRequest) {
       firestore,
       historyUrl
     );
-    await notificationService.notifyStatusChange(result.mission, 'queued');
 
-    return NextResponse.json({ success: true, mission: result.mission }, { status: 201 });
+    await notificationService.notifyStatusChange(mission, validation.data.status);
+
+    return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },

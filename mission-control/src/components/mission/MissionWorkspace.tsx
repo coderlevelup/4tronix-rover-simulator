@@ -5,9 +5,6 @@ import { useSearchParams } from 'next/navigation';
 import { RoverState } from '@/lib/rover-physics';
 import { getLearnerID } from '@/lib/getLearnerID';
 import { useLearner } from '@/contexts/LearnerContext';
-import { getFirestoreClient } from '@/lib/firebase';
-import { FirestoreMissionRepository } from '@/infrastructure/persistence/FirestoreMissionRepository';
-import { MissionService } from '@/core/application/services/MissionService';
 import { validateMission } from '@/infrastructure/validation/schemas';
 import { EditorPanel, type EditorMode } from '@/components/mission/EditorPanel';
 import { SimulationPanel } from '@/components/mission/SimulationPanel';
@@ -174,11 +171,14 @@ export function MissionWorkspace() {
         return;
       }
 
-      const repository = new FirestoreMissionRepository(getFirestoreClient());
-      const service = new MissionService(repository);
-      const result = await service.submitMission(validation.data!);
+      const response = await fetch('/api/missions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(validation.data),
+      });
+      const result = await response.json();
 
-      if (!result.success || !result.mission) {
+      if (!response.ok || !result.success || !result.mission) {
         throw new Error(result.error || 'Failed to submit mission');
       }
 

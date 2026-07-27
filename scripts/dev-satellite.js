@@ -63,12 +63,12 @@ const python = fs.existsSync(venvPython)
     : 'python3';
 
 (async () => {
-  // Preflight: the satellite needs its Python deps (firebase-admin, flask) in
+  // Preflight: the satellite needs its Python deps (firebase-admin, flask, dotenv) in
   // the interpreter we run. Without them the operator login fails at runtime
   // with a cryptic "could not verify token", so install them on first run.
   // (These live in yard/satellite/requirements.txt, separate from the desktop
   // simulator's root requirements.txt.)
-  const hasDeps = spawnSync(python, ['-c', 'import firebase_admin, flask'], { stdio: 'ignore' });
+  const hasDeps = spawnSync(python, ['-c', 'import firebase_admin, flask, dotenv'], { stdio: 'ignore' });
   if (!hasDeps.error && hasDeps.status !== 0) {
     const reqs = path.join('yard', 'satellite', 'requirements.txt');
     console.log('[satellite] installing Python dependencies (first run)...');
