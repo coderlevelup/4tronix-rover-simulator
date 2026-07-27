@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Operator Console</title>
     <link rel="stylesheet" href="/static/yard-base.css">
+    <script src="/static/yard-cache.js"></script>
     <style>
         :root {
             --fs-body: 0.9rem;
@@ -159,18 +160,14 @@
         }
 
         /* ---------- Actions row: all buttons inline, primary given the most visual weight ---------- */
-        /* ---------- Actions row: one obvious primary action + a kebab for the rest ---------- */
         .mission-actions {
             display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 0.6rem;
+            align-items: center;
+            gap: 0.5rem;
             flex-wrap: wrap;
             padding: 0.75rem 1rem;
             border-top: 1px solid var(--border);
-            position: relative;
         }
-        .primary-action { display: flex; align-items: center; gap: 0.5rem; flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
 
         .btn {
             border: 1px solid var(--border);
@@ -211,53 +208,8 @@
         .field-error { color: var(--bad); font-size: var(--fs-xs); min-height: 1em; }
         .field-hint { color: var(--text-faint, #666); font-size: var(--fs-xs); min-height: 1em; }
 
-        .action-error { width: 100%; color: var(--bad); font-size: var(--fs-xs); }
-        .action-success { width: 100%; color: var(--ok); font-size: var(--fs-xs); }
         .yt-link { color: var(--ok); font-size: var(--fs-sm); text-decoration: none; border-radius: 4px; }
         .yt-link:hover { text-decoration: underline; }
-
-        /* ---------- Secondary / overflow menu ---------- */
-        .secondary-actions { position: relative; flex-shrink: 0; }
-        .kebab-btn {
-            width: 44px; height: 44px;
-            display: inline-flex; align-items: center; justify-content: center;
-            background: var(--surface-3, #222);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text-dim, #ccc);
-            font-size: 1.2rem;
-            line-height: 1;
-            cursor: pointer;
-        }
-        .kebab-btn:hover { border-color: var(--border-strong); }
-        .action-menu {
-            position: absolute;
-            right: 0;
-            top: calc(100% + 6px);
-            background: var(--surface-2);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            min-width: 180px;
-            padding: 0.35rem;
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
-            z-index: 30;
-        }
-        .action-menu[hidden] { display: none; }
-        .action-menu button {
-            display: block;
-            width: 100%;
-            text-align: left;
-            background: none;
-            border: none;
-            color: var(--text-dim, #ccc);
-            font-size: var(--fs-sm);
-            padding: 0.65rem 0.7rem;
-            min-height: 44px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-        .action-menu button:hover, .action-menu button:focus-visible { background: var(--surface-3); color: var(--text, #fff); }
-        .action-menu button[data-danger="true"] { color: var(--bad); }
 
         .empty {
             text-align: center;
@@ -441,13 +393,11 @@
                 title: 'Mark mission complete?',
                 body: 'This marks the mission as completed and cannot be undone.',
                 confirmLabel: 'Mark complete',
-                confirmLabel: 'Complete mission',
             },
             rerun: {
                 title: 'Rerun this mission?',
                 body: 'This clears the completed status and any attached video, and sends the mission back into the queue. This cannot be undone.',
                 confirmLabel: 'Rerun',
-                confirmLabel: 'Rerun mission',
             },
         };
 
@@ -501,6 +451,30 @@
             return /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=[\w-]{6,}|youtu\.be\/[\w-]{6,})/i.test(v.trim());
         }
 
+        // Returns the full row of action buttons for a mission, in display order.
+        // The first/primary action gets the .primary style; the rest render as
+        // plain buttons right alongside it (no overflow menu).
+        function buildActions(m) {
+            if (m.status === 'queued') {
+                return `<button class="btn primary" data-act="send" data-id="${m.id}">Send to rover</button>
+                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>
+                        <button class="btn" data-act="complete" data-id="${m.id}" data-confirm="true">Mark complete</button>`;
+            }
+            if (m.status === 'processing') {
+                return `<button class="btn success" data-act="complete" data-id="${m.id}" data-confirm="true">Mark complete</button>
+                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>${m.blocklyState ? `<button class="btn" data-act="copyblocks" data-id="${m.id}">Copy blocks</button>` : ''}`;
+            }
+            if (m.status === 'completed' && !m.youtubeUrl) {
+                return `<div class="field-group">
+                            <input type="url" inputmode="url" placeholder="https://youtube.com/watch?v=..." value="${esc(drafts[m.id] || '')}" data-draft="${m.id}" data-yt-validate="${m.id}" aria-describedby="yt-err-${m.id}">
+                            <div class="field-error" id="yt-err-${m.id}"></div>
+                        </div>
+                        <button class="btn primary" data-act="youtube" data-id="${m.id}" disabled>Attach video</button>
+                        <button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Rerun</button>`;
+            }
+            if (m.status === 'completed') {
+                return `<a class="yt-link" href="${esc(m.youtubeUrl)}" target="_blank" rel="noopener">Video attached &#8599;</a>
+                        <button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Rerun</button>`;
         // Builds { primaryHtml, secondary: [{act, label, confirm, danger}] } for a mission,
         // per the "one obvious next action, everything else in the overflow menu" rule.
         function buildActions(m) {
@@ -546,27 +520,10 @@
                 };
             }
             if (m.status === 'failed') {
-                return {
-                    primaryHtml: `<button class="btn primary" data-act="rerun" data-id="${m.id}">Retry mission</button>`,
-                    secondary: [
-                        { act: 'copy', label: 'Copy code' },
-                        ...(m.blocklyState ? [{ act: 'copyblocks', label: 'Copy blocks' }] : []),
-                    ],
-                };
+                return `<button class="btn primary" data-act="rerun" data-id="${m.id}">Rerun</button>
+                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>${m.blocklyState ? `<button class="btn" data-act="copyblocks" data-id="${m.id}">Copy blocks</button>` : ''}`;
             }
-            return { primaryHtml: '', secondary: [] };
-        }
-
-        function renderActionsMarkup(m) {
-            const { primaryHtml, secondary } = buildActions(m);
-            const menu = secondary.length ? `
-                <div class="secondary-actions">
-                    <button class="kebab-btn" data-menu-toggle="${m.id}" aria-haspopup="true" aria-expanded="false" aria-label="More actions for ${esc(m.name) || 'this mission'}">&#8942;</button>
-                    <div class="action-menu" id="menu-${m.id}" role="menu" hidden>
-                        ${secondary.map(it => `<button role="menuitem" data-act="${it.act}" data-id="${m.id}" ${it.confirm ? 'data-confirm="true"' : ''} ${it.danger ? 'data-danger="true"' : ''}>${esc(it.label)}</button>`).join('')}
-                    </div>
-                </div>` : '';
-            return `<div class="primary-action">${primaryHtml}</div>${menu}`;
+            return '';
         }
 
         function render() {
@@ -592,7 +549,6 @@
                     </div>
                     <pre>${esc((m.code || '').trim()) || '# No code'}</pre>
                     <div class="mission-actions" data-mission="${m.id}">${buildActions(m)}</div>
-                    <div class="mission-actions" data-mission="${m.id}">${renderActionsMarkup(m)}</div>
                 </div>`).join('');
 
             missionsEl.querySelectorAll('input[data-draft]').forEach(el => {
@@ -765,7 +721,7 @@
         function handleAction(btn) {
             const action = btn.dataset.act;
             const missionId = btn.dataset.id;
-            closeAllMenus();
+            if (btn.dataset.processing === 'true') return;
             if (btn.dataset.confirm === 'true') {
                 const copy = CONFIRM_COPY[action] || { title: 'Are you sure?', body: 'This action cannot be undone.', confirmLabel: 'Confirm' };
                 openConfirm(copy, () => act(action, missionId, btn));
@@ -826,6 +782,8 @@
         };
 
         async function act(action, missionId, btn) {
+            if (btn.dataset.processing === 'true') return;
+            btn.dataset.processing = 'true';
             if (action === 'copy' || action === 'copyblocks') {
                 const m = missions.find(x => x.id === missionId);
                 const text = action === 'copyblocks' ? (m.blocklyState || '') : (m.code || '');
@@ -836,6 +794,8 @@
                     setTimeout(() => { btn.textContent = label; }, 1500);
                 } catch {
                     showError(missionId, 'Could not copy to clipboard');
+                } finally {
+                    btn.dataset.processing = 'false';
                 }
                 return;
             }
@@ -860,6 +820,8 @@
             } catch (err) {
                 btn.disabled = false;
                 showError(missionId, missionErrorMessage(err, resp, data));
+            } finally {
+                btn.dataset.processing = 'false';
             }
         }
 
