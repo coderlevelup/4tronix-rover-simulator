@@ -10,5 +10,8 @@
   },
   "dependencies": {
     "firebase": "^12.16.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
   }
 }
