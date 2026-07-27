@@ -1,0 +1,151 @@
+"""
+Mission mirror (SQLite) tests - schema, upsert semantics, and reads.
+
+Covers yard/docs/offline-sync-test.md section B1-B3 (tests #16-26): the
+satellite-local store that lets the operator console list missions with no
+internet. See yard/docs/offline-sync-plan.md section 3.2 for the schema.
+"""
+
+import os
+import sys
+
+import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import mission_store  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def isolated_db(tmp_path, monkeypatch):
+    monkeypatch.setattr(mission_store, 'DB_PATH', str(tmp_path / 'missions.db'))
+    mission_store.init_db()
+
+
+def _mission(mission_id, status='queued', **overrides):
+    m = {
+        'id': mission_id,
+        'name': f'Mission {mission_id}',
+        'yardId': 'uct-rover-1',
+        'code': 'rover.forward(10)',
+        'blocklyState': '{"blocks":{}}',
+        'status': status,
+        'submittedAt': '2026-07-14T08:00:00Z',
+    }
+    m.update(overrides)
+    return m
+
+
+# ---------------------------------------------------------------------------
+# B1: schema and init
+# ---------------------------------------------------------------------------
+
+def test_init_db_creates_expected_tables():
+    conn = mission_store._connect()
+    rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    conn.close()
+    names = {row['name'] for row in rows}
+    assert {'mission_mirror', 'outbox', 'sync_meta', 'conflict_log'} <= names
+
+
+def test_init_db_is_idempotent():
+    mission_store.init_db()  # second call must not raise
+
+
+# ---------------------------------------------------------------------------
+# B2: upsert_missions
+# ---------------------------------------------------------------------------
+
+def test_upsert_inserts_new_missions():
+    mission_store.upsert_missions(
+        [_mission('a'), _mission('b'), _mission('c')], '2026-07-14T09:00:00Z',
+    )
+    missions, _ = mission_store.get_missions()
+    assert {m['id'] for m in missions} == {'a', 'b', 'c'}
+
+
+def test_upsert_updates_existing_mission_status():
+    mission_store.upsert_missions([_mission('a', status='queued')], '2026-07-14T09:00:00Z')
+    mission_store.upsert_missions([_mission('a', status='completed')], '2026-07-14T09:05:00Z')
+    assert mission_store.get_mission('a')['status'] == 'completed'
+
+
+def test_upsert_does_not_overwrite_a_dirty_row():
+    # local_dirty=1 means a local write hasn't flushed to Firestore yet (PR 3).
+    # A pull landing in the middle of that must not clobber it.
+    mission_store.upsert_missions([_mission('a', status='queued')], '2026-07-14T09:00:00Z')
+
+    conn = mission_store._connect()
+    conn.execute("UPDATE mission_mirror SET local_dirty = 1, status = 'completed' WHERE id = 'a'")
+    conn.commit()
+    conn.close()
+
+    mission_store.upsert_missions([_mission('a', status='queued')], '2026-07-14T09:10:00Z')
+
+    assert mission_store.get_mission('a')['status'] == 'completed'
+    assert mission_store.get_mission('a')['local_dirty'] == 1
+
+
+def test_upsert_stores_last_synced_at_in_sync_meta():
+    mission_store.upsert_missions([_mission('a')], '2026-07-14T09:00:00Z')
+    _, last_synced = mission_store.get_missions()
+    assert last_synced == '2026-07-14T09:00:00Z'
+
+
+def test_upsert_maps_camel_case_firestore_fields_to_snake_case_columns():
+    mission_store.upsert_missions(
+        [_mission('a', yardId='uct-rover-1', blocklyState='{"x":1}')],
+        '2026-07-14T09:00:00Z',
+    )
+    row = mission_store.get_mission('a')
+    assert row['yard_id'] == 'uct-rover-1'
+    assert row['blockly_state'] == '{"x":1}'
+
+
+# ---------------------------------------------------------------------------
+# B3: get_missions / get_mission
+# ---------------------------------------------------------------------------
+
+def test_get_missions_orders_by_submitted_at_descending():
+    mission_store.upsert_missions([
+        _mission('old', submittedAt='2026-07-14T06:00:00Z'),
+        _mission('new', submittedAt='2026-07-14T09:00:00Z'),
+    ], '2026-07-14T09:00:00Z')
+    missions, _ = mission_store.get_missions()
+    assert missions[0]['id'] == 'new'
+
+
+def test_get_missions_excludes_cancelled():
+    mission_store.upsert_missions([
+        _mission('a', status='queued'),
+        _mission('b', status='cancelled'),
+    ], '2026-07-14T09:00:00Z')
+    missions, _ = mission_store.get_missions()
+    assert {m['id'] for m in missions} == {'a'}
+
+
+def test_get_missions_respects_limit():
+    mission_store.upsert_missions(
+        [_mission(str(i), submittedAt=f'2026-07-14T08:{i:02d}:00Z') for i in range(10)],
+        '2026-07-14T09:00:00Z',
+    )
+    missions, _ = mission_store.get_missions(limit=3)
+    assert len(missions) == 3
+
+
+def test_get_mission_returns_none_for_unknown_id():
+    assert mission_store.get_mission('nonexistent') is None
+
+
+def test_outbox_count_starts_at_zero():
+    assert mission_store.outbox_count() == 0
+
+
+def test_outbox_count_reflects_inserted_rows():
+    conn = mission_store._connect()
+    conn.execute(
+        "INSERT INTO outbox (uuid, mission_id, op, payload, event_at, created_at) "
+        "VALUES ('u1', 'a', 'complete', '{}', '2026-07-14T09:00:00Z', '2026-07-14T09:00:00Z')"
+    )
+    conn.commit()
+    conn.close()
+    assert mission_store.outbox_count() == 1

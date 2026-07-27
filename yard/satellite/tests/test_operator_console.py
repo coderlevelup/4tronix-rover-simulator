@@ -15,6 +15,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from web_server import app as flask_app  # noqa: E402
 import operator_console  # noqa: E402
+import mission_store  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -136,7 +137,7 @@ def missions():
 
 
 @pytest.fixture
-def client(missions, monkeypatch):
+def client(missions, monkeypatch, tmp_path):
     # web_server.py now calls load_dotenv() on import, so a developer's real
     # local .env (OPERATOR_AUTH=off while testing at an event, a real
     # YOUTUBE_API_KEY, etc.) would otherwise leak into every test run. Start
@@ -146,6 +147,11 @@ def client(missions, monkeypatch):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr(operator_console, '_firestore', lambda: FakeFirestore(missions))
     monkeypatch.setattr(operator_console, '_admin_configured', lambda: True)
+    # api_missions reads the SQLite mirror, not Firestore - point it at a
+    # throwaway per-test file so tests never share state or touch a real
+    # missions.db on disk.
+    monkeypatch.setattr(mission_store, 'DB_PATH', str(tmp_path / 'missions.db'))
+    mission_store.init_db()
     flask_app.config['TESTING'] = True
     with flask_app.test_client() as c:
         yield c
@@ -383,9 +389,32 @@ def test_youtube_only_attaches_to_completed_missions(client, missions):
 # Mission list
 # ---------------------------------------------------------------------------
 
-def test_missions_endpoint_serialises_documents(client, missions, monkeypatch):
+def _seed_mirror(synced_at='2026-07-14T09:00:00Z'):
+    """api_missions reads the SQLite mirror now, not Firestore - seed it the
+    way the sync worker would after a successful pull.
+    """
+    mission_store.upsert_missions([
+        {
+            'id': 'q1', 'name': 'Sand Observer', 'yardId': 'uct-rover-1',
+            'code': 'rover.forward(60)\nrover.stop()', 'blocklyState': '{"blocks":{}}',
+            'status': 'queued', 'submittedAt': '2026-07-14T08:00:00Z',
+        },
+        {
+            'id': 'p1', 'name': 'Storm Collector', 'yardId': 'uct-rover-1',
+            'code': 'rover.forward(30)', 'status': 'processing',
+            'submittedAt': '2026-07-14T07:00:00Z',
+        },
+        {
+            'id': 'c1', 'name': 'Crater Pioneer', 'yardId': 'uct-rover-1',
+            'code': 'rover.stop()', 'status': 'completed',
+            'submittedAt': '2026-07-14T06:00:00Z',
+        },
+    ], synced_at)
+
+
+def test_missions_endpoint_serialises_documents(client):
     sign_in(client)
-    monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(missions))
+    _seed_mirror(synced_at=operator_console._now_iso())
 
     resp = client.get('/operator/api/missions')
     assert resp.status_code == 200
@@ -395,6 +424,53 @@ def test_missions_endpoint_serialises_documents(client, missions, monkeypatch):
     q1 = next(m for m in payload['missions'] if m['id'] == 'q1')
     assert q1['status'] == 'queued'
     assert q1['code'].startswith('rover.forward')
+    # camelCase API contract must survive the snake_case SQLite round-trip
+    assert q1['yardId'] == 'uct-rover-1'
+    assert q1['blocklyState'] == '{"blocks":{}}'
+    assert q1['submittedAt'] == '2026-07-14T08:00:00Z'
+
+
+def test_missions_endpoint_is_stale_when_never_synced(client):
+    sign_in(client)
+    resp = client.get('/operator/api/missions')
+    payload = resp.get_json()
+    assert payload['missions'] == []
+    assert payload['stale'] is True
+    assert payload['lastSyncedAt'] is None
+    assert payload['pendingWrites'] == 0
+
+
+def test_missions_endpoint_is_fresh_right_after_a_sync(client):
+    sign_in(client)
+    _seed_mirror(synced_at=operator_console._now_iso())
+    payload = client.get('/operator/api/missions').get_json()
+    assert payload['stale'] is False
+
+
+def test_missions_endpoint_is_stale_when_last_sync_is_old(client):
+    sign_in(client)
+    _seed_mirror(synced_at='2020-01-01T00:00:00Z')
+    payload = client.get('/operator/api/missions').get_json()
+    assert payload['stale'] is True
+    assert payload['lastSyncedAt'] == '2020-01-01T00:00:00Z'
+
+
+def test_missions_endpoint_reports_pending_writes_from_outbox(client):
+    sign_in(client)
+    _seed_mirror(synced_at=operator_console._now_iso())
+
+    conn = mission_store._connect()
+    for i in range(3):
+        conn.execute(
+            "INSERT INTO outbox (uuid, mission_id, op, payload, event_at, created_at) "
+            "VALUES (?, 'q1', 'complete', '{}', '2026-07-14T09:00:00Z', '2026-07-14T09:00:00Z')",
+            (f'uuid-{i}',),
+        )
+    conn.commit()
+    conn.close()
+
+    payload = client.get('/operator/api/missions').get_json()
+    assert payload['pendingWrites'] == 3
 
 
 # ---------------------------------------------------------------------------

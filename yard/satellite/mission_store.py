@@ -38,9 +38,33 @@ def init_db():
                 local_dirty       INTEGER DEFAULT 0
             );
 
+            -- Write queue: local changes not yet accepted by Firestore. Unused
+            -- until PR 3 (outbox + push-before-pull sync), but the schema
+            -- lands now so the mirror doesn't need a second migration.
+            CREATE TABLE IF NOT EXISTS outbox (
+                seq        INTEGER PRIMARY KEY AUTOINCREMENT,
+                uuid       TEXT UNIQUE NOT NULL,
+                mission_id TEXT NOT NULL,
+                op         TEXT NOT NULL,
+                payload    TEXT NOT NULL,
+                event_at   TEXT NOT NULL,
+                attempts   INTEGER DEFAULT 0,
+                last_error TEXT,
+                created_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS sync_meta (
                 key   TEXT PRIMARY KEY,
                 value TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS conflict_log (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                mission_id   TEXT NOT NULL,
+                local_state  TEXT NOT NULL,
+                remote_state TEXT NOT NULL,
+                resolution   TEXT NOT NULL,
+                logged_at    TEXT NOT NULL
             );
         """)
         conn.commit()
@@ -103,4 +127,24 @@ def get_missions(limit=100):
     last_synced = meta[0] if meta else None
     missions = [dict(row) for row in rows]
     return missions, last_synced
+
+
+def get_mission(mission_id):
+    """A single mission from the mirror, or None if it isn't there."""
+    with _db_lock:
+        conn = _connect()
+        row = conn.execute(
+            "SELECT * FROM mission_mirror WHERE id = ?", (mission_id,)
+        ).fetchone()
+        conn.close()
+    return dict(row) if row else None
+
+
+def outbox_count():
+    """Number of local writes not yet flushed to Firestore."""
+    with _db_lock:
+        conn = _connect()
+        row = conn.execute("SELECT COUNT(*) AS n FROM outbox").fetchone()
+        conn.close()
+    return row['n']
 
