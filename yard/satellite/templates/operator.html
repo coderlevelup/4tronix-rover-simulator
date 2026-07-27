@@ -10,10 +10,10 @@
             --fs-body: 0.9rem;
             --fs-sm: 0.8rem;
             --fs-xs: 0.72rem;
-            --accent-select: #60a5fa;
+            --accent-select: var(--primary);
         }
-        body { min-height: 100vh; }
-        :focus-visible { outline: 2px solid var(--accent-select); outline-offset: 2px; border-radius: 4px; }
+        body { min-height: 100vh; background: var(--background); color: var(--foreground); }
+        :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
 
         .wrap { max-width: 920px; margin: 0 auto; padding: 1.9rem 1.5rem 3rem; }
 
@@ -29,27 +29,28 @@
         h1 { font-size: 1.5rem; font-weight: 600; color: var(--heading, #fff); }
         .subtitle { font-size: var(--fs-sm); color: var(--text-faint, #666); }
 
-        /* ---------- Status pill (shared) ---------- */
-        .status-pill {
+        /* ---------- Status badge: icon + text + color, never color alone ---------- */
+        .status-badge {
             display: inline-flex;
             align-items: center;
-            gap: 0.3rem;
+            gap: 0.35rem;
             border-radius: 999px;
             font-size: 0.68rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            padding: 0.2rem 0.6rem;
+            padding: 0.28rem 0.65rem 0.28rem 0.55rem;
             border: 1px solid var(--border);
             background: var(--surface-3, #222);
             color: var(--text-faint, #888);
             flex-shrink: 0;
+            white-space: nowrap;
         }
-        .status-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
-        .status-pill[data-tone="ok"]   { color: var(--ok);   background: rgba(52, 211, 153, 0.1);  border-color: rgba(52, 211, 153, 0.35); }
-        .status-pill[data-tone="warn"] { color: var(--warn); background: rgba(251, 191, 36, 0.1);  border-color: rgba(251, 191, 36, 0.35); }
-        .status-pill[data-tone="bad"]  { color: var(--bad);  background: rgba(248, 113, 113, 0.1); border-color: rgba(248, 113, 113, 0.35); }
-        .status-pill[data-tone="info"] { color: var(--accent-select); background: rgba(96, 165, 250, 0.1); border-color: rgba(96, 165, 250, 0.35); }
+        .status-badge svg { width: 13px; height: 13px; flex-shrink: 0; }
+        .status-badge[data-tone="ok"]   { color: var(--ok);   background: rgba(52, 211, 153, 0.1);  border-color: rgba(52, 211, 153, 0.35); }
+        .status-badge[data-tone="warn"] { color: var(--warn); background: rgba(251, 191, 36, 0.1);  border-color: rgba(251, 191, 36, 0.35); }
+        .status-badge[data-tone="bad"]  { color: var(--bad);  background: rgba(248, 113, 113, 0.1); border-color: rgba(248, 113, 113, 0.35); }
+        .status-badge[data-tone="info"] { color: var(--accent); background: rgba(118, 255, 221, 0.1); border-color: rgba(118, 255, 221, 0.25); }
 
         .search-box {
             display: flex;
@@ -62,7 +63,7 @@
             margin-bottom: 1rem;
             max-width: 360px;
         }
-        .search-box:focus-within { border-color: var(--accent-select); }
+        .search-box:focus-within { border-color: var(--primary); }
         .search-box svg { width: 16px; height: 16px; color: var(--text-faint, #666); flex-shrink: 0; }
         .search-box input {
             flex: 1;
@@ -82,30 +83,18 @@
             padding: 0 0.2rem;
             display: none;
             border-radius: 4px;
+            min-width: 32px;
+            min-height: 32px;
         }
         .search-box .clear-search.visible { display: block; }
         .search-box .clear-search:hover { color: var(--text, #ccc); }
 
-        .toolbar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-        .toolbar a, .toolbar button {
-            background: var(--surface-2, #1a1a1a);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text-dim, #ccc);
-            font-size: var(--fs-sm);
-            padding: 0.45rem 0.8rem;
-            text-decoration: none;
-            cursor: pointer;
-        }
-        .toolbar a:hover, .toolbar button:hover { border-color: var(--border-strong); }
-
-
         .mission {
-            background: var(--surface-2, #1a1a1a);
+            background: var(--surface-2);
             border: 1px solid var(--border);
             border-radius: 12px;
             margin-bottom: 0.9rem;
-            overflow: hidden;
+            overflow: visible;
         }
 
         .mission-head {
@@ -121,24 +110,30 @@
         .mission-meta { font-size: var(--fs-xs); color: var(--text-faint, #666); font-family: ui-monospace, monospace; }
 
         pre {
-            background: var(--surface-3, #111);
-            color: var(--text-dim, #d0d0d0);
-            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            background: var(--surface-3);
+            color: var(--text-dim);
+            font-family: var(--mono);
             font-size: var(--fs-sm);
             line-height: 1.5;
             padding: 0.9rem 1rem;
             max-height: 180px;
             overflow: auto;
+            border-radius: 0;
         }
 
+        /* ---------- Actions row: one obvious primary action + a kebab for the rest ---------- */
         .mission-actions {
             display: flex;
-            align-items: center;
-            gap: 0.5rem;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.6rem;
             flex-wrap: wrap;
             padding: 0.75rem 1rem;
             border-top: 1px solid var(--border);
+            position: relative;
         }
+        .primary-action { display: flex; align-items: center; gap: 0.5rem; flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+
         .btn {
             border: 1px solid var(--border);
             border-radius: 8px;
@@ -146,31 +141,85 @@
             color: var(--text-dim, #ccc);
             font-size: var(--fs-sm);
             font-weight: 600;
-            padding: 0.5rem 0.9rem;
+            padding: 0.6rem 0.95rem;
+            min-height: 44px;
             cursor: pointer;
+            line-height: 1.2;
         }
         .btn:hover { border-color: var(--border-strong); }
         .btn:disabled { opacity: 0.5; cursor: default; }
-        .btn.primary { background: #f97316; border-color: #f97316; color: #fff; }
-        .btn.primary:hover:not(:disabled) { background: #ea580c; }
+        .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); font-weight: 700; }
+        .btn.primary:hover:not(:disabled) { background: var(--mars); }
         .btn.success { background: rgba(52, 211, 153, 0.15); border-color: rgba(52, 211, 153, 0.4); color: var(--ok); }
+        a.btn.primary { display: inline-flex; align-items: center; text-decoration: none; }
 
-        .mission-actions input {
-            flex: 1;
-            min-width: 200px;
+        .field-group { display: flex; flex-direction: column; gap: 0.3rem; flex: 1 1 220px; min-width: 200px; }
+        .field-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        .field-group input {
+            width: 100%;
             background: var(--surface-3, #111);
             border: 1px solid var(--border);
             border-radius: 8px;
             color: var(--text, #e0e0e0);
             font-size: var(--fs-sm);
-            padding: 0.5rem 0.75rem;
+            padding: 0.6rem 0.75rem;
+            min-height: 44px;
             outline: none;
+            box-sizing: border-box;
         }
-        .mission-actions input:focus-visible { border-color: #f97316; }
+        .field-group input:focus-visible { border-color: var(--primary); }
+        .field-group input.invalid { border-color: var(--bad); }
+        .field-group input.valid { border-color: var(--ok); }
+        .field-error { color: var(--bad); font-size: var(--fs-xs); min-height: 1em; }
+        .field-hint { color: var(--text-faint, #666); font-size: var(--fs-xs); min-height: 1em; }
 
         .action-error { width: 100%; color: var(--bad); font-size: var(--fs-xs); }
+        .action-success { width: 100%; color: var(--ok); font-size: var(--fs-xs); }
         .yt-link { color: var(--ok); font-size: var(--fs-sm); text-decoration: none; border-radius: 4px; }
         .yt-link:hover { text-decoration: underline; }
+
+        /* ---------- Secondary / overflow menu ---------- */
+        .secondary-actions { position: relative; flex-shrink: 0; }
+        .kebab-btn {
+            width: 44px; height: 44px;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: var(--surface-3, #222);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-dim, #ccc);
+            font-size: 1.2rem;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .kebab-btn:hover { border-color: var(--border-strong); }
+        .action-menu {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 6px);
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            min-width: 180px;
+            padding: 0.35rem;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+            z-index: 30;
+        }
+        .action-menu[hidden] { display: none; }
+        .action-menu button {
+            display: block;
+            width: 100%;
+            text-align: left;
+            background: none;
+            border: none;
+            color: var(--text-dim, #ccc);
+            font-size: var(--fs-sm);
+            padding: 0.65rem 0.7rem;
+            min-height: 44px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .action-menu button:hover, .action-menu button:focus-visible { background: var(--surface-3); color: var(--text, #fff); }
+        .action-menu button[data-danger="true"] { color: var(--bad); }
 
         .empty {
             text-align: center;
@@ -190,8 +239,43 @@
             margin-bottom: 0.9rem;
         }
         .net-banner.visible { display: flex; }
-        .net-banner.stale { color: #fbbf24; background: #451a03; border: 1px solid #b45309; }
-        .net-banner.offline { color: #f87171; background: #450a0a; border: 1px solid #b91c1c; }
+        .net-banner.stale { color: var(--warn); background: rgba(251, 191, 36, 0.14); border: 1px solid rgba(251, 191, 36, 0.3); }
+        .net-banner.offline { color: var(--bad); background: rgba(248, 113, 113, 0.14); border: 1px solid rgba(248, 113, 113, 0.35); }
+
+        /* ---------- Confirmation modal ---------- */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            display: flex; align-items: center; justify-content: center;
+            padding: 1.25rem;
+            z-index: 100;
+        }
+        .modal-overlay[hidden] { display: none; }
+        .modal {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            max-width: 400px;
+            width: 100%;
+            padding: 1.4rem;
+        }
+        .modal h2 { font-size: 1.05rem; color: var(--heading, #fff); margin-bottom: 0.5rem; }
+        .modal p { font-size: var(--fs-sm); color: var(--text-dim, #ccc); line-height: 1.5; margin-bottom: 1.2rem; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; flex-wrap: wrap; }
+        .modal-actions .btn { min-width: 44px; }
+        .modal-actions .btn.danger { background: rgba(248, 113, 113, 0.15); border-color: rgba(248, 113, 113, 0.4); color: var(--bad); }
+
+        /* ---------- Responsive: yard-in-hand, one thumb ---------- */
+        @media (max-width: 640px) {
+            .wrap { padding: 1.25rem 1rem 2.5rem; }
+            .search-box { max-width: 100%; }
+            .mission-actions { flex-direction: column; align-items: stretch; }
+            .primary-action { width: 100%; }
+            .primary-action .btn, .primary-action a.btn { width: 100%; text-align: center; }
+            .field-row { flex-direction: column; align-items: stretch; }
+            .field-row .btn { width: 100%; }
+            .secondary-actions { align-self: flex-end; }
+        }
     </style>
 </head>
 <body>
@@ -208,20 +292,54 @@
             <button class="clear-search" id="clearSearch" title="Clear search" aria-label="Clear search">&times;</button>
         </div>
 
-        <div class="net-banner" id="netBanner"></div>
-        <!-- stages/stations UI removed -->
-        <div id="missions"></div>
+        <div class="net-banner" id="netBanner" role="status" aria-live="polite"></div>
+        <div id="missions" aria-live="polite"></div>
+    </div>
+
+    <!-- Confirmation modal: shared by every irreversible action (Mark Complete, Rerun) -->
+    <div class="modal-overlay" id="confirmOverlay" hidden>
+        <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmBody">
+            <h2 id="confirmTitle"></h2>
+            <p id="confirmBody"></p>
+            <div class="modal-actions">
+                <button class="btn" id="confirmCancel">Cancel</button>
+                <button class="btn danger" id="confirmOk"></button>
+            </div>
+        </div>
     </div>
 
     <script>
-        let stage = 'all';
         let missions = [];
         let missionsJson = null;
         let hasLoadedOnce = false;
         let searchQuery = '';
         const drafts = {};
 
-        const STATUS_TONE = { queued: 'info', processing: 'warn', completed: 'ok', failed: 'bad' };
+        const STATUS_META = {
+            queued:     { label: 'Queued',      tone: 'info', icon: 'clock' },
+            processing: { label: 'In Progress', tone: 'warn', icon: 'play' },
+            completed:  { label: 'Completed',   tone: 'ok',   icon: 'check' },
+            failed:     { label: 'Failed',      tone: 'bad',  icon: 'alert' },
+        };
+        const ICONS = {
+            clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+            play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4V8z"/></svg>',
+            check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>',
+            alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+        };
+
+        const CONFIRM_COPY = {
+            complete: {
+                title: 'Mark mission complete?',
+                body: 'This marks the mission as completed and cannot be undone.',
+                confirmLabel: 'Complete mission',
+            },
+            rerun: {
+                title: 'Rerun this mission?',
+                body: 'This clears the completed status and any attached video, and sends the mission back into the queue. This cannot be undone.',
+                confirmLabel: 'Rerun mission',
+            },
+        };
 
         const missionsEl = document.getElementById('missions');
         const netBanner = document.getElementById('netBanner');
@@ -238,8 +356,6 @@
             return haystack.includes(searchQuery);
         }
 
-
-
         function relTime(iso) {
             if (!iso) return '';
             const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -250,44 +366,91 @@
             return Math.round(hrs / 24) + 'd ago';
         }
 
-
-
         function esc(s) {
             return (s || '').replace(/[&<>"']/g, c => ({
                 '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
             })[c]);
         }
 
-        function actionsFor(m) {
+        function statusBadge(status) {
+            const meta = STATUS_META[status] || { label: status, tone: '', icon: 'alert' };
+            return `<span class="status-badge" data-tone="${meta.tone}">${ICONS[meta.icon]}<span>${esc(meta.label)}</span></span>`;
+        }
+
+        function isValidYoutubeUrl(v) {
+            return /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=[\w-]{6,}|youtu\.be\/[\w-]{6,})/i.test(v.trim());
+        }
+
+        // Builds { primaryHtml, secondary: [{act, label, confirm, danger}] } for a mission,
+        // per the "one obvious next action, everything else in the overflow menu" rule.
+        function buildActions(m) {
             if (m.status === 'queued') {
-                return `<button class="btn primary" data-act="send" data-id="${m.id}">Send to rover</button>
-                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>
-                        <button class="btn" data-act="complete" data-id="${m.id}">Mark complete</button>`;
+                return {
+                    primaryHtml: `<button class="btn primary" data-act="send" data-id="${m.id}">Start mission</button>`,
+                    secondary: [
+                        { act: 'copy', label: 'Copy code' },
+                        { act: 'complete', label: 'Mark complete', confirm: true },
+                    ],
+                };
             }
             if (m.status === 'processing') {
-                return `<button class="btn success" data-act="complete" data-id="${m.id}">Mark complete</button>
-                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>${m.blocklyState ? `<button class="btn" data-act="copyblocks" data-id="${m.id}">Copy blocks</button>` : ''}`;
+                return {
+                    primaryHtml: `<button class="btn primary" data-act="complete" data-id="${m.id}" data-confirm="true">Complete mission</button>`,
+                    secondary: [
+                        { act: 'copy', label: 'Copy code' },
+                        ...(m.blocklyState ? [{ act: 'copyblocks', label: 'Copy blocks' }] : []),
+                    ],
+                };
             }
             if (m.status === 'completed' && !m.youtubeUrl) {
-                return `<input type="url" placeholder="https://youtube.com/watch?v=..." value="${esc(drafts[m.id] || '')}" data-draft="${m.id}">
-                        <button class="btn primary" data-act="youtube" data-id="${m.id}">Attach video</button>
-                        <button class="btn" data-act="rerun" data-id="${m.id}">Rerun</button>`;
+                return {
+                    primaryHtml: `
+                        <div class="field-row" style="width:100%">
+                            <div class="field-group">
+                                <input type="url" inputmode="url" placeholder="https://youtube.com/watch?v=..." value="${esc(drafts[m.id] || '')}" data-draft="${m.id}" data-yt-validate="${m.id}" aria-describedby="yt-err-${m.id}">
+                                <div class="field-error" id="yt-err-${m.id}"></div>
+                            </div>
+                            <button class="btn primary" data-act="youtube" data-id="${m.id}" disabled>Attach video</button>
+                        </div>`,
+                    secondary: [
+                        { act: 'rerun', label: 'Rerun mission', confirm: true, danger: true },
+                    ],
+                };
             }
             if (m.status === 'completed') {
-                return `<a class="yt-link" href="${esc(m.youtubeUrl)}" target="_blank" rel="noopener">Video attached &#8599;</a>
-                        <button class="btn" data-act="rerun" data-id="${m.id}">Rerun</button>`;
+                return {
+                    primaryHtml: `<a class="btn primary yt-link" href="${esc(m.youtubeUrl)}" target="_blank" rel="noopener">View details &#8599;</a>`,
+                    secondary: [
+                        { act: 'rerun', label: 'Rerun mission', confirm: true, danger: true },
+                    ],
+                };
             }
             if (m.status === 'failed') {
-                return `<button class="btn primary" data-act="rerun" data-id="${m.id}">Rerun</button>
-                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>${m.blocklyState ? `<button class="btn" data-act="copyblocks" data-id="${m.id}">Copy blocks</button>` : ''}`;
+                return {
+                    primaryHtml: `<button class="btn primary" data-act="rerun" data-id="${m.id}">Retry mission</button>`,
+                    secondary: [
+                        { act: 'copy', label: 'Copy code' },
+                        ...(m.blocklyState ? [{ act: 'copyblocks', label: 'Copy blocks' }] : []),
+                    ],
+                };
             }
-            return '';
+            return { primaryHtml: '', secondary: [] };
+        }
+
+        function renderActionsMarkup(m) {
+            const { primaryHtml, secondary } = buildActions(m);
+            const menu = secondary.length ? `
+                <div class="secondary-actions">
+                    <button class="kebab-btn" data-menu-toggle="${m.id}" aria-haspopup="true" aria-expanded="false" aria-label="More actions for ${esc(m.name) || 'this mission'}">&#8942;</button>
+                    <div class="action-menu" id="menu-${m.id}" role="menu" hidden>
+                        ${secondary.map(it => `<button role="menuitem" data-act="${it.act}" data-id="${m.id}" ${it.confirm ? 'data-confirm="true"' : ''} ${it.danger ? 'data-danger="true"' : ''}>${esc(it.label)}</button>`).join('')}
+                    </div>
+                </div>` : '';
+            return `<div class="primary-action">${primaryHtml}</div>${menu}`;
         }
 
         function render() {
-            const visible = missions
-                .filter(m => stage === 'all' || m.status === stage)
-                .filter(matchesSearch);
+            const visible = missions.filter(matchesSearch);
             if (visible.length === 0) {
                 missionsEl.innerHTML = !hasLoadedOnce
                     ? '<div class="empty">Loading missions&hellip;</div>'
@@ -303,30 +466,152 @@
                             <div class="mission-title">${esc(m.name) || 'Mission-' + m.id.slice(0, 8)}</div>
                             <div class="mission-meta">${esc(m.yardId) || ''} &middot; ${relTime(m.submittedAt)}</div>
                         </div>
-                        <span class="status-pill" data-tone="${STATUS_TONE[m.status] || ''}">${m.status === 'processing' ? 'running' : esc(m.status)}</span>
+                        ${statusBadge(m.status)}
                     </div>
                     <pre>${esc((m.code || '').trim()) || '# No code'}</pre>
-                    <div class="mission-actions" data-mission="${m.id}">${actionsFor(m)}</div>
+                    <div class="mission-actions" data-mission="${m.id}">${renderActionsMarkup(m)}</div>
                 </div>`).join('');
 
             missionsEl.querySelectorAll('input[data-draft]').forEach(el => {
                 el.oninput = () => { drafts[el.dataset.draft] = el.value; };
             });
-            missionsEl.querySelectorAll('button[data-act]').forEach(el => {
-                el.onclick = () => act(el.dataset.act, el.dataset.id, el);
+
+            missionsEl.querySelectorAll('input[data-yt-validate]').forEach(el => {
+                const id = el.dataset.ytValidate;
+                const run = () => validateYoutubeField(id);
+                el.addEventListener('input', run);
+                el.addEventListener('blur', run);
+                validateYoutubeField(id); // set initial button/error state
             });
+
+            missionsEl.querySelectorAll('button[data-act]').forEach(el => {
+                el.onclick = () => handleAction(el);
+            });
+
+            missionsEl.querySelectorAll('button[data-menu-toggle]').forEach(el => {
+                el.onclick = (e) => {
+                    e.stopPropagation();
+                    const id = el.dataset.menuToggle;
+                    const menu = document.getElementById('menu-' + id);
+                    const isOpen = !menu.hidden;
+                    closeAllMenus();
+                    if (!isOpen) {
+                        menu.hidden = false;
+                        el.setAttribute('aria-expanded', 'true');
+                        const first = menu.querySelector('button');
+                        if (first) first.focus();
+                    }
+                };
+            });
+        }
+
+        function closeAllMenus() {
+            missionsEl.querySelectorAll('.action-menu').forEach(m => { m.hidden = true; });
+            missionsEl.querySelectorAll('.kebab-btn').forEach(b => b.setAttribute('aria-expanded', 'false'));
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.secondary-actions')) closeAllMenus();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { closeAllMenus(); closeConfirm(); }
+        });
+
+        function validateYoutubeField(id) {
+            const input = missionsEl.querySelector(`input[data-yt-validate="${id}"]`);
+            if (!input) return;
+            const errEl = document.getElementById('yt-err-' + id);
+            const btn = missionsEl.querySelector(`button[data-act="youtube"][data-id="${id}"]`);
+            const val = input.value.trim();
+            let msg = '';
+            if (val !== '' && !isValidYoutubeUrl(val)) msg = 'Please enter a valid YouTube URL.';
+            input.classList.toggle('invalid', !!msg);
+            input.classList.toggle('valid', val !== '' && !msg);
+            if (errEl) errEl.textContent = msg;
+            if (btn) btn.disabled = !(val !== '' && !msg);
         }
 
         function showError(missionId, message) {
             const row = missionsEl.querySelector(`.mission-actions[data-mission="${missionId}"]`);
             if (!row) return;
-            let err = row.querySelector('.action-error');
-            if (!err) {
-                err = document.createElement('div');
-                err.className = 'action-error';
-                row.appendChild(err);
-            }
+            clearFeedback(row);
+            const err = document.createElement('div');
+            err.className = 'action-error';
+            err.setAttribute('role', 'alert');
             err.textContent = message;
+            row.appendChild(err);
+        }
+
+        function showSuccess(missionId, message) {
+            const row = missionsEl.querySelector(`.mission-actions[data-mission="${missionId}"]`);
+            if (!row) return;
+            clearFeedback(row);
+            const ok = document.createElement('div');
+            ok.className = 'action-success';
+            ok.setAttribute('role', 'status');
+            ok.textContent = message;
+            row.appendChild(ok);
+            setTimeout(() => { if (ok.parentNode) ok.remove(); }, 3000);
+        }
+
+        function clearFeedback(row) {
+            row.querySelectorAll('.action-error, .action-success').forEach(el => el.remove());
+        }
+
+        // ---------- Confirmation modal ----------
+        const confirmOverlay = document.getElementById('confirmOverlay');
+        const confirmTitle = document.getElementById('confirmTitle');
+        const confirmBody = document.getElementById('confirmBody');
+        const confirmCancel = document.getElementById('confirmCancel');
+        const confirmOk = document.getElementById('confirmOk');
+        let confirmReturnFocus = null;
+        let confirmPending = false;
+
+        function openConfirm(copy, onConfirm) {
+            confirmTitle.textContent = copy.title;
+            confirmBody.textContent = copy.body;
+            confirmOk.textContent = copy.confirmLabel;
+            confirmPending = false;
+            confirmOk.disabled = false;
+            confirmReturnFocus = document.activeElement;
+            confirmOverlay.hidden = false;
+            confirmCancel.focus(); // default focus is Cancel, not the destructive action
+            confirmOk.onclick = () => {
+                if (confirmPending) return; // prevent accidental double-clicks
+                confirmPending = true;
+                confirmOk.disabled = true;
+                closeConfirm();
+                onConfirm();
+            };
+        }
+
+        function closeConfirm() {
+            if (confirmOverlay.hidden) return;
+            confirmOverlay.hidden = true;
+            if (confirmReturnFocus && confirmReturnFocus.focus) confirmReturnFocus.focus();
+        }
+
+        confirmCancel.onclick = closeConfirm;
+        confirmOverlay.addEventListener('click', (e) => { if (e.target === confirmOverlay) closeConfirm(); });
+        confirmOverlay.addEventListener('keydown', (e) => {
+            if (e.key !== 'Tab') return;
+            const focusables = [confirmCancel, confirmOk];
+            const idx = focusables.indexOf(document.activeElement);
+            e.preventDefault();
+            const next = e.shiftKey ? (idx <= 0 ? 1 : 0) : (idx === 1 ? 0 : 1);
+            focusables[next].focus();
+        });
+
+        function handleAction(btn) {
+            const action = btn.dataset.act;
+            const missionId = btn.dataset.id;
+            closeAllMenus();
+            if (btn.dataset.confirm === 'true') {
+                const copy = CONFIRM_COPY[action] || { title: 'Are you sure?', body: 'This action cannot be undone.', confirmLabel: 'Confirm' };
+                openConfirm(copy, () => act(action, missionId, btn));
+            } else {
+                act(action, missionId, btn);
+            }
         }
 
         async function fetchWithTimeout(url, opts, timeoutMs) {
@@ -373,6 +658,13 @@
             }
         }
 
+        const SUCCESS_MESSAGE = {
+            send: 'Mission sent to rover.',
+            complete: 'Mission marked complete.',
+            youtube: 'Video attached.',
+            rerun: 'Mission queued for rerun.',
+        };
+
         async function act(action, missionId, btn) {
             if (action === 'copy' || action === 'copyblocks') {
                 const m = missions.find(x => x.id === missionId);
@@ -403,6 +695,7 @@
                 data = await resp.json().catch(() => ({}));
                 if (!resp.ok) throw new Error(data.error || `Failed (HTTP ${resp.status})`);
                 delete drafts[missionId];
+                if (SUCCESS_MESSAGE[action]) showSuccess(missionId, SUCCESS_MESSAGE[action]);
                 missionsPoller.refreshNow().catch(() => {});
             } catch (err) {
                 btn.disabled = false;
