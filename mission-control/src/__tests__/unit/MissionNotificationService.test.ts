@@ -110,7 +110,7 @@ describe('MissionNotificationService', () => {
     expect(sender.calls[0].html).toContain('Hi Space Explorer,');
   });
 
-  it('swallows sender errors instead of throwing', async () => {
+  it('reports sender errors instead of throwing', async () => {
     const sender = new MockEmailSender();
     sender.failOnNextSend();
     const firestore = makeFirestoreStub({ displayName: 'Ada' });
@@ -119,9 +119,24 @@ describe('MissionNotificationService', () => {
 
     await expect(
       service.notifyStatusChange(makeMission({ learnerEmail: 'ada@school.edu' }), 'failed')
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ sent: false, reason: 'send-failed', error: expect.any(String) });
 
     expect(consoleErrorSpy).toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
+  });
+
+  it('reports the skip when the mission has no learner email', async () => {
+    const sender = new MockEmailSender();
+    const firestore = makeFirestoreStub({ displayName: 'Ada' });
+    const service = new MissionNotificationService(sender, firestore as never, HISTORY_URL);
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(
+      service.notifyStatusChange(makeMission({ learnerEmail: undefined }), 'queued')
+    ).resolves.toEqual({ sent: false, reason: 'no-learner-email' });
+
+    expect(sender.calls).toHaveLength(0);
+    expect(consoleWarnSpy).toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
   });
 });

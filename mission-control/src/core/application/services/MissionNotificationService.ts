@@ -14,6 +14,18 @@ import { buildMissionStatusEmail } from '@/infrastructure/email/missionStatusTem
 
 const LEARNERS_COLLECTION = 'learners';
 
+/** Log prefix so every notification attempt is greppable in server output. */
+const LOG_TAG = '[mission-email]';
+
+/**
+ * Why a send did or did not happen. Returned rather than thrown so callers keep
+ * their best-effort semantics, but the outcome is no longer invisible: a silent
+ * catch is how the whole feature sat broken without anyone noticing.
+ */
+export type NotifyOutcome =
+  | { sent: true }
+  | { sent: false; reason: 'no-learner-email' | 'send-failed'; error?: string };
+
 export class MissionNotificationService {
   constructor(
     private readonly emailSender: IEmailSender,
@@ -21,9 +33,12 @@ export class MissionNotificationService {
     private readonly historyUrl: string
   ) {}
 
-  async notifyStatusChange(mission: Mission, status: MissionStatus): Promise<void> {
+  async notifyStatusChange(mission: Mission, status: MissionStatus): Promise<NotifyOutcome> {
     if (!mission.learnerEmail) {
-      return;
+      console.warn(
+        `${LOG_TAG} skipped mission=${mission.id} status=${status} reason=no-learner-email`
+      );
+      return { sent: false, reason: 'no-learner-email' };
     }
 
     try {
@@ -35,8 +50,17 @@ export class MissionNotificationService {
       });
 
       await this.emailSender.send(mission.learnerEmail, subject, html);
+
+      console.info(
+        `${LOG_TAG} sent mission=${mission.id} status=${status} to=${mission.learnerEmail}`
+      );
+      return { sent: true };
     } catch (error) {
-      console.error(`Failed to send mission status email for mission ${mission.id}:`, error);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(
+        `${LOG_TAG} FAILED mission=${mission.id} status=${status} to=${mission.learnerEmail}: ${message}`
+      );
+      return { sent: false, reason: 'send-failed', error: message };
     }
   }
 
