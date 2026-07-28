@@ -184,3 +184,9 @@ crash.log
 # Youtube API IDs
 client_secret.json
 
+
+# Satellite mission mirror (local SQLite state, never shared)
+yard/satellite/missions.db
+yard/satellite/missions.db-shm
+yard/satellite/missions.db-wal
+yard/satellite/satellite_config.json
