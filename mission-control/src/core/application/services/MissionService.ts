@@ -14,6 +14,7 @@
 
 import { Mission } from '@/core/domain/entities/Mission';
 import { IMissionRepository } from '@/core/domain/repositories/IMissionRepository';
+import { hashLearnerEmail } from '@/core/domain/services/learnerEmailHash';
 import { CreateMissionDto } from '@/infrastructure/validation/schemas';
 
 export interface SubmitMissionResult {
@@ -34,11 +35,18 @@ export class MissionService {
    */
   async submitMission(dto: CreateMissionDto): Promise<SubmitMissionResult> {
     try {
+      // The address is accepted over HTTPS but never persisted on the mission:
+      // mission documents are world-readable, so only the hash is stored. The
+      // address itself lives on the learner record, written by the client.
+      const learnerEmailHash = dto.learnerEmail
+        ? await hashLearnerEmail(dto.learnerEmail)
+        : undefined;
+
       const mission = await this.missionRepository.create({
         yardId: dto.yardId,
         learnerId: dto.learnerId,
         sessionId: dto.sessionId,
-        learnerEmail: dto.learnerEmail,
+        learnerEmailHash,
         name: dto.name,
         code: dto.code,
         blocklyState: dto.blocklyState,

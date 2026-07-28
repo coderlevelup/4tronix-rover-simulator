@@ -26,6 +26,13 @@ Configuration (environment):
       "MissionID: <id>" in the video description. Either unset disables the
       poll (it logs and no-ops) - manual "attach YouTube URL" still works
       without these.
+  MISSION_CONTROL_URL
+      Optional. Base URL of the mission-control web app, used to fire a
+      best-effort POST /api/missions/<id>/notify after a status change so the
+      learner gets a status email. This console remains fully functional
+      (Firestore is still updated) if mission-control is unreachable or this
+      is unset - the call is fire-and-forget. Defaults to
+      http://localhost:3000.
 
 The module file is named operator_console (not operator) so it does not
 shadow Python's stdlib `operator` module.
@@ -46,6 +53,7 @@ operator_bp = Blueprint('operator', __name__, url_prefix='/operator')
 # Timeouts (seconds)
 LOGIN_TIMEOUT = 10.0
 ROVER_TIMEOUT = 5.0
+NOTIFY_TIMEOUT = 10.0
 
 MISSIONS_COLLECTION = 'missions'
 MISSION_LIST_LIMIT = 100
@@ -129,6 +137,50 @@ def _verify_id_token(id_token):
 def _rover_url():
     getter = current_app.config.get('ROVER_URL_GETTER')
     return getter() if getter else os.environ.get('ROVER_URL', 'http://marspi.local:8523')
+
+
+def _mission_control_url():
+    getter = current_app.config.get('MISSION_CONTROL_URL_GETTER')
+    return getter() if getter else os.environ.get('MISSION_CONTROL_URL', 'http://localhost:3000')
+
+
+def _notify_mission_control(mission_id, status):
+    """Best-effort status-email trigger, called after Firestore is already
+    updated. Must never raise - a learner missing an email is far cheaper
+    than an operator unable to run the rover because mission-control happens
+    to be down.
+    """
+    try:
+        requests.post(
+            f'{_mission_control_url()}/api/missions/{mission_id}/notify',
+            json={'status': status},
+            timeout=NOTIFY_TIMEOUT,
+        )
+    except requests.exceptions.RequestException:
+        current_app.logger.warning(
+            'Failed to notify mission-control of status change (mission=%s, status=%s)',
+            mission_id, status,
+        )
+
+
+def _notify_mission_control_async(mission_id, status):
+    """Fire _notify_mission_control on a background thread so a slow or
+    unreachable mission-control - a Cloud Run cold start, or the venue wifi
+    the operator console already has to tolerate - never delays the
+    operator's response. The rover dispatch / Firestore write this follows
+    has already succeeded by the time this is called.
+
+    Flask's app context is thread-local and does not propagate to new
+    threads automatically, so it's captured here (while still on the
+    request's thread) and re-pushed inside the background thread.
+    """
+    app = current_app._get_current_object()
+
+    def run():
+        with app.app_context():
+            _notify_mission_control(mission_id, status)
+
+    threading.Thread(target=run, daemon=True).start()
 
 
 def _now_iso():
@@ -331,20 +383,50 @@ def _get_mission_ref(mission_id):
 _acquire_lock = threading.Lock()
 LEASE_TTL_SECONDS = 300  # 5 minutes
 
-@firestore.transactional
+def _transactional(fn):
+    """Apply firebase-admin's @firestore.transactional lazily.
+
+    Everything firebase-admin in this module is imported inside functions, so
+    the kiosk pages and the test-suite work without the package or real
+    credentials present (see _init_firebase / _firestore). A module-level
+    `@firestore.transactional` breaks that contract - and in fact breaks
+    importing this module at all, because `firestore` is not a module-level
+    name here. Wrapping at call time keeps the lazy design intact.
+    """
+    from firebase_admin import firestore
+    return firestore.transactional(fn)
+
+
 def _acquire(transaction, ref, owner, now_iso, expires_iso):
     snap = ref.get(transaction=transaction)
     if not snap.exists:
-        return False, 'not-found'
+        return False, 'not-found', None
     data = snap.to_dict() or {}
 
-    if data.get('status') != 'queued':
-        return False, 'not-queued'
-
+    status = data.get('status')
     holder = data.get('lockOwner')
     lease = data.get('leaseExpiresAt')
-    if holder and holder != owner and lease and lease > now_iso:
-        return False, 'locked-by-other'
+    lease_live = bool(lease) and lease > now_iso
+
+    # A 'processing' mission whose lease has EXPIRED is abandoned: the operator
+    # that held it crashed, closed the tab, or lost the venue wifi, and the
+    # in-process renewal timer died with it. Reclaiming it is the entire point
+    # of having a lease - without this, an expired lease leaves the mission
+    # stuck in 'processing' forever, rejected by send (not-queued) and by rerun
+    # (not-terminal), recoverable only by hand-editing Firestore.
+    #
+    # A mission with NO lease at all is deliberately NOT reclaimable. Every path
+    # that sets 'processing' also sets a lease, so no-lease means legacy data
+    # written before this feature. Treating that as free to grab would let two
+    # operators drive the same mission, so those are left to be unstuck
+    # deliberately rather than silently re-dispatched.
+    reclaimable = status == 'processing' and bool(lease) and not lease_live
+
+    if status != 'queued' and not reclaimable:
+        return False, 'not-queued', None
+
+    if holder and holder != owner and lease_live:
+        return False, 'locked-by-other', None
 
     transaction.update(ref, {
         'status': 'processing',
@@ -354,7 +436,9 @@ def _acquire(transaction, ref, owner, now_iso, expires_iso):
         'lockedAt': now_iso,
         'leaseExpiresAt': expires_iso,
     })
-    return True, None
+    # Returns the pre-update snapshot so the caller has the mission's code to
+    # dispatch, matching _acquire_for_rerun's shape.
+    return True, None, data
 
 
 
@@ -391,13 +475,13 @@ def api_send_to_rover(mission_id):
     operator = current_operator()
     owner = operator['uid']
     now = _now_iso()
-    expires = _expires_iso(now)
+    expires = _expires_iso()
 
     ref = _firestore().collection(MISSIONS_COLLECTION).document(mission_id)
 
     with _acquire_lock:
         transaction = _firestore().transaction()
-        ok, reason = _acquire(transaction, ref, owner, now, expires)
+        ok, reason, mission = _transactional(_acquire)(transaction, ref, owner, now, expires)
 
     if not ok:
         messages = {
@@ -414,10 +498,10 @@ def api_send_to_rover(mission_id):
         ref.update({'status': 'queued', 'lockOwner': None, 'lockedAt': None, 'leaseExpiresAt': None})
         return err
     _start_lease_renewal(mission_id, ref)
+    _notify_mission_control_async(mission_id, 'processing')
     return jsonify({'status': 'ok', 'missionId': mission_id})
 
 
-@firestore.transactional
 def _acquire_for_rerun(transaction, ref, owner, now_iso, expires_iso):
     snap = ref.get(transaction=transaction)
     if not snap.exists:
@@ -457,7 +541,9 @@ def api_rerun(mission_id):
 
     with _acquire_lock:
         transaction = _firestore().transaction()
-        ok, reason, mission = _acquire_for_rerun(transaction, ref, owner, now, expires)
+        ok, reason, mission = _transactional(_acquire_for_rerun)(transaction, ref, owner, now, expires)
+
+    previous_status = (mission or {}).get('status', 'completed')
 
     if not ok:
         messages = {
@@ -471,14 +557,19 @@ def api_rerun(mission_id):
     ok, err = _dispatch_to_rover(mission, mission_id=mission_id)
 
     if not ok:
+        # Dispatch failed, so nothing ran. Restore the status the mission had
+        # before the lock was taken rather than marking it 'failed': an
+        # unreachable rover is not a failed mission, and 'failed' would also
+        # surface to the learner as a run that went wrong.
         ref.update({
-            'status': 'failed',
+            'status': previous_status,
             'lockOwner': None,
             'lockedAt': None,
             'leaseExpiresAt': None,
         })
         return err
-    _start_lease_renewal(mission_id, ref)  
+    _start_lease_renewal(mission_id, ref)
+    _notify_mission_control_async(mission_id, 'processing')
     return jsonify({'status': 'ok', 'missionId': mission_id})
 
 
@@ -501,6 +592,7 @@ def api_mark_complete(mission_id):
         'lockedAt': None,
         'leaseExpiresAt': None,
     })
+    _notify_mission_control_async(mission_id, 'completed')
     return jsonify({'status': 'ok', 'missionId': mission_id})
 
 

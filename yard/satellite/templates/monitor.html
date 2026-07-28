@@ -17,9 +17,9 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0a0a0a;
-            color: #fff;
+            font-family: var(--font-sans);
+            background-color: var(--background);
+            color: var(--foreground);
         }
 
         .container {
@@ -33,8 +33,8 @@
             flex: 2;
             display: flex;
             flex-direction: column;
-            background: #111;
-            border-right: 2px solid #222;
+            background: var(--surface);
+            border-right: 2px solid var(--border);
         }
 
         .camera-header {
@@ -42,14 +42,14 @@
             align-items: center;
             justify-content: space-between;
             padding: 12px 20px;
-            background: #1a1a1a;
-            border-bottom: 1px solid #333;
+            background: var(--surface-2);
+            border-bottom: 1px solid var(--border);
         }
 
         .camera-header h2 {
             font-size: 18px;
             font-weight: 500;
-            color: #aaa;
+            color: var(--text-faint);
         }
 
         .connection-badge {
@@ -59,22 +59,22 @@
             padding: 4px 10px;
             border-radius: 12px;
             font-size: 12px;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.06);
         }
 
         .connection-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: #666;
+            background: var(--border);
         }
 
         .connection-dot.connected {
-            background: #4CAF50;
+            background: var(--ok);
         }
 
         .connection-dot.connecting {
-            background: #ff9800;
+            background: var(--warn);
             animation: pulse 1s infinite;
         }
 
@@ -89,7 +89,7 @@
             align-items: center;
             justify-content: center;
             position: relative;
-            background: #000;
+            background: var(--background);
         }
 
         #cameraCanvas {
@@ -104,7 +104,7 @@
             flex-direction: column;
             align-items: center;
             gap: 12px;
-            color: #666;
+            color: var(--text-faint);
         }
 
         /* Student-code output (e.g. distance readings) shown over the feed */
@@ -113,8 +113,8 @@
             bottom: 28px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 137, 123, 0.92);
-            color: #fff;
+            background: var(--accent);
+            color: var(--background);
             font-size: 30px;
             font-weight: 600;
             padding: 14px 30px;
@@ -130,10 +130,10 @@
         .output-toast.visible { opacity: 1; }
 
         .instruction-output {
-            font-family: monospace;
+            font-family: var(--mono);
             font-size: 13px;
-            color: #4ade80;
-            background: #0d1f12;
+            color: var(--ok);
+            background: var(--surface-3);
             border-radius: 6px;
             padding: 6px 8px;
             margin-top: 6px;
@@ -151,20 +151,20 @@
             margin-top: 6px;
             padding: 12px;
             border-radius: 8px;
-            background: #2a1010;
-            border: 1px solid #f44336;
+            background: rgba(248, 113, 113, 0.12);
+            border: 1px solid var(--bad);
             text-align: center;
         }
 
         .photo-error-title {
-            color: #ff8a80;
+            color: var(--bad);
             font-weight: 600;
             font-size: 14px;
         }
 
         .photo-error-why {
-            color: #c98;
-            font-family: monospace;
+            color: var(--text-faint);
+            font-family: var(--mono);
             font-size: 11px;
             margin-top: 4px;
             word-break: break-word;
@@ -193,14 +193,14 @@
             align-items: center;
             justify-content: space-between;
             padding: 12px 20px;
-            background: #1a1a1a;
-            border-bottom: 1px solid #333;
+            background: var(--surface-2);
+            border-bottom: 1px solid var(--border);
         }
 
         .queue-header h2 {
             font-size: 18px;
             font-weight: 500;
-            color: #aaa;
+            color: var(--text-faint);
         }
 
         .rover-badge {
@@ -210,18 +210,18 @@
             padding: 4px 10px;
             border-radius: 12px;
             font-size: 12px;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.06);
         }
 
         .rover-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: #666;
+            background: var(--border);
         }
 
         .rover-dot.connected {
-            background: #4CAF50;
+            background: var(--ok);
         }
 
         .rover-badge {
@@ -238,8 +238,8 @@
             position: absolute;
             right: 16px;
             top: 48px;
-            background: #1a1a1a;
-            border: 1px solid #444;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
             border-radius: 8px;
             padding: 10px 14px;
             font-size: 12px;
@@ -261,23 +261,23 @@
         }
 
         .popover-row + .popover-row {
-            border-top: 1px solid #333;
+            border-top: 1px solid var(--border);
         }
 
         .popover-label {
-            color: #666;
+            color: var(--text-faint);
             flex-shrink: 0;
         }
 
         .popover-value {
-            color: #ccc;
-            font-family: monospace;
+            color: var(--text);
+            font-family: var(--mono);
             text-align: right;
             word-break: break-all;
         }
 
         .popover-link {
-            color: #4a9eff;
+            color: var(--primary);
             text-decoration: none;
         }
 
@@ -300,10 +300,10 @@
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: #666;
+            color: var(--text-faint);
             margin-bottom: 12px;
             padding-bottom: 8px;
-            border-bottom: 1px solid #333;
+            border-bottom: 1px solid var(--border);
         }
 
         .instruction {
@@ -312,23 +312,23 @@
             gap: 12px;
             padding: 10px 12px;
             margin-bottom: 8px;
-            background: #1a1a1a;
+            background: var(--surface-2);
             border-radius: 8px;
-            border-left: 3px solid #444;
+            border-left: 3px solid var(--border);
         }
 
         .instruction.executing {
-            border-left-color: #4CAF50;
-            background: #1a2a1a;
+            border-left-color: var(--ok);
+            background: var(--surface);
         }
 
         .instruction.pending {
-            border-left-color: #ff9800;
+            border-left-color: var(--warn);
         }
 
         .instruction.completed {
-            border-left-color: #2196F3;
-            opacity: 0.6;
+            border-left-color: var(--accent);
+            opacity: 0.75;
         }
 
         .instruction-icon {
@@ -338,12 +338,12 @@
             align-items: center;
             justify-content: center;
             border-radius: 8px;
-            background: #333;
+            background: var(--surface-3);
             font-size: 16px;
         }
 
         .instruction.executing .instruction-icon {
-            background: #4CAF50;
+            background: var(--ok);
             animation: pulse 0.5s infinite;
         }
 
@@ -355,17 +355,18 @@
             font-weight: 600;
             font-size: 14px;
             text-transform: capitalize;
+            color: var(--text);
         }
 
         .instruction-params {
             font-size: 12px;
-            color: #888;
+            color: var(--text-faint);
             margin-top: 2px;
         }
 
         .empty-message {
             text-align: center;
-            color: #555;
+            color: var(--text-faint);
             font-size: 14px;
             padding: 20px;
         }
@@ -384,11 +385,11 @@
         .instruction-code {
             margin-top: 6px;
             padding: 6px 8px;
-            background: #0d1117;
+            background: var(--surface-3);
             border-radius: 4px;
-            font-family: monospace;
+            font-family: var(--mono);
             font-size: 11px;
-            color: #adbac7;
+            color: var(--text-dim);
             white-space: pre;
             overflow-x: auto;
             max-height: 120px;
@@ -400,13 +401,13 @@
             border-radius: 4px;
             overflow: hidden;
             margin-top: 6px;
-            background: #1a1a2e;
+            background: var(--surface);
         }
 
         .refresh-btn {
             background: none;
             border: none;
-            color: #666;
+            color: var(--text-faint);
             font-size: 16px;
             cursor: pointer;
             padding: 4px 6px;
@@ -415,8 +416,8 @@
         }
 
         .refresh-btn:hover {
-            background: rgba(255,255,255,0.1);
-            color: #aaa;
+            background: rgba(255,255,255,0.06);
+            color: var(--text);
         }
     </style>
 </head>
@@ -426,7 +427,7 @@
             <div class="camera-header">
                 <a class="yard-home" href="/" title="Home" aria-label="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></a>
                 <h2>Camera Feed</h2>
-                <span style="font-size:12px;color:#555;font-family:monospace;">{{ server_hostname }}&nbsp;&nbsp;{{ server_ip }}:5050</span>
+                <span style="font-size:12px;color:var(--text-faint);font-family:var(--mono);">{{ server_hostname }}&nbsp;&nbsp;{{ server_ip }}:5050</span>
                 <div class="connection-badge">
                     <span class="connection-dot" id="cameraDot"></span>
                     <span>Camera&nbsp;</span><span id="cameraStatus">Disconnected</span>

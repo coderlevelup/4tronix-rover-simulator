@@ -13,7 +13,7 @@
            shares one visual identity with the rest of the console instead
            of being a hardcoded, unbranded island.
            ============================================================ */
-        body { min-height: 100vh; display: flex; flex-direction: column; }
+        body { min-height: 100vh; display: flex; flex-direction: column; color: var(--foreground); }
 
         .login-wrap {
             flex: 1;
@@ -39,8 +39,14 @@
             margin-bottom: 1.5rem;
         }
         .login-brand .brand-mark {
-            width: 26px; height: 26px; border-radius: 7px;
-            background: #f97316;
+            width: 30px; height: 30px; border-radius: 10px;
+            background-color: var(--surface);
+            background-image: url('/static/rover-hero.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 8px 22px rgba(0, 0, 0, 0.18);
             flex-shrink: 0;
         }
         .login-brand-txt b { display: block; font-size: 0.95rem; font-weight: 700; color: var(--heading, #fff); }
@@ -86,22 +92,22 @@
         }
         input::placeholder { color: var(--text-faint, #555); }
         input:hover { border-color: var(--border-strong); }
-        input:focus-visible { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.18); }
+        input:focus-visible { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255, 214, 150, 0.18); }
 
         button[type="submit"] {
             width: 100%;
-            background: #f97316;
+            background: var(--primary);
             border: none;
             border-radius: 8px;
-            color: #fff;
+            color: var(--primary-foreground);
             font-size: 0.9rem;
             font-weight: 600;
             padding: 0.75rem;
             cursor: pointer;
             margin-top: 0.25rem;
         }
-        button[type="submit"]:hover:not(:disabled) { background: #ea580c; }
-        button[type="submit"]:focus-visible { outline: 2px solid #f97316; outline-offset: 2px; }
+        button[type="submit"]:hover:not(:disabled) { background: var(--mars); }
+        button[type="submit"]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
         button[type="submit"]:disabled { opacity: 0.55; cursor: default; }
 
         .login-help {
@@ -112,9 +118,9 @@
             color: var(--text-faint, #777);
             line-height: 1.5;
         }
-        .login-help a { color: #f97316; text-decoration: none; }
+        .login-help a { color: var(--primary); text-decoration: none; }
         .login-help a:hover { text-decoration: underline; }
-        .login-help a:focus-visible { outline: 2px solid #f97316; outline-offset: 2px; border-radius: 3px; }
+        .login-help a:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 3px; }
 
         .login-links {
             margin-top: 1.5rem;
@@ -123,9 +129,9 @@
             gap: 1rem;
             font-size: 0.78rem;
         }
-        .login-links a { color: var(--text-faint, #777); text-decoration: none; }
-        .login-links a:hover { color: var(--text, #ccc); }
-        .login-links a:focus-visible { outline: 2px solid #f97316; outline-offset: 2px; border-radius: 3px; }
+        .login-links a { color: var(--text-faint); text-decoration: none; }
+        .login-links a:hover { color: var(--text); }
+        .login-links a:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 3px; }
     </style>
 </head>
 <body>

@@ -6,48 +6,112 @@ and GitHub Workload Identity Federation. Firebase provisioning (Firestore
 database, Auth, web app) happens alongside this, out of Terraform, see the
 migration checklist below.
 
-The project starts EMPTY. This is the from-zero order.
+**This is NOT a from-zero apply.** A partial apply ran on 2026-07-17 and
+stopped part way. Part A below resumes it. State verified against the live
+project on 2026-07-27.
 
-## Part A: Terraform bootstrap (one person, ~an hour)
+## Part A: finish the Terraform bootstrap (one person, ~20 min)
+
+### Already done, do not redo
+
+- State bucket `gs://bt-impact-academy-tfstate` exists (in `africa-south1`;
+  deliberate, state access has nothing to do with request latency).
+- All 7 required APIs are enabled.
+- 15 resources are already in state and healthy: the 7 APIs, the
+  `mission-control-deploy` service account, the Artifact Registry repo, both
+  Secret Manager secrets with their `CHANGE_ME` seed versions, and both
+  runtime service accounts (staging + prod).
+
+Skipping straight to `terraform apply` is correct. Running the old bucket
+create or `gcloud services enable` will just error as already-existing.
+
+### What is left
+
+Not yet created: the Workload Identity pool, its provider and the
+impersonation binding (the previous apply stopped right here), both Cloud Run
+services, and every IAM binding.
 
 ```bash
 gcloud auth login
 gcloud config set project bt-impact-academy
 
-# 1. Enable the API that lets Terraform enable the other APIs
-gcloud services enable serviceusage.googleapis.com cloudresourcemanager.googleapis.com
-
-# 2. The one hand-made resource: the state bucket (state cannot store itself)
-gcloud storage buckets create gs://bt-impact-academy-tfstate \
-  --location=africa-south1 --uniform-bucket-level-access
-
-# 3. Plan and apply
 cd infra
 terraform init
-terraform plan    # review: ~25 resources, nothing destructive, project is empty
+terraform plan
 terraform apply
+```
 
-# 4. Copy outputs into GitHub repo variables
+**Expected plan: `23 to add, 0 to change, 1 to destroy`.**
+
+The one destroy is the Artifact Registry repo. `location` is a force-new
+attribute and the region moves `africa-south1 -> europe-west1` to co-locate
+with Firestore, which Werner created in `europe-west1` (`africa-south1` is not
+offered for Firestore). **This is safe right now because the repo is empty -
+zero images have ever been pushed.** It stops being safe the moment the first
+image lands, so this apply should happen before anyone builds and pushes.
+
+There is no soft-deleted `github` Workload Identity pool, so the undelete +
+import caveat in the Notes below does not apply.
+
+### After the apply
+
+```bash
+# Copy outputs into GitHub repo variables
 terraform output
 # Settings -> Secrets and variables -> Actions -> Variables:
 #   GCP_WIF_PROVIDER, GCP_DEPLOY_SA, GCP_PROJECT_ID, GCP_REGION,
 #   GCP_AR_REPO, STAGING_SERVICE, PROD_SERVICE
 # plus the NEXT_PUBLIC_FIREBASE_* values from the NEW Firebase web app
-# (Part B below).
+# (Part B). The deploy workflow reads all of these; it will fail without the
+# NEXT_PUBLIC_FIREBASE_* set, so they gate the first deploy, not the apply.
+#
+# Also set NEXT_PUBLIC_APP_URL to the service's own URL (get it from
+# `terraform output service_urls`). It is inlined at `next build` time, so it
+# has to be a GitHub *variable* read by the build - a Cloud Run runtime env
+# var is too late. Unset means every email link points at localhost.
+```
 
-# 5. Set the REAL secret values out-of-band (never in Terraform or git).
-#    Terraform seeded each secret with a CHANGE_ME version so the first
-#    apply can start the placeholder services; these commands add the real
-#    values as the new "latest":
+### Not the apply operator's job: the real secret values
+
+Both secrets still hold only the `CHANGE_ME` seed (version 1, 2026-07-17).
+The real values come from the Firebase Admin SDK key generated in Part B
+step 5, so whoever holds that key runs these, not whoever runs the apply:
+
+```bash
 echo -n 'firebase-adminsdk-...@bt-impact-academy.iam.gserviceaccount.com' | \
   gcloud secrets versions add firebase-client-email --data-file=-
 # private key: paste the PEM (real newlines) into a temp file, then:
 gcloud secrets versions add firebase-private-key --data-file=key.pem && rm key.pem
+# Resend API key (from the Resend dashboard):
+echo -n 're_...' | gcloud secrets versions add resend-api-key --data-file=-
 ```
+
+All three secrets are seeded with `CHANGE_ME` by the apply so the first Cloud
+Run revision can start. Until the real values are added, Firestore access and
+mission emails both fail at runtime.
 
 After that, a push to main auto-deploys staging via
 `.github/workflows/deploy-staging.yml`; prod is a manual, approval-gated
 promotion via `deploy-prod.yml`.
+
+### Email sending while no domain is verified
+
+`RESEND_FROM_EMAIL` defaults to `onboarding@resend.dev`, Resend's shared
+sandbox sender. While that is the from address, Resend rejects every recipient
+except the address that owns the API key, so **no learner receives mail**.
+
+To demo end to end before a domain is verified, set the redirect variable
+out-of-band (it is a personal address, so it is not committed):
+
+```bash
+export TF_VAR_resend_sandbox_recipient='owner@example.com'
+terraform apply
+```
+
+Every mission email then goes to that one inbox with the intended recipient
+prefixed into the subject. Unset it and re-apply once `sapient.rocks` is
+verified and `RESEND_FROM_EMAIL` points at it, or learners silently get
+nothing.
 
 GitHub settings to flip once (repo Settings):
 - Branches -> main -> required status checks: both CI jobs
@@ -59,8 +123,10 @@ The app moves to Impact's Firebase world. In the Firebase console
 (https://console.firebase.google.com), "Add project" -> select the EXISTING
 `bt-impact-academy` GCP project, then:
 
-1. **Firestore**: create the database (production mode). Location matters and
-   is permanent: `africa-south1` if offered, else the nearest europe region.
+1. **Firestore**: DONE - Werner created the database in `europe-west1`
+   (`africa-south1` is not offered for Firestore). Location is permanent.
+   Confirm it is the `(default)` database, not a named one: the app passes no
+   database id anywhere, so a named database would need code changes.
 2. **Authentication**: enable the Email/Password provider (operators only;
    learners never sign in).
 3. **Web app**: add one, copy its config. These are the new
@@ -86,7 +152,10 @@ The app moves to Impact's Firebase world. In the Firebase console
 
 ## Notes
 
-- Region default is `africa-south1` (Johannesburg). Change `var.region`
+- Region default is `europe-west1`, co-located with the Firestore database
+  Werner created there. Johannesburg (`africa-south1`) would be closer to the
+  yard, but Firestore is not offered in it, and splitting Cloud Run from
+  Firestore puts a cross-continent hop on every read. Change `var.region`
   before the first apply if Impact prefers another; it is painful to move
   later (registry + services are regional).
 - Terraform deliberately does NOT manage the serving image (lifecycle

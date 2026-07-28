@@ -6,18 +6,18 @@
     <title>System Status</title>
     <link rel="stylesheet" href="/static/yard-base.css">
     <style>
-        body { min-height: 100vh; }
+        body { min-height: 100vh; color: var(--foreground); }
 
         h1 {
             font-size: 1.8rem;
             font-weight: 600;
             margin-bottom: 0.25rem;
-            color: #fff;
+            color: var(--heading);
         }
 
         .subtitle {
             font-size: 0.9rem;
-            color: #666;
+            color: var(--text-faint);
             margin-bottom: 2rem;
         }
 
@@ -84,15 +84,15 @@
         .footer {
             margin-top: 2rem;
             font-size: 0.8rem;
-            color: #444;
+            color: var(--text-faint);
         }
 
-        .subtitle code { color: #ccc; }
+        .subtitle code { color: var(--text); }
 
         .link-btn {
             background: none;
             border: none;
-            color: #4a9eff;
+            color: var(--primary);
             font-size: 0.85rem;
             cursor: pointer;
             padding: 0 0.25rem;
@@ -113,34 +113,34 @@
 
         .url-editor input {
             flex: 1;
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
             border-radius: 6px;
-            color: #e0e0e0;
-            font-family: monospace;
+            color: var(--text);
+            font-family: var(--mono);
             font-size: 0.9rem;
             padding: 0.45rem 0.6rem;
         }
 
         .editor-btn {
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
             border-radius: 6px;
-            color: #ccc;
+            color: var(--text-dim);
             font-size: 0.85rem;
             padding: 0.45rem 0.9rem;
             cursor: pointer;
         }
 
         .editor-btn.save {
-            border-color: #22c55e;
-            color: #4ade80;
+            border-color: var(--ok);
+            color: var(--ok);
         }
 
-        .editor-btn:hover { background: #222; }
+        .editor-btn:hover { background: var(--surface); }
 
         .url-error {
-            color: #f87171;
+            color: var(--bad);
             font-size: 0.8rem;
         }
     </style>
@@ -229,8 +229,8 @@
             const cam = r.camera;
             if (!cam) return '';
             return cam.detected
-                ? '<br>Mast cam: <span style="color:#4ade80">' + (cam.model || 'detected') + '</span>'
-                : '<br>Mast cam: <span style="color:#f87171">not detected (reseat + reboot)</span>';
+                ? '<br>Mast cam: <span style="color:var(--ok)">' + (cam.model || 'detected') + '</span>'
+                : '<br>Mast cam: <span style="color:var(--bad)">not detected (reseat + reboot)</span>';
         }
 
         // Pure render step, split out from the fetch so a cached snapshot

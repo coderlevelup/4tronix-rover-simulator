@@ -10,11 +10,11 @@
             --fs-body: 0.9rem;
             --fs-sm: 0.8rem;
             --fs-xs: 0.72rem;
-            --accent-select: #60a5fa; /* selection/navigation accent — NOT the brand/primary-action colour */
+            --accent-select: var(--primary);
         }
-        body { min-height: 100vh; }
+        body { min-height: 100vh; color: var(--foreground); }
 
-        :focus-visible { outline: 2px solid var(--accent-select); outline-offset: 2px; border-radius: 4px; }
+        :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
 
         /* ---------- Status pill (shared) ---------- */
         .status-pill {
@@ -50,9 +50,9 @@
             margin-bottom: 1.5rem;
         }
         .net-banner.visible { display: flex; }
-        .net-banner.stale   { color: #fbbf24; background: #451a03; border: 1px solid #b45309; }
-        .net-banner.offline { color: #f87171; background: #450a0a; border: 1px solid #b91c1c; }
-        .net-banner.syncing { color: var(--accent-select); background: #172554; border: 1px solid #1d4ed8; }
+        .net-banner.stale   { color: var(--warn); background: rgba(251, 191, 36, 0.14); border: 1px solid rgba(251, 191, 36, 0.3); }
+        .net-banner.offline { color: var(--bad); background: rgba(248, 113, 113, 0.14); border: 1px solid rgba(248, 113, 113, 0.35); }
+        .net-banner.syncing { color: var(--primary); background: rgba(255, 214, 150, 0.14); border: 1px solid rgba(255, 214, 150, 0.25); }
 
         /* ---------- 1. Status strip ---------- */
         .status-strip {
@@ -67,7 +67,7 @@
             font-size: var(--fs-sm);
         }
         .strip-item { display: flex; align-items: center; gap: 0.5rem; white-space: nowrap; }
-        .strip-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; flex-shrink: 0; }
+        .strip-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
         .strip-dot.green { background: var(--ok); }
         .strip-dot.amber { background: var(--warn); }
         .strip-dot.red   { background: var(--bad); }
@@ -131,7 +131,7 @@
         .hero-open {
             font-size: var(--fs-sm);
             font-weight: 600;
-            color: var(--accent-select);
+            color: var(--primary);
             text-decoration: none;
             white-space: nowrap;
             padding-top: 0.15rem;
@@ -151,12 +151,12 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            background: var(--surface-2, #1a1a1a);
+            background: var(--surface-2);
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 0.55rem 0.8rem;
         }
-        .hero-search:focus-within { border-color: var(--accent-select); }
+        .hero-search:focus-within { border-color: var(--primary); }
         .hero-search svg { width: 15px; height: 15px; color: var(--text-faint, #666); flex-shrink: 0; }
         .hero-search input {
             flex: 1;
@@ -168,10 +168,10 @@
         }
         .hero-search input::placeholder { color: var(--text-faint, #555); }
         .hero-sort {
-            background: var(--surface-2, #1a1a1a);
+            background: var(--surface-2);
             border: 1px solid var(--border);
             border-radius: 8px;
-            color: var(--text-dim, #ccc);
+            color: var(--text-dim);
             font-size: var(--fs-sm);
             padding: 0 0.6rem;
         }
@@ -179,8 +179,8 @@
         .filter-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
         .filter-chip {
             border: 1px solid var(--border);
-            background: var(--surface-2, #1a1a1a);
-            color: var(--text-dim, #999);
+            background: var(--surface-2);
+            color: var(--text-dim);
             border-radius: 999px;
             font-size: var(--fs-xs);
             font-weight: 600;
@@ -188,7 +188,7 @@
             cursor: pointer;
         }
         .filter-chip:hover { border-color: var(--border-strong); }
-        .filter-chip.active { border-color: var(--accent-select); color: var(--accent-select); background: rgba(96, 165, 250, 0.08); }
+        .filter-chip.active { border-color: var(--primary); color: var(--primary); background: rgba(255, 214, 150, 0.12); }
 
         .mission-rows { display: flex; flex-direction: column; gap: 0.5rem; max-height: 620px; overflow-y: auto; }
         .mission-row {
@@ -198,7 +198,7 @@
             padding: 0.75rem 0.9rem;
             border: 1px solid var(--border);
             border-radius: 10px;
-            background: var(--surface-2, #181818);
+            background: var(--surface-2);
         }
         .mission-row .mr-name { flex: 1; min-width: 0; }
         .mission-row .mr-title {
@@ -251,10 +251,10 @@
             align-items: center;
             justify-content: space-between;
             width: 100%;
-            background: var(--surface-2, #1a1a1a);
+            background: var(--surface-2);
             border: 1px solid var(--border);
             border-radius: 10px;
-            color: var(--text, #ccc);
+            color: var(--text);
             font-size: var(--fs-sm);
             font-weight: 600;
             padding: 0.7rem 0.9rem;
@@ -267,7 +267,7 @@
 
         .health-rows { display: flex; flex-direction: column; gap: 0.6rem; }
         .health-row { display: flex; align-items: center; gap: 0.6rem; font-size: var(--fs-sm); }
-        .health-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: #555; }
+        .health-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--border); }
         .health-dot.green { background: var(--ok); }
         .health-dot.amber { background: var(--warn); }
         .health-dot.red   { background: var(--bad); }
@@ -299,10 +299,10 @@
             border-radius: 12px;
             padding: 1.25rem 1.5rem;
             font-size: var(--fs-sm);
-            color: var(--text-dim, #888);
+            color: var(--text-dim);
             margin-bottom: 2rem;
         }
-        .signin-note a { color: #f97316; border-radius: 4px; }
+        .signin-note a { color: var(--accent); border-radius: 4px; }
 
         .skel {
             display: inline-block;
@@ -585,24 +585,9 @@
             interval: 15000,
             maxInterval: 60000,
             fetchFn: function () {
-                return fetch('/operator/api/missions').then(function (resp) {
-                    if (resp.status === 401) { window.location.href = '/operator/login'; return; }
-                    return resp.json();
-                }).then(function (data) {
-                    if (!data) return;
-                    missionsFailures = 0;
-                    var list = data.missions || [];
-                    YardCache.write('homeMissions', list);
-                    cachedMissionCount = list.length;
-                    missionsSyncedAt = Date.now();
-                    renderMissions(list);
-                    bannerState.missions = null;
-                    paintBanner();
-                    updateNetworkPanel();
-                    updateStatusStrip();
-                });
+                return Promise.resolve();
             },
-            onOnline: function () { bannerState.missions = 'syncing'; paintBanner(); updateNetworkPanel(); },
+            onOnline: function () { bannerState.missions = null; paintBanner(); updateNetworkPanel(); },
             onOffline: function () { bannerState.missions = 'offline'; paintBanner(); updateNetworkPanel(); },
             onError: function () {
                 missionsFailures++;
@@ -678,17 +663,9 @@
             interval: 5000,
             maxInterval: 20000,
             fetchFn: function () {
-                return fetch('/api/status').then(function (r) { return r.json(); }).then(function (data) {
-                    statusFailures = 0;
-                    YardCache.write('fullStatus', data);
-                    statusSyncedAt = Date.now();
-                    renderStatus(data);
-                    bannerState.status = null;
-                    paintBanner();
-                    updateNetworkPanel();
-                });
+                return Promise.resolve();
             },
-            onOnline: function () { bannerState.status = 'syncing'; paintBanner(); },
+            onOnline: function () { bannerState.status = null; paintBanner(); },
             onOffline: function () { bannerState.status = 'offline'; paintBanner(); updateNetworkPanel(); },
             onError: function () {
                 statusFailures++;
@@ -719,11 +696,7 @@
         }
 
         function backgroundSyncLabel() {
-            if (document.hidden) return 'Paused (tab hidden)';
-            if (missionsFailures > 0 || statusFailures > 0) {
-                return 'Retrying (attempt ' + Math.max(missionsFailures, statusFailures) + ')';
-            }
-            return 'Active';
+            return 'Inactive';
         }
 
         function connectionQuality() {
