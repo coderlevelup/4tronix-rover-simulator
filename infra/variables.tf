@@ -5,9 +5,9 @@ variable "project_id" {
 }
 
 variable "region" {
-  description = "Region for Cloud Run + Artifact Registry (Johannesburg)"
+  description = "Region for Cloud Run + Artifact Registry. Co-located with Firestore, which is in europe-west1 because africa-south1 is not offered for Firestore."
   type        = string
-  default     = "africa-south1"
+  default     = "europe-west1"
 }
 
 variable "github_repository" {
