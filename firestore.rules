@@ -1,4 +1,19 @@
 rules_version = '2';
+
+// Mission Control / Yard security rules.
+//
+// Trust model: every write that creates or advances a mission goes through the
+// Admin SDK - mission-control's API routes and the yard operator console - and
+// the Admin SDK bypasses these rules entirely. So the browser needs far less
+// access than it used to have, and anything not matched below is denied.
+//
+// KNOWN RESIDUAL EXPOSURE: mission documents carry `learnerEmail`, and the
+// discovery feed lists missions, so a determined reader can still harvest
+// learner email addresses. Firestore rules cannot filter fields on read, so
+// closing that means taking learnerEmail off the mission document and
+// resolving it server-side from the learner record instead. That refactor is
+// tracked separately; these rules remove everything that does not depend on it.
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -12,6 +27,11 @@ service cloud.firestore {
         ).data.role == "operator";
     }
 
+    // Keys this write would add, change or remove.
+    function touchedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
     match /rover-configs/{configId} {
       allow read, create, update, delete: if isOperator();
     }
@@ -21,20 +41,63 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Missions.
+    //
+    // Read is public: the discovery feed and mission detail pages are meant to
+    // be shared, and learners are never signed in.
+    //
+    // Writes: creation and every status transition go through the Admin SDK, so
+    // the browser gets exactly one narrow write - stamping learnerEmail onto a
+    // mission submitted before the learner supplied one (LearnerContext's
+    // backfillLatestMissionEmail). It may only fill a blank, never overwrite,
+    // and may touch no other field.
     match /missions/{missionId} {
-      allow read, write: if true;
+      allow get, list: if true;
+      allow create, delete: if false;
+
+      allow update: if touchedKeys().hasOnly(['learnerEmail'])
+                    && !('learnerEmail' in resource.data)
+                    && request.resource.data.learnerEmail is string
+                    && request.resource.data.learnerEmail.size() > 0
+                    && request.resource.data.learnerEmail.size() <= 254;
     }
 
-    match /learners/{learnerId} {
-      allow read, write: if true;
-    }
-
+    // Mission subcollections: nothing writes these from a browser today.
     match /missions/{missionId}/{document=**} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Learner records hold an email address and an optional display name.
+    //
+    // `get` is allowed so a returning browser can restore its own profile, but
+    // `list` is denied so the collection cannot be enumerated - a reader has to
+    // already hold the exact 21-character nanoid document id.
+    //
+    // Writes are restricted to the profile fields the app actually sets, so a
+    // learner document cannot become arbitrary storage, and can never be
+    // deleted from a browser.
+    match /learners/{learnerId} {
+      allow get: if true;
+      allow list: if false;
+      allow delete: if false;
+
+      allow create: if request.resource.data.keys().hasOnly([
+                      'id', 'sessionId', 'avatarColor', 'displayName',
+                      'learnerEmail', 'missionCount', 'completedMissions',
+                      'createdAt', 'lastActiveAt', 'devices',
+                      'learnerId', 'missionsCompleted', 'progress'
+                    ]);
+
+      allow update: if touchedKeys().hasOnly([
+                      'learnerEmail', 'displayName', 'avatarColor',
+                      'lastActiveAt', 'missionCount', 'completedMissions',
+                      'missionsCompleted', 'progress', 'devices'
+                    ]);
     }
 
     match /learners/{learnerId}/{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
