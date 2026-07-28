@@ -193,18 +193,20 @@ def _expires_iso():
 LEASE_RENEW_INTERVAL = 60  # seconds
 
 
-def _start_lease_renewal(mission_id, ref):
-    """Bump leaseExpiresAt every 60 seconds until stopped."""
+def _start_lease_renewal(mission_id):
+    """Keep the lease alive locally while a mission runs.
+
+    Mirror-only by design: a renewal carries no new information for Firestore
+    (the lease is re-sent with the next real status change), and queueing one
+    every 60 seconds would fill the outbox with entries that mean nothing.
+    """
     def _renew():
         try:
-            ref.update({
-                'leaseExpiresAt': _expires_iso(),
-                'statusUpdatedAt': _now_iso(),
-            })
+            from mission_store import renew_lease
+            renew_lease(mission_id, _expires_iso(), _now_iso())
         except Exception as e:
             print(f'[lease] Failed to renew lease for {mission_id}: {e}')
 
-        # Reschedule
         timer = threading.Timer(LEASE_RENEW_INTERVAL, _renew)
         timer.daemon = True
         _active_leases[mission_id] = timer
@@ -480,16 +482,25 @@ def _dispatch_to_rover(mission, mission_id=None):
 @operator_bp.route('/api/missions/<mission_id>/send', methods=['POST'])
 @require_operator
 def api_send_to_rover(mission_id):
+    """Claim the mission locally, then push its Python onto the rover queue.
+
+    Firestore is deliberately NOT touched here (plan PR 3): the request path
+    runs entirely off SQLite so the console keeps working with no internet, and
+    the sync worker is the only thing that talks to Firestore. The lock is
+    still atomic - acquire_mission uses BEGIN IMMEDIATE - so two simultaneous
+    taps still produce exactly one dispatch.
+    """
+    from mission_store import acquire_mission, release_mission
     from satellite_identity import satellite_id
+
     owner = satellite_id()
     now = _now_iso()
     expires = _expires_iso()
 
-    ref = _firestore().collection(MISSIONS_COLLECTION).document(mission_id)
-
+    # The SQLite transaction serialises across processes; this serialises the
+    # rover dispatch that follows it within this process.
     with _acquire_lock:
-        transaction = _firestore().transaction()
-        ok, reason, mission = _transactional(_acquire)(transaction, ref, owner, now, expires)
+        ok, reason, mission = acquire_mission(mission_id, owner, now, expires)
 
     if not ok:
         messages = {
@@ -500,56 +511,32 @@ def api_send_to_rover(mission_id):
         msg, code = messages.get(reason, ('Lock failed', 500))
         return jsonify({'error': msg}), code
 
-    ok, err = _dispatch_to_rover(mission, mission_id=mission_id)
+    ok, err = _dispatch_to_rover(_mirror_row_to_dict(mission), mission_id=mission_id)
     if not ok:
-        # Release the lock since dispatch failed
-        ref.update({'status': 'queued', 'lockOwner': None, 'lockedAt': None, 'leaseExpiresAt': None})
+        # Nothing reached the rover, so put it back rather than holding the
+        # lock for a full lease period.
+        release_mission(mission_id, 'queued', _now_iso())
         return err
-    _start_lease_renewal(mission_id, ref)
+
+    _start_lease_renewal(mission_id)
     _notify_mission_control_async(mission_id, 'processing')
     return jsonify({'status': 'ok', 'missionId': mission_id})
-
-
-def _acquire_for_rerun(transaction, ref, owner, now_iso, expires_iso):
-    snap = ref.get(transaction=transaction)
-    if not snap.exists:
-        return False, 'not-found', None
-    data = snap.to_dict() or {}
-
-    if data.get('status') not in ('completed', 'failed'):
-        return False, 'not-terminal', None
-
-    holder = data.get('lockOwner')
-    lease = data.get('leaseExpiresAt')
-    if holder and holder != owner and lease and lease > now_iso:
-        return False, 'locked-by-other', None
-
-    transaction.update(ref, {
-        'status': 'processing',
-        'startedAt': now_iso,
-        'statusUpdatedAt': now_iso,
-        'completedAt': None,
-        'youtubeUrl': None,
-        'lockOwner': owner,
-        'lockedAt': now_iso,
-        'leaseExpiresAt': expires_iso,
-    })
-    return True, None, data
 
 
 @operator_bp.route('/api/missions/<mission_id>/rerun', methods=['POST'])
 @require_operator
 def api_rerun(mission_id):
+    """Re-run a finished mission. Clears the previous run's completion and
+    video so the mission reflects the new run, not stale data."""
+    from mission_store import acquire_mission, release_mission
     from satellite_identity import satellite_id
+
     owner = satellite_id()
     now = _now_iso()
     expires = _expires_iso()
 
-    ref = _firestore().collection(MISSIONS_COLLECTION).document(mission_id)
-
     with _acquire_lock:
-        transaction = _firestore().transaction()
-        ok, reason, mission = _transactional(_acquire_for_rerun)(transaction, ref, owner, now, expires)
+        ok, reason, mission = acquire_mission(mission_id, owner, now, expires, for_rerun=True)
 
     previous_status = (mission or {}).get('status', 'completed')
 
@@ -562,44 +549,32 @@ def api_rerun(mission_id):
         msg, code = messages.get(reason, ('Lock failed', 500))
         return jsonify({'error': msg}), code
 
-    ok, err = _dispatch_to_rover(mission, mission_id=mission_id)
-
+    ok, err = _dispatch_to_rover(_mirror_row_to_dict(mission), mission_id=mission_id)
     if not ok:
-        # Dispatch failed, so nothing ran. Restore the status the mission had
-        # before the lock was taken rather than marking it 'failed': an
-        # unreachable rover is not a failed mission, and 'failed' would also
-        # surface to the learner as a run that went wrong.
-        ref.update({
-            'status': previous_status,
-            'lockOwner': None,
-            'lockedAt': None,
-            'leaseExpiresAt': None,
-        })
+        # Nothing ran, so restore what the mission was before the lock. Marking
+        # it 'failed' would misreport an unreachable rover as a failed run, and
+        # 'failed' reaches the learner as a run that went wrong.
+        release_mission(mission_id, previous_status, _now_iso())
         return err
-    _start_lease_renewal(mission_id, ref)
+
+    _start_lease_renewal(mission_id)
     _notify_mission_control_async(mission_id, 'processing')
     return jsonify({'status': 'ok', 'missionId': mission_id})
-
 
 
 @operator_bp.route('/api/missions/<mission_id>/complete', methods=['POST'])
 @require_operator
 def api_mark_complete(mission_id):
-    ref, mission = _get_mission_ref(mission_id)
-    if ref is None:
+    from mission_store import get_mission, release_mission
+
+    mission = get_mission(mission_id)
+    if mission is None:
         return jsonify({'error': 'Mission not found'}), 404
     if mission.get('status') not in ('queued', 'processing'):
         return jsonify({'error': 'Only queued or running missions can be marked complete'}), 400
 
     _stop_lease_renewal(mission_id)
-    ref.update({
-        'status': 'completed',
-        'completedAt': _now_iso(),
-        'statusUpdatedAt': _now_iso(),
-        'lockOwner': None,
-        'lockedAt': None,
-        'leaseExpiresAt': None,
-    })
+    release_mission(mission_id, 'completed', _now_iso())
     _notify_mission_control_async(mission_id, 'completed')
     return jsonify({'status': 'ok', 'missionId': mission_id})
 
@@ -613,13 +588,15 @@ def api_attach_youtube(mission_id):
     if not url or not any(p.match(url) for p in YOUTUBE_URL_PATTERNS):
         return jsonify({'error': 'Use a youtube.com/watch?v=... or youtu.be/... URL'}), 400
 
-    ref, mission = _get_mission_ref(mission_id)
-    if ref is None:
+    from mission_store import get_mission, set_mission_field
+
+    mission = get_mission(mission_id)
+    if mission is None:
         return jsonify({'error': 'Mission not found'}), 404
     if mission.get('status') != 'completed':
         return jsonify({'error': 'Attach the video after the mission is marked complete'}), 400
 
-    ref.update({'youtubeUrl': url})
+    set_mission_field(mission_id, {'youtube_url': url}, {'youtubeUrl': url})
     return jsonify({'status': 'ok', 'missionId': mission_id})
 
 
@@ -715,9 +692,40 @@ def check_for_new_videos():
                     continue
                 youtube_url = f'https://www.youtube.com/watch?v={video_id}'
 
+                # Plan 7.5: this poll writes to Firestore directly rather than
+                # through the outbox (it only runs online anyway, since it needs
+                # the YouTube API). Skip any mission with a pending local write,
+                # or this would land between the flush's read and write and be
+                # clobbered - or clobber it.
+                if _has_pending_writes(mission_id):
+                    print(f'[youtube-poll] Skipping {mission_id}: local writes pending')
+                    break
+
                 missions_ref.document(mission_id).update({'youtubeUrl': youtube_url})
+                _mirror_youtube_url(mission_id, youtube_url)
                 print(f'[youtube-poll] Linked mission {mission_id} to video {video_id}')
                 break
+
+
+def _has_pending_writes(mission_id):
+    """True if the outbox still holds an unflushed change for this mission."""
+    try:
+        from mission_store import mission_has_pending
+        return mission_has_pending(mission_id)
+    except Exception:
+        # If we cannot tell, assume there are: skipping one poll cycle is
+        # cheaper than racing a flush.
+        return True
+
+
+def _mirror_youtube_url(mission_id, url):
+    """Keep the mirror in step with a direct Firestore write, so the console
+    shows the link without waiting for the next pull."""
+    try:
+        from mission_store import set_mirror_only
+        set_mirror_only(mission_id, {'youtube_url': url})
+    except Exception:
+        pass
 
 
 def start_polling():

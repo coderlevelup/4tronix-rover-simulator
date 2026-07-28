@@ -175,8 +175,87 @@ def _plain_transactional(monkeypatch):
     monkeypatch.setattr(operator_console, '_transactional', lambda fn: fn)
 
 
+# --- Mirror-backed mission fixture ----------------------------------------
+#
+# PR 3 moved the request path off Firestore and onto the SQLite mirror, so the
+# tests seed and assert against a real (temporary) mirror instead of a fake
+# Firestore dict. This view keeps the original `missions['q1']['status']` and
+# `missions['q1'].update({...})` API so the existing assertions still read
+# naturally - it just writes through to SQLite underneath.
+
+_MIRROR_FIELDS = {
+    'name': 'name', 'yardId': 'yard_id', 'code': 'code',
+    'blocklyState': 'blockly_state', 'status': 'status',
+    'submittedAt': 'submitted_at', 'startedAt': 'started_at',
+    'completedAt': 'completed_at', 'youtubeUrl': 'youtube_url',
+    'lockOwner': 'lock_owner', 'lockedAt': 'locked_at',
+    'leaseExpiresAt': 'lease_expires_at', 'needsReview': 'needs_review',
+    'reviewReason': 'review_reason', 'statusUpdatedAt': 'status_updated_at',
+}
+_TO_CAMEL = {v: k for k, v in _MIRROR_FIELDS.items()}
+
+
+class _MissionRow(dict):
+    """A mission as camelCase, whose .update() writes back to the mirror."""
+
+    def __init__(self, mission_id, row):
+        super().__init__({_TO_CAMEL.get(k, k): v for k, v in row.items()})
+        self._id = mission_id
+
+    def update(self, fields):  # noqa: A003 - deliberately shadows dict.update
+        import mission_store
+        cols = {_MIRROR_FIELDS.get(k, k): v for k, v in fields.items()}
+        with mission_store._db_lock:
+            conn = mission_store._connect()
+            sets = ', '.join(f'{c} = ?' for c in cols)
+            conn.execute(
+                f'UPDATE mission_mirror SET {sets} WHERE id = ?',
+                list(cols.values()) + [self._id],
+            )
+            conn.commit()
+            conn.close()
+        super().update(fields)
+
+
+class MirrorView:
+    def __init__(self, seed):
+        self._seed = seed
+
+    def __getitem__(self, mission_id):
+        import mission_store
+        row = mission_store.get_mission(mission_id)
+        if row is None:
+            raise KeyError(mission_id)
+        return _MissionRow(mission_id, row)
+
+    def __contains__(self, mission_id):
+        import mission_store
+        return mission_store.get_mission(mission_id) is not None
+
+    def keys(self):
+        return self._seed.keys()
+
+
 @pytest.fixture
-def missions():
+def missions(tmp_path, monkeypatch):
+    import mission_store
+    import satellite_identity
+
+    monkeypatch.setattr(mission_store, 'DB_PATH', str(tmp_path / 'mirror.db'))
+    monkeypatch.setattr(satellite_identity, 'CONFIG_FILE', str(tmp_path / 'sat.json'))
+    satellite_identity.reset_cache()
+    mission_store.init_db()
+
+    seed = _seed_missions()
+    mission_store.upsert_missions(
+        [dict(m, id=mid) for mid, m in seed.items()],
+        '2026-07-14T09:00:00Z',
+    )
+    yield MirrorView(seed)
+    satellite_identity.reset_cache()
+
+
+def _seed_missions():
     return {
         'q1': {
             'name': 'Sand Observer',
@@ -214,11 +293,9 @@ def client(missions, monkeypatch, tmp_path):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr(operator_console, '_firestore', lambda: FakeFirestore(missions))
     monkeypatch.setattr(operator_console, '_admin_configured', lambda: True)
-    # api_missions reads the SQLite mirror, not Firestore - point it at a
-    # throwaway per-test file so tests never share state or touch a real
-    # missions.db on disk.
-    monkeypatch.setattr(mission_store, 'DB_PATH', str(tmp_path / 'missions.db'))
-    mission_store.init_db()
+    # The mirror is owned by the `missions` fixture, which seeds it. Do not
+    # re-point DB_PATH here: it runs after that fixture and would leave every
+    # handler reading an empty database.
     # Default to a no-op so tests that don't care about the mission-control
     # notification never make a real network call. Tests that do care
     # re-monkeypatch this within the test body.
@@ -575,6 +652,16 @@ def test_missions_endpoint_serialises_documents(client):
 
 
 def test_missions_endpoint_is_stale_when_never_synced(client):
+    """A satellite that has never reached Firestore has nothing to show and
+    must say so, rather than looking like an empty queue."""
+    import mission_store
+    with mission_store._db_lock:
+        conn = mission_store._connect()
+        conn.execute('DELETE FROM mission_mirror')
+        conn.execute('DELETE FROM sync_meta')
+        conn.commit()
+        conn.close()
+
     sign_in(client)
     resp = client.get('/operator/api/missions')
     payload = resp.get_json()
@@ -633,17 +720,25 @@ def fake_playlist_response(mission_id, video_id='vid123'):
 
 
 @pytest.fixture
+def firestore_missions():
+    """A plain dict for FakeQueryFirestore. The YouTube poll is the one thing
+    that still reads Firestore directly (plan 7.5), so it is not backed by the
+    mirror like the request-path handlers are."""
+    return _seed_missions()
+
+
+@pytest.fixture
 def youtube_env(monkeypatch):
     monkeypatch.setenv('YOUTUBE_API_KEY', 'test-key')
     monkeypatch.setenv('YOUTUBE_CHANNEL_ID', 'UCabc123')
 
 
-def test_poll_links_mission_with_no_youtube_field_at_all(missions, monkeypatch, youtube_env):
+def test_poll_links_mission_with_no_youtube_field_at_all(missions, firestore_missions, monkeypatch, youtube_env):
     # c1 is completed and has never had a youtubeUrl key written at all -
     # this is what a real first-run completion looks like (mission-control
     # never writes the field, and api_mark_complete doesn't touch it).
-    assert 'youtubeUrl' not in missions['c1']
-    monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(missions))
+    assert 'youtubeUrl' not in firestore_missions['c1']
+    monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(firestore_missions))
     monkeypatch.setattr(
         operator_console.requests, 'get',
         lambda *a, **k: fake_playlist_response('c1'),
@@ -651,12 +746,12 @@ def test_poll_links_mission_with_no_youtube_field_at_all(missions, monkeypatch, 
 
     operator_console.check_for_new_videos()
 
-    assert missions['c1']['youtubeUrl'] == 'https://www.youtube.com/watch?v=vid123'
+    assert firestore_missions['c1']['youtubeUrl'] == 'https://www.youtube.com/watch?v=vid123'
 
 
-def test_poll_skips_missions_that_already_have_a_link(missions, monkeypatch, youtube_env):
-    missions['c1']['youtubeUrl'] = 'https://www.youtube.com/watch?v=already-linked'
-    monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(missions))
+def test_poll_skips_missions_that_already_have_a_link(missions, firestore_missions, monkeypatch, youtube_env):
+    firestore_missions['c1']['youtubeUrl'] = 'https://www.youtube.com/watch?v=already-linked'
+    monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(firestore_missions))
     monkeypatch.setattr(
         operator_console.requests, 'get',
         lambda *a, **k: pytest.fail('YouTube API must not be called when nothing is unlinked'),
@@ -664,7 +759,7 @@ def test_poll_skips_missions_that_already_have_a_link(missions, monkeypatch, you
 
     operator_console.check_for_new_videos()
 
-    assert missions['c1']['youtubeUrl'] == 'https://www.youtube.com/watch?v=already-linked'
+    assert firestore_missions['c1']['youtubeUrl'] == 'https://www.youtube.com/watch?v=already-linked'
 
 
 def test_poll_skips_entirely_when_credentials_missing(missions, monkeypatch):
@@ -678,17 +773,17 @@ def test_poll_skips_entirely_when_credentials_missing(missions, monkeypatch):
     operator_console.check_for_new_videos()
 
 
-def test_poll_survives_youtube_api_error_response(missions, monkeypatch, youtube_env):
-    monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(missions))
+def test_poll_survives_youtube_api_error_response(missions, firestore_missions, monkeypatch, youtube_env):
+    monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(firestore_missions))
     monkeypatch.setattr(operator_console.requests, 'get', lambda *a, **k: FakeResponse(500))
 
     operator_console.check_for_new_videos()
 
-    assert 'youtubeUrl' not in missions['c1']
+    assert 'youtubeUrl' not in firestore_missions['c1']
 
 
-def test_poll_survives_youtube_network_error(missions, monkeypatch, youtube_env):
-    monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(missions))
+def test_poll_survives_youtube_network_error(missions, firestore_missions, monkeypatch, youtube_env):
+    monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(firestore_missions))
 
     def fake_get(*a, **k):
         raise operator_console.requests.exceptions.ConnectionError()
@@ -697,7 +792,7 @@ def test_poll_survives_youtube_network_error(missions, monkeypatch, youtube_env)
 
     operator_console.check_for_new_videos()
 
-    assert 'youtubeUrl' not in missions['c1']
+    assert 'youtubeUrl' not in firestore_missions['c1']
 
 
 def test_poll_survives_firestore_error(monkeypatch, youtube_env):
@@ -873,7 +968,7 @@ def test_processing_mission_with_no_lease_is_not_silently_grabbed(client, missio
     _ok_rover(monkeypatch)
 
     assert missions['p1']['status'] == 'processing'
-    assert 'leaseExpiresAt' not in missions['p1']
+    assert not missions['p1']['leaseExpiresAt'], 'legacy row: processing with no lease'
 
     assert client.post('/operator/api/missions/p1/send').status_code == 400
 
@@ -1118,3 +1213,42 @@ def test_yard_id_prefers_env_then_config_then_default(monkeypatch, tmp_path):
     satellite_identity.reset_cache()
     assert satellite_identity.yard_id() == satellite_identity.DEFAULT_YARD_ID
     satellite_identity.reset_cache()
+
+
+def test_youtube_poll_skips_a_mission_with_pending_local_writes(
+    missions, firestore_missions, monkeypatch, youtube_env
+):
+    """Plan 7.5: the poll writes to Firestore directly, so it must not land
+    between a flush's read and write and clobber an operator's completion."""
+    import mission_store
+    mission_store.release_mission('c1', 'completed', '2026-07-14T10:00:00Z')
+    assert mission_store.mission_has_pending('c1')
+
+    monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(firestore_missions))
+    monkeypatch.setattr(
+        operator_console.requests, 'get',
+        lambda *a, **k: fake_playlist_response('c1'),
+    )
+
+    operator_console.check_for_new_videos()
+
+    assert 'youtubeUrl' not in firestore_missions['c1'], 'must not write over a pending change'
+
+
+def test_youtube_poll_writes_when_nothing_is_pending(
+    missions, firestore_missions, monkeypatch, youtube_env
+):
+    import mission_store
+    assert not mission_store.mission_has_pending('c1')
+
+    monkeypatch.setattr(operator_console, '_firestore', lambda: FakeQueryFirestore(firestore_missions))
+    monkeypatch.setattr(
+        operator_console.requests, 'get',
+        lambda *a, **k: fake_playlist_response('c1'),
+    )
+
+    operator_console.check_for_new_videos()
+
+    assert firestore_missions['c1']['youtubeUrl'] == 'https://www.youtube.com/watch?v=vid123'
+    # The mirror is updated too, so the console shows it without a pull.
+    assert mission_store.get_mission('c1')['youtube_url'] == 'https://www.youtube.com/watch?v=vid123'

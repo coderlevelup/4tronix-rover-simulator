@@ -1,9 +1,16 @@
+import json
+import os
 import sqlite3
 import threading
-import os
+import uuid as uuid_mod
+from datetime import datetime, timezone
 
 DB_PATH = os.environ.get('MISSION_MIRROR_DB', 'missions.db')
 _db_lock = threading.Lock()
+
+
+def _now_iso():
+    return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
 
 def _connect():
@@ -30,6 +37,7 @@ def init_db():
                 completed_at      TEXT,
                 youtube_url       TEXT,
                 lock_owner        TEXT,
+                locked_at         TEXT,
                 lease_expires_at  TEXT,
                 needs_review      INTEGER DEFAULT 0,
                 review_reason     TEXT,
@@ -67,8 +75,25 @@ def init_db():
                 logged_at    TEXT NOT NULL
             );
         """)
+        _migrate(conn)
         conn.commit()
         conn.close()
+
+
+# Columns added after the first release, with the type to add them as. init_db
+# runs this every boot so a satellite that already has a mirror on disk from an
+# earlier version picks them up instead of failing on the first write.
+_ADDED_COLUMNS = {
+    'mission_mirror': {'locked_at': 'TEXT'},
+}
+
+
+def _migrate(conn):
+    for table, columns in _ADDED_COLUMNS.items():
+        existing = {r['name'] for r in conn.execute(f'PRAGMA table_info({table})')}
+        for name, coltype in columns.items():
+            if name not in existing:
+                conn.execute(f'ALTER TABLE {table} ADD COLUMN {name} {coltype}')
 
 
 def upsert_missions(missions, synced_at):
@@ -80,9 +105,9 @@ def upsert_missions(missions, synced_at):
                 INSERT INTO mission_mirror
                     (id, name, yard_id, code, blockly_state, status,
                      submitted_at, started_at, completed_at, youtube_url,
-                     lock_owner, lease_expires_at, needs_review, review_reason,
-                     status_updated_at, synced_at, local_dirty)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
+                     lock_owner, locked_at, lease_expires_at, needs_review,
+                     review_reason, status_updated_at, synced_at, local_dirty)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
                 ON CONFLICT(id) DO UPDATE SET
                     name=excluded.name,
                     yard_id=excluded.yard_id,
@@ -94,6 +119,7 @@ def upsert_missions(missions, synced_at):
                     completed_at=excluded.completed_at,
                     youtube_url=excluded.youtube_url,
                     lock_owner=excluded.lock_owner,
+                    locked_at=excluded.locked_at,
                     lease_expires_at=excluded.lease_expires_at,
                     needs_review=excluded.needs_review,
                     review_reason=excluded.review_reason,
@@ -104,7 +130,8 @@ def upsert_missions(missions, synced_at):
                 m['id'], m.get('name'), m.get('yardId'),
                 m.get('code'), m.get('blocklyState'), m.get('status'),
                 m.get('submittedAt'), m.get('startedAt'), m.get('completedAt'),
-                m.get('youtubeUrl'), m.get('lockOwner'), m.get('leaseExpiresAt'),
+                m.get('youtubeUrl'), m.get('lockOwner'), m.get('lockedAt'),
+                m.get('leaseExpiresAt'),
                 m.get('needsReview', 0), m.get('reviewReason'),
                 m.get('statusUpdatedAt'), synced_at,
             ))
@@ -163,3 +190,309 @@ def outbox_count():
         conn.close()
     return row['n']
 
+
+
+# --- Write side: mirror + outbox (plan section 3.2 / PR 3) -----------------
+
+def write_and_enqueue(mission_id, mirror_updates, op, payload):
+    """Apply a local change to the mirror and queue it for Firestore, atomically.
+
+    One SQLite transaction covers both, so the console can never show a state
+    that has no matching outbox entry (which would silently never sync), nor
+    queue a change it did not apply locally.
+
+    `local_dirty` marks the row so the next Firestore pull cannot overwrite a
+    change that has not been flushed yet - push-before-pull at the row level.
+    """
+    with _db_lock:
+        conn = _connect()
+        try:
+            conn.execute('BEGIN IMMEDIATE')
+            updates = dict(mirror_updates)
+            updates['local_dirty'] = 1
+            sets = ', '.join(f'{k} = ?' for k in updates)
+            conn.execute(
+                f'UPDATE mission_mirror SET {sets} WHERE id = ?',
+                list(updates.values()) + [mission_id],
+            )
+            now = _now_iso()
+            conn.execute(
+                'INSERT INTO outbox (uuid, mission_id, op, payload, event_at, created_at)'
+                ' VALUES (?,?,?,?,?,?)',
+                (str(uuid_mod.uuid4()), mission_id, op, json.dumps(payload), now, now),
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+
+def peek_outbox():
+    """The oldest unflushed entry, or None.
+
+    Ordering is by `seq`, never by a timestamp: the Pi has no real-time clock,
+    so an offline boot can produce wildly wrong wall-clock values (plan 7.2).
+    """
+    with _db_lock:
+        conn = _connect()
+        row = conn.execute('SELECT * FROM outbox ORDER BY seq ASC LIMIT 1').fetchone()
+        conn.close()
+    return dict(row) if row else None
+
+
+def delete_outbox(seq):
+    """Drop an entry once Firestore has confirmed the write."""
+    with _db_lock:
+        conn = _connect()
+        conn.execute('DELETE FROM outbox WHERE seq = ?', (seq,))
+        conn.commit()
+        conn.close()
+
+
+def clear_dirty(mission_id):
+    """Release a mirror row once nothing is queued for it, so Firestore pulls
+    can refresh it again."""
+    with _db_lock:
+        conn = _connect()
+        still_queued = conn.execute(
+            'SELECT 1 FROM outbox WHERE mission_id = ? LIMIT 1', (mission_id,)
+        ).fetchone()
+        if not still_queued:
+            conn.execute('UPDATE mission_mirror SET local_dirty = 0 WHERE id = ?', (mission_id,))
+            conn.commit()
+        conn.close()
+
+
+def mark_attempt(seq, error_msg):
+    """Record a failed flush so a stuck entry is visible rather than silent."""
+    with _db_lock:
+        conn = _connect()
+        conn.execute(
+            'UPDATE outbox SET attempts = attempts + 1, last_error = ? WHERE seq = ?',
+            (error_msg, seq),
+        )
+        conn.commit()
+        conn.close()
+
+
+def log_conflict(mission_id, local_state, remote_state, resolution):
+    """Record a merge where the losing side was already terminal (plan 6)."""
+    with _db_lock:
+        conn = _connect()
+        conn.execute(
+            'INSERT INTO conflict_log (mission_id, local_state, remote_state, resolution, logged_at)'
+            ' VALUES (?,?,?,?,?)',
+            (mission_id, local_state, remote_state, resolution, _now_iso()),
+        )
+        conn.commit()
+        conn.close()
+
+
+def get_conflicts(limit=50):
+    with _db_lock:
+        conn = _connect()
+        rows = conn.execute(
+            'SELECT * FROM conflict_log ORDER BY id DESC LIMIT ?', (limit,)
+        ).fetchall()
+        conn.close()
+    return [dict(r) for r in rows]
+
+
+# --- Local mission locking (plan PR 1 semantics, PR 3 storage) -------------
+#
+# PR 1 acquired the lock with a Firestore transaction inside the request. PR 3
+# takes Firestore out of the request path entirely so the console works with no
+# internet, which means the lock has to move here. Losing the lock in the move
+# would reintroduce the plan's defect A - two operators both read 'queued',
+# both dispatch, and the rover runs the mission twice.
+#
+# So this keeps the same decision logic, made atomic by SQLite instead:
+# BEGIN IMMEDIATE takes a write lock before the read, so a second caller waits
+# rather than reading stale state. Contention is within one satellite, which is
+# the only contention that exists (plan section 9: one yard, yardId-scoped).
+
+def acquire_mission(mission_id, owner, now_iso, expires_iso, for_rerun=False):
+    """Atomically claim a mission and queue the claim for Firestore.
+
+    Returns (ok, reason, mission_dict). Reasons mirror the Firestore version:
+    'not-found', 'not-queued' / 'not-terminal', 'locked-by-other'.
+    """
+    with _db_lock:
+        conn = _connect()
+        try:
+            conn.execute('BEGIN IMMEDIATE')
+            row = conn.execute(
+                'SELECT * FROM mission_mirror WHERE id = ?', (mission_id,)
+            ).fetchone()
+
+            if row is None:
+                conn.rollback()
+                return False, 'not-found', None
+
+            mission = dict(row)
+            status = mission.get('status')
+            holder = mission.get('lock_owner')
+            lease = mission.get('lease_expires_at')
+            lease_live = bool(lease) and lease > now_iso
+
+            if for_rerun:
+                if status not in ('completed', 'failed'):
+                    conn.rollback()
+                    return False, 'not-terminal', None
+            else:
+                # An expired lease on a 'processing' mission means the holder
+                # died; reclaiming it is the point of having a lease. No lease
+                # at all is legacy data and is deliberately NOT reclaimable.
+                reclaimable = status == 'processing' and bool(lease) and not lease_live
+                if status != 'queued' and not reclaimable:
+                    conn.rollback()
+                    return False, 'not-queued', None
+
+            if holder and holder != owner and lease_live:
+                conn.rollback()
+                return False, 'locked-by-other', None
+
+            updates = {
+                'status': 'processing',
+                'started_at': now_iso,
+                'status_updated_at': now_iso,
+                'lock_owner': owner,
+                'locked_at': now_iso,
+                'lease_expires_at': expires_iso,
+                'local_dirty': 1,
+            }
+            payload = {
+                'status': 'processing',
+                'startedAt': now_iso,
+                'statusUpdatedAt': now_iso,
+                'lockOwner': owner,
+                'lockedAt': now_iso,
+                'leaseExpiresAt': expires_iso,
+            }
+            if for_rerun:
+                # A rerun supersedes the previous run's outcome.
+                updates['completed_at'] = None
+                updates['youtube_url'] = None
+                payload['completedAt'] = None
+                payload['youtubeUrl'] = None
+
+            sets = ', '.join(f'{k} = ?' for k in updates)
+            conn.execute(
+                f'UPDATE mission_mirror SET {sets} WHERE id = ?',
+                list(updates.values()) + [mission_id],
+            )
+            _enqueue(conn, mission_id, 'lock', payload)
+            conn.commit()
+            return True, None, mission
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+
+def release_mission(mission_id, status, now_iso, review_reason=None):
+    """Drop the lock and set a status, queueing both for Firestore.
+
+    Used for terminal transitions and for rolling back when a dispatch never
+    reached the rover.
+    """
+    with _db_lock:
+        conn = _connect()
+        try:
+            conn.execute('BEGIN IMMEDIATE')
+            updates = {
+                'status': status,
+                'status_updated_at': now_iso,
+                'lock_owner': None,
+                'locked_at': None,
+                'lease_expires_at': None,
+                'local_dirty': 1,
+            }
+            payload = {
+                'status': status,
+                'statusUpdatedAt': now_iso,
+                'lockOwner': None,
+                'lockedAt': None,
+                'leaseExpiresAt': None,
+            }
+            if status == 'completed':
+                updates['completed_at'] = now_iso
+                payload['completedAt'] = now_iso
+            if review_reason is not None:
+                updates['needs_review'] = 1
+                updates['review_reason'] = review_reason
+                payload['needsReview'] = True
+                payload['reviewReason'] = review_reason
+
+            sets = ', '.join(f'{k} = ?' for k in updates)
+            conn.execute(
+                f'UPDATE mission_mirror SET {sets} WHERE id = ?',
+                list(updates.values()) + [mission_id],
+            )
+            _enqueue(conn, mission_id, 'release', payload)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+
+def renew_lease(mission_id, expires_iso, now_iso):
+    """Extend a live lease. Mirror-only: a renewal is not worth an outbox entry,
+    because the lease is re-sent with the next real status change and a lapsed
+    lease is recoverable by design."""
+    with _db_lock:
+        conn = _connect()
+        conn.execute(
+            'UPDATE mission_mirror SET lease_expires_at = ?, status_updated_at = ? WHERE id = ?',
+            (expires_iso, now_iso, mission_id),
+        )
+        conn.commit()
+        conn.close()
+
+
+def set_mission_field(mission_id, mirror_updates, payload):
+    """Generic mirror write + outbox enqueue for non-status changes (YouTube)."""
+    write_and_enqueue(mission_id, mirror_updates, 'youtube', payload)
+
+
+def _enqueue(conn, mission_id, op, payload):
+    """Append to the outbox on an already-open transaction."""
+    now = _now_iso()
+    conn.execute(
+        'INSERT INTO outbox (uuid, mission_id, op, payload, event_at, created_at)'
+        ' VALUES (?,?,?,?,?,?)',
+        (str(uuid_mod.uuid4()), mission_id, op, json.dumps(payload), now, now),
+    )
+
+
+def mission_has_pending(mission_id):
+    """True if the outbox holds an unflushed entry for this mission."""
+    with _db_lock:
+        conn = _connect()
+        row = conn.execute(
+            'SELECT 1 FROM outbox WHERE mission_id = ? LIMIT 1', (mission_id,)
+        ).fetchone()
+        conn.close()
+    return row is not None
+
+
+def set_mirror_only(mission_id, updates):
+    """Update the mirror WITHOUT queueing an outbox entry.
+
+    For changes that were already written straight to Firestore (the YouTube
+    poll), where enqueueing would push the same value back a second time.
+    """
+    with _db_lock:
+        conn = _connect()
+        sets = ', '.join(f'{k} = ?' for k in updates)
+        conn.execute(
+            f'UPDATE mission_mirror SET {sets} WHERE id = ?',
+            list(updates.values()) + [mission_id],
+        )
+        conn.commit()
+        conn.close()
