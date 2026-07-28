@@ -94,6 +94,35 @@ would lose the ability to reach that learner. Missions with an address but no
 (Part B step 7 of `infra/README.md`), skip this entirely — the new database
 starts clean and no plaintext address ever reaches Impact's project.
 
+### Then clean up the orphaned learner records
+
+Unifying the learner document id left records under the old `sessionId` keys
+that no mission references. They still held a plaintext address that nothing
+could ever use, since the notification service only reads
+`learners/{mission.learnerId}`.
+
+```bash
+node scripts/redact-orphaned-learner-emails.mjs           # dry run
+node scripts/redact-orphaned-learner-emails.mjs --apply
+```
+
+It removes the `learnerEmail` field from unreachable records and leaves the
+document itself in place — the goal is to stop holding an address nothing can
+use, not to destroy records. A learner id counts as reachable if it appears as
+*either* `learnerId` or `sessionId` on any mission, deliberately generous so a
+still-in-use address is never redacted.
+
+Run this **after** the hash migration, not before: the hash migration copies
+addresses onto learner records, and running the redaction first would strip
+addresses that migration is about to make reachable.
+
+### Both scripts have been run against `mars-rover-cloud-platform`
+
+As of 2026-07-27, on the old project: 30 missions migrated to hashes with zero
+plaintext addresses left publicly readable, 11 reachable learner records hold
+the addresses, 6 orphaned records redacted, and all 30 missions verified to
+still resolve to a matching address. The export to Impact will carry hashes.
+
 ## Deploying the rules and index together
 
 The rules and the composite index both changed. Deploy them as a pair, and
