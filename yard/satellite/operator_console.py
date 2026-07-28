@@ -366,8 +366,11 @@ def _mirror_is_stale(last_synced_at):
 @require_operator
 def api_missions():
     from mission_store import get_missions, outbox_count
+    from satellite_identity import yard_id
 
-    rows, last_synced = get_missions(MISSION_LIST_LIMIT)
+    # Scoped to this satellite's own yard (plan 3.3) so a second yard's
+    # missions can never appear in, or be dispatched from, this console.
+    rows, last_synced = get_missions(MISSION_LIST_LIMIT, yard_id=yard_id())
 
     return jsonify({
         'missions': [_mirror_row_to_dict(row) for row in rows],
@@ -477,8 +480,8 @@ def _dispatch_to_rover(mission, mission_id=None):
 @operator_bp.route('/api/missions/<mission_id>/send', methods=['POST'])
 @require_operator
 def api_send_to_rover(mission_id):
-    operator = current_operator()
-    owner = operator['uid']
+    from satellite_identity import satellite_id
+    owner = satellite_id()
     now = _now_iso()
     expires = _expires_iso()
 
@@ -537,8 +540,8 @@ def _acquire_for_rerun(transaction, ref, owner, now_iso, expires_iso):
 @operator_bp.route('/api/missions/<mission_id>/rerun', methods=['POST'])
 @require_operator
 def api_rerun(mission_id):
-    operator = current_operator()
-    owner = operator['uid']
+    from satellite_identity import satellite_id
+    owner = satellite_id()
     now = _now_iso()
     expires = _expires_iso()
 

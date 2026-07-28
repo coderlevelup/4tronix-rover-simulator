@@ -1048,3 +1048,73 @@ def test_lease_expiry_window_is_longer_than_the_renewal_interval(client):
     would look abandoned and could be stolen mid-run."""
     assert operator_console.LEASE_TTL_SECONDS > operator_console.LEASE_RENEW_INTERVAL * 2
 
+
+
+# ---------------------------------------------------------------------------
+# Satellite identity as the lock owner (plan 3.3 / 7.4)
+# ---------------------------------------------------------------------------
+
+def test_lock_owner_is_the_satellite_not_the_operator_session(client, missions, monkeypatch, tmp_path):
+    """OPERATOR_AUTH=off gives every operator the same stub uid ('offline'), so
+    an operator-scoped lock owner silently disables the lock in exactly the mode
+    used at events. The owner must identify the satellite instead."""
+    import satellite_identity
+    monkeypatch.setenv('SATELLITE_CONFIG', str(tmp_path / 'sat.json'))
+    monkeypatch.setattr(satellite_identity, 'CONFIG_FILE', str(tmp_path / 'sat.json'))
+    satellite_identity.reset_cache()
+
+    monkeypatch.setenv('OPERATOR_AUTH', 'off')
+    _ok_rover(monkeypatch)
+
+    client.post('/operator/api/missions/q1/send')
+
+    owner = missions['q1']['lockOwner']
+    assert owner == satellite_identity.satellite_id()
+    assert owner != 'offline', 'the shared offline stub must never be the lock owner'
+    satellite_identity.reset_cache()
+
+
+def test_satellite_id_is_stable_across_calls_and_restarts(monkeypatch, tmp_path):
+    import satellite_identity
+    cfg = tmp_path / 'sat.json'
+    monkeypatch.setattr(satellite_identity, 'CONFIG_FILE', str(cfg))
+    satellite_identity.reset_cache()
+
+    first = satellite_identity.satellite_id()
+    assert satellite_identity.satellite_id() == first, 'must be stable within a process'
+
+    # Simulate a restart: drop the memo, reload from disk.
+    satellite_identity.reset_cache()
+    assert satellite_identity.satellite_id() == first, 'must survive a restart'
+    assert cfg.exists(), 'the id must be persisted, not regenerated each boot'
+    satellite_identity.reset_cache()
+
+
+def test_satellite_id_survives_an_unwritable_config(monkeypatch, tmp_path):
+    """A read-only filesystem degrades lock ownership; it must not stop boot."""
+    import satellite_identity
+    monkeypatch.setattr(satellite_identity, 'CONFIG_FILE', str(tmp_path / 'nope' / 'sat.json'))
+    satellite_identity.reset_cache()
+
+    assert satellite_identity.satellite_id()  # does not raise
+    satellite_identity.reset_cache()
+
+
+def test_yard_id_prefers_env_then_config_then_default(monkeypatch, tmp_path):
+    import satellite_identity
+    cfg = tmp_path / 'sat.json'
+    cfg.write_text('{"yard_id": "from-config"}')
+    monkeypatch.setattr(satellite_identity, 'CONFIG_FILE', str(cfg))
+
+    monkeypatch.setenv('YARD_ID', 'from-env')
+    satellite_identity.reset_cache()
+    assert satellite_identity.yard_id() == 'from-env'
+
+    monkeypatch.delenv('YARD_ID')
+    satellite_identity.reset_cache()
+    assert satellite_identity.yard_id() == 'from-config'
+
+    cfg.write_text('{}')
+    satellite_identity.reset_cache()
+    assert satellite_identity.yard_id() == satellite_identity.DEFAULT_YARD_ID
+    satellite_identity.reset_cache()

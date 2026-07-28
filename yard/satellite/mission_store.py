@@ -113,14 +113,29 @@ def upsert_missions(missions, synced_at):
         conn.close()
 
 
-def get_missions(limit=100):
-    """Read missions from the local mirror."""
+def get_missions(limit=100, yard_id=None):
+    """Read missions from the local mirror.
+
+    `yard_id` scopes the list to this satellite's own yard (plan 3.3). It is
+    applied here rather than in the Firestore pull because a
+    `yardId + submittedAt` query needs a composite index that does not exist,
+    and with one yard the difference is only how much gets mirrored. If a
+    second yard is ever added, move this into the sync query and add the index.
+    """
     with _db_lock:
         conn = _connect()
-        rows = conn.execute(
-            "SELECT * FROM mission_mirror WHERE status != 'cancelled' ORDER BY submitted_at DESC LIMIT ?",
-            (limit,)
-        ).fetchall()
+        if yard_id:
+            rows = conn.execute(
+                "SELECT * FROM mission_mirror WHERE status != 'cancelled' AND yard_id = ?"
+                " ORDER BY submitted_at DESC LIMIT ?",
+                (yard_id, limit)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM mission_mirror WHERE status != 'cancelled'"
+                " ORDER BY submitted_at DESC LIMIT ?",
+                (limit,)
+            ).fetchall()
         meta = conn.execute("SELECT value FROM sync_meta WHERE key = 'last_synced_at'").fetchone()
         conn.close()
 

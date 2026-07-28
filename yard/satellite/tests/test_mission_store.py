@@ -149,3 +149,22 @@ def test_outbox_count_reflects_inserted_rows():
     conn.commit()
     conn.close()
     assert mission_store.outbox_count() == 1
+
+
+def test_get_missions_scopes_to_a_yard(tmp_path, monkeypatch):
+    """A satellite must never list, and therefore never dispatch, a mission
+    belonging to another yard."""
+    import mission_store
+    monkeypatch.setattr(mission_store, 'DB_PATH', str(tmp_path / 'm.db'))
+    mission_store.init_db()
+
+    mission_store.upsert_missions([
+        {'id': 'a', 'yardId': 'uct-rover-1', 'status': 'queued', 'submittedAt': '2026-01-02'},
+        {'id': 'b', 'yardId': 'durban-rover-1', 'status': 'queued', 'submittedAt': '2026-01-01'},
+    ], '2026-01-03T00:00:00Z')
+
+    scoped, _ = mission_store.get_missions(yard_id='uct-rover-1')
+    assert [m['id'] for m in scoped] == ['a']
+
+    unscoped, _ = mission_store.get_missions()
+    assert {m['id'] for m in unscoped} == {'a', 'b'}
