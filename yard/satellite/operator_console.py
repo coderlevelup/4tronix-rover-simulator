@@ -600,6 +600,66 @@ def api_attach_youtube(mission_id):
     return jsonify({'status': 'ok', 'missionId': mission_id})
 
 
+@operator_bp.route('/api/missions/needs-review', methods=['GET'])
+@require_operator
+def api_needs_review():
+    """Missions that were running when the satellite stopped.
+
+    Surfaced as a distinct group rather than mixed into the queue: they are
+    ambiguous, not queued, and an operator has to decide what happened.
+    """
+    from mission_store import get_needs_review
+
+    return jsonify({
+        'missions': [_mirror_row_to_dict(row) for row in get_needs_review()],
+    })
+
+
+@operator_bp.route('/api/missions/<mission_id>/resolve', methods=['POST'])
+@require_operator
+def api_resolve_review(mission_id):
+    """Record the operator's decision about an interrupted mission.
+
+    'completed' - they checked and the run finished.
+    'requeue'   - put it back in the queue to be run again.
+
+    Deliberately does NOT dispatch to the rover. Re-queuing makes the mission
+    available for a human to send again; it never moves the robot by itself
+    (plan 2.3).
+    """
+    from mission_store import get_mission, resolve_review
+
+    data = request.get_json(silent=True) or {}
+    outcome = (data.get('outcome') or '').strip()
+    if outcome not in ('completed', 'requeue'):
+        return jsonify({'error': "outcome must be 'completed' or 'requeue'"}), 400
+
+    mission = get_mission(mission_id)
+    if mission is None:
+        return jsonify({'error': 'Mission not found'}), 404
+    if not mission.get('needs_review'):
+        return jsonify({'error': 'This mission is not awaiting review'}), 400
+
+    status = 'completed' if outcome == 'completed' else 'queued'
+    _stop_lease_renewal(mission_id)
+    resolve_review(mission_id, status, _now_iso())
+
+    if status == 'completed':
+        _notify_mission_control_async(mission_id, 'completed')
+
+    return jsonify({'status': 'ok', 'missionId': mission_id, 'newStatus': status})
+
+
+@operator_bp.route('/api/conflicts', methods=['GET'])
+@require_operator
+def api_conflicts():
+    """Merges where the losing side was already terminal, so the team can see
+    that reconciliation made a real decision rather than silently picking."""
+    from mission_store import get_conflicts
+
+    return jsonify({'conflicts': get_conflicts()})
+
+
 @operator_bp.route('/api/health', methods=['GET'])
 @require_operator
 def api_rover_health():

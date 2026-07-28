@@ -311,7 +311,20 @@
             .mission-actions .btn, .mission-actions a.btn { width: 100%; text-align: center; }
             .mission-actions .field-group { width: 100%; }
         }
-    </style>
+    
+        /* Needs-review group: amber, deliberately not one of the status
+           colours, because this is an unknown rather than a state. */
+        #reviewSection { margin-bottom: 1.4rem; }
+        .review-heading { color: var(--warn); font-size: 1rem; font-weight: 700; margin-bottom: .25rem; }
+        .review-note { color: var(--text-dim); font-size: .82rem; margin-bottom: .8rem; max-width: 60ch; }
+        .review-card {
+            border: 1px solid color-mix(in oklab, var(--warn) 45%, transparent);
+            background: color-mix(in oklab, var(--warn) 8%, var(--surface));
+            border-radius: 14px; padding: 1rem; margin-bottom: .7rem;
+        }
+        .review-card .mission-title { color: var(--heading); font-weight: 650; }
+        .review-actions { display: flex; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; }
+</style>
 </head>
 <body>
     {% set nav_active = 'queue' %}{% include "_nav.html" %}
@@ -342,6 +355,12 @@
         </div>
 
         <div class="net-banner" id="netBanner" role="status" aria-live="polite"></div>
+        <section id="reviewSection" hidden aria-live="polite">
+            <h2 class="review-heading">Needs review</h2>
+            <p class="review-note">These were running when the satellite stopped. The rover may or
+                may not have finished them, so nothing has been assumed.</p>
+            <div id="reviewList"></div>
+        </section>
         <div id="missions" aria-live="polite"></div>
     </div>
 
@@ -734,6 +753,51 @@
             setBanner('stale', `Showing missions from ${age}s ago — refreshing…`);
         }
 
+        // --- Needs review -------------------------------------------------
+        const reviewSection = document.getElementById('reviewSection');
+        const reviewList = document.getElementById('reviewList');
+
+        function renderReview(list) {
+            reviewSection.hidden = list.length === 0;
+            reviewList.innerHTML = list.map(m => `
+                <div class="review-card">
+                    <div class="mission-title">${esc(m.name) || 'Mission-' + m.id.slice(0, 8)}</div>
+                    <div class="mission-meta">${esc(m.yardId) || ''} &middot; started ${relTime(m.startedAt || m.submittedAt)}</div>
+                    <div class="review-actions">
+                        <button class="btn" data-review="completed" data-id="${m.id}">It finished</button>
+                        <button class="btn" data-review="requeue" data-id="${m.id}">Re-queue it</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        async function loadReview() {
+            try {
+                const resp = await fetch('/operator/api/missions/needs-review');
+                if (!resp.ok) return;
+                renderReview((await resp.json()).missions || []);
+            } catch (e) { /* offline: leave whatever is on screen */ }
+        }
+
+        reviewList.addEventListener('click', async (ev) => {
+            const btn = ev.target.closest('[data-review]');
+            if (!btn) return;
+            btn.disabled = true;
+            try {
+                const resp = await fetch(`/operator/api/missions/${btn.dataset.id}/resolve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ outcome: btn.dataset.review }),
+                });
+                if (!resp.ok) throw new Error((await resp.json()).error || 'Could not save');
+                toast(btn.dataset.review === 'completed' ? 'Marked complete' : 'Back in the queue');
+                await loadReview();
+                missionsPoller.refresh && missionsPoller.refresh();
+            } catch (e) {
+                toast(e.message || 'Could not save', 'bad');
+                btn.disabled = false;
+            }
+        });
+
         const missionsPoller = YardCache.createPoller({
             interval: 15000,
             maxInterval: 60000,
@@ -790,6 +854,11 @@
                 render();
             });
         });
+
+        // Recovery state changes only at satellite startup or when an operator
+        // resolves one, so this polls far less often than the queue does.
+        loadReview();
+        setInterval(loadReview, 30000);
     </script>
 </body>
 </html>

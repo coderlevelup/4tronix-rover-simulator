@@ -496,3 +496,109 @@ def set_mirror_only(mission_id, updates):
         )
         conn.commit()
         conn.close()
+
+
+# --- Recovery (plan PR 4) --------------------------------------------------
+
+def find_interrupted(owner):
+    """Missions this satellite still holds as 'processing' after a restart.
+
+    These are genuinely ambiguous: the rover may have finished the run, or the
+    power may have gone out mid-drive. Nothing here decides which - that is a
+    human's call (plan 2.3, never move the robot without a human).
+    """
+    with _db_lock:
+        conn = _connect()
+        rows = conn.execute(
+            "SELECT * FROM mission_mirror WHERE status = 'processing' AND lock_owner = ?"
+            " AND needs_review = 0",
+            (owner,),
+        ).fetchall()
+        conn.close()
+    return [dict(r) for r in rows]
+
+
+def flag_for_review(mission_id, reason):
+    """Mark a mission as needing a human decision, and queue that for Firestore.
+
+    Deliberately does NOT change status: moving it to 'failed' would assert an
+    outcome nobody established, and 'failed' reaches the learner as a run that
+    went wrong. It stays 'processing' with the flag on top.
+    """
+    with _db_lock:
+        conn = _connect()
+        try:
+            conn.execute('BEGIN IMMEDIATE')
+            conn.execute(
+                'UPDATE mission_mirror SET needs_review = 1, review_reason = ?, local_dirty = 1'
+                ' WHERE id = ?',
+                (reason, mission_id),
+            )
+            _enqueue(conn, mission_id, 'review', {'needsReview': True, 'reviewReason': reason})
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+
+def get_needs_review():
+    with _db_lock:
+        conn = _connect()
+        rows = conn.execute(
+            'SELECT * FROM mission_mirror WHERE needs_review = 1 ORDER BY submitted_at DESC'
+        ).fetchall()
+        conn.close()
+    return [dict(r) for r in rows]
+
+
+def resolve_review(mission_id, status, now_iso):
+    """Clear the review flag and set the status a human chose.
+
+    'completed' means the operator confirmed the run finished; 'queued' puts it
+    back in the queue to be run again. Either way the lock is released.
+    """
+    with _db_lock:
+        conn = _connect()
+        try:
+            conn.execute('BEGIN IMMEDIATE')
+            updates = {
+                'status': status,
+                'status_updated_at': now_iso,
+                'needs_review': 0,
+                'review_reason': None,
+                'lock_owner': None,
+                'locked_at': None,
+                'lease_expires_at': None,
+                'local_dirty': 1,
+            }
+            payload = {
+                'status': status,
+                'statusUpdatedAt': now_iso,
+                'needsReview': False,
+                'reviewReason': None,
+                'lockOwner': None,
+                'lockedAt': None,
+                'leaseExpiresAt': None,
+            }
+            if status == 'completed':
+                updates['completed_at'] = now_iso
+                payload['completedAt'] = now_iso
+            else:
+                # Re-queued: clear the previous run's stamps so it looks fresh.
+                updates['started_at'] = None
+                payload['startedAt'] = None
+
+            sets = ', '.join(f'{k} = ?' for k in updates)
+            conn.execute(
+                f'UPDATE mission_mirror SET {sets} WHERE id = ?',
+                list(updates.values()) + [mission_id],
+            )
+            _enqueue(conn, mission_id, 'resolve', payload)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()

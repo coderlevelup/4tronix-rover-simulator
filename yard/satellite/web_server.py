@@ -323,6 +323,16 @@ if __name__ == '__main__':
     from sync_worker import start_sync_worker
 
     init_db()
+
+    # Recovery runs before the sync worker so an interrupted mission is flagged
+    # for review before any flush can push its stale 'processing' onward.
+    try:
+        from recovery import recover_interrupted_missions
+        from satellite_identity import satellite_id
+        recover_interrupted_missions(satellite_id(), rover_url=os.environ.get('ROVER_URL'))
+    except Exception as e:
+        print(f'[recovery] Skipped: {e}')
+
     # Started unconditionally, with a FACTORY rather than a client. Building the
     # client here and bailing on failure would mean a satellite powered on with
     # no internet - the exact situation this whole feature exists for - never
