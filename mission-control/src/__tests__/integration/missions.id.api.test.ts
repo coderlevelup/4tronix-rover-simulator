@@ -127,7 +127,7 @@ describe('PATCH /api/missions/[id] Integration Tests', () => {
     expect(response.status).toBe(400);
   });
 
-  it('does not send an email when the mission has no learnerEmail', async () => {
+  it('does not send an email when the learner record has no address', async () => {
     await PATCH(patchRequest('mission-1', { status: 'processing' }), {
       params: Promise.resolve({ id: 'mission-1' }),
     });
@@ -135,18 +135,17 @@ describe('PATCH /api/missions/[id] Integration Tests', () => {
     expect(sendMock).not.toHaveBeenCalled();
   });
 
-  it('sends a status email when the mission has a learnerEmail', async () => {
+  it('sends a status email to the address on the learner record', async () => {
     missions.set('mission-1', {
       yardId: 'yard-1',
       learnerId: 'learner-1',
       sessionId: 'session-1',
-      learnerEmail: 'ada@school.edu',
       name: 'Orbital Nomad',
       code: 'rover.forward(100)',
       status: 'queued',
       submittedAt: '2026-01-01T00:00:00.000Z',
     });
-    learners.set('learner-1', { displayName: 'Ada' });
+    learners.set('learner-1', { learnerEmail: 'ada@school.edu', displayName: 'Ada' });
 
     const response = await PATCH(patchRequest('mission-1', { status: 'completed' }), {
       params: Promise.resolve({ id: 'mission-1' }),
@@ -165,7 +164,6 @@ describe('PATCH /api/missions/[id] Integration Tests', () => {
       yardId: 'yard-1',
       learnerId: 'learner-1',
       sessionId: 'session-1',
-      learnerEmail: 'ada@school.edu',
       name: 'Orbital Nomad',
       code: 'rover.forward(100)',
       status: 'queued',

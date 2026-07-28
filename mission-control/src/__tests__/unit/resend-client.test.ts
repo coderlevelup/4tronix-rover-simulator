@@ -20,8 +20,8 @@ const ORIGINAL_ENV = process.env;
 async function loadSender() {
   // The module memoises its Resend client, so each case needs a fresh copy.
   jest.resetModules();
-  const module = await import('@/infrastructure/email/resend-client');
-  return module.ResendEmailSender;
+  const imported = await import('@/infrastructure/email/resend-client');
+  return imported.ResendEmailSender;
 }
 
 beforeEach(() => {

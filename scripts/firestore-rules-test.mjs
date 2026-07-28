@@ -35,8 +35,11 @@ function check(label, status, want) {
 }
 
 // --- seed -------------------------------------------------------------------
+const HASH = 'b'.repeat(64);
+const OTHER_HASH = 'c'.repeat(64);
 await seed('missions/m_no_email', { name: S('Blank'), code: S('forward(50)'), status: S('queued') });
-await seed('missions/m_has_email', { name: S('Taken'), code: S('forward(50)'), status: S('queued'), learnerEmail: S('a@b.com') });
+await seed('missions/m_has_email', { name: S('Taken'), code: S('forward(50)'), status: S('queued'), learnerEmailHash: S(HASH) });
+await seed('missions/m_no_email2', { name: S('Blank2'), code: S('forward(50)'), status: S('queued') });
 await seed('learners/L1', { learnerEmail: S('a@b.com'), displayName: S('Ada') });
 
 // --- missions ---------------------------------------------------------------
@@ -46,8 +49,10 @@ check('mission: delete blocked', await attempt('DELETE', 'missions/m_no_email'),
 check('mission: create blocked', await attempt('POST', 'missions?documentId=m_new', { name: S('x') }), 'DENY');
 // updateDoc() in the web SDK always sends an updateMask; a maskless PATCH
 // would replace the whole document, which is not what the app ever does.
-check('mission: backfill email into blank', await attempt('PATCH', 'missions/m_no_email', { body: { learnerEmail: S('new@school.edu') }, mask: ['learnerEmail'] }), 'ALLOW');
-check('mission: overwrite existing email blocked', await attempt('PATCH', 'missions/m_has_email', { body: { learnerEmail: S('evil@x.com') }, mask: ['learnerEmail'] }), 'DENY');
+check('mission: backfill hash into blank', await attempt('PATCH', 'missions/m_no_email', { body: { learnerEmailHash: S(HASH) }, mask: ['learnerEmailHash'] }), 'ALLOW');
+check('mission: overwrite existing hash blocked', await attempt('PATCH', 'missions/m_has_email', { body: { learnerEmailHash: S(OTHER_HASH) }, mask: ['learnerEmailHash'] }), 'DENY');
+check('mission: plaintext address as hash blocked', await attempt('PATCH', 'missions/m_no_email2', { body: { learnerEmailHash: S('ada@school.edu') }, mask: ['learnerEmailHash'] }), 'DENY');
+check('mission: plaintext learnerEmail field blocked', await attempt('PATCH', 'missions/m_no_email2', { body: { learnerEmail: S('ada@school.edu') }, mask: ['learnerEmail'] }), 'DENY');
 check('mission: tamper with code blocked', await attempt('PATCH', 'missions/m_has_email', { body: { code: S('import os') }, mask: ['code'] }), 'DENY');
 check('mission: tamper with status blocked', await attempt('PATCH', 'missions/m_no_email', { body: { status: S('completed') }, mask: ['status'] }), 'DENY');
 

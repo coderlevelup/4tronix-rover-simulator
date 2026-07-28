@@ -11,6 +11,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { getFirestoreClient } from '@/lib/firebase';
 import { getOrCreateSession, clearSession } from '@/lib/anonymous-auth';
+import { getLearnerID } from '@/lib/getLearnerID';
+import { hashLearnerEmail } from '@/core/domain/services/learnerEmailHash';
 import { Learner, createAnonymousLearner, sanitizeDisplayName } from '@/core/domain/entities/Learner';
 
 interface LearnerContextType {
@@ -32,16 +34,33 @@ const LearnerContext = createContext<LearnerContextType | undefined>(undefined);
 const LATEST_MISSION_KEY = 'rover-latest-mission-id';
 
 /**
- * The email prompt opens *after* a mission is submitted, so a first-time
- * learner's mission is written with no learnerEmail on it. Since
- * MissionNotificationService gates on that field, that mission would otherwise
- * stay silent for its whole lifecycle - including the completion email, which
- * is the one the learner was just promised.
+ * Learner records are keyed by getLearnerID(), the SAME id missions carry as
+ * `learnerId`. They used to be keyed by getOrCreateSession()'s sessionId, a
+ * separate nanoid under a different localStorage key, so the server could never
+ * find a mission's learner - which is both why emails greeted "Space Explorer"
+ * and why the address now has somewhere reliable to live.
  *
- * Stamp the address onto the mission they have in flight, then fire the queued
- * email that was skipped at submit time. Best-effort: the learner's email is
- * already saved by the time this runs, so a failure here costs one notification,
- * not the address.
+ * Existing documents under the old sessionId key are orphaned by this change.
+ * Nothing is lost that matters: they hold only an email and display name, and
+ * the email is also in localStorage, so it is rewritten under the correct id
+ * the next time the learner saves it.
+ */
+function learnerDocId(): string {
+  return getLearnerID();
+}
+
+/**
+ * The email prompt opens *after* a mission is submitted, so a first-time
+ * learner's mission is written with no learnerEmailHash on it, and the
+ * notification service has no way to connect that mission to an address. That
+ * mission would otherwise stay silent for its whole lifecycle - including the
+ * completion email, which is the one the learner was just promised.
+ *
+ * Stamps the HASH onto the mission in flight (never the address: mission
+ * documents are world-readable), then fires the queued email that was skipped
+ * at submit time. Best-effort: the address is already saved to the learner
+ * record by the time this runs, so a failure here costs one notification, not
+ * the address.
  */
 async function backfillLatestMissionEmail(email: string): Promise<void> {
   let missionId: string | null = null;
@@ -61,9 +80,9 @@ async function backfillLatestMissionEmail(email: string): Promise<void> {
 
     // Already stamped (e.g. the learner re-saved the same address from the
     // history page) - the queued email has been sent, don't send it twice.
-    if (!snapshot.exists() || snapshot.data().learnerEmail) return;
+    if (!snapshot.exists() || snapshot.data().learnerEmailHash) return;
 
-    await updateDoc(missionRef, { learnerEmail: email });
+    await updateDoc(missionRef, { learnerEmailHash: await hashLearnerEmail(email) });
 
     await fetch(`/api/missions/${missionId}/notify`, {
       method: 'POST',
@@ -112,13 +131,17 @@ export function LearnerProvider({ children }: { children: ReactNode }) {
     setLearnerEmailState(email);
     setShowEmailPrompt(false);
 
-    if (email) await backfillLatestMissionEmail(email);
-
-    if (!sessionId) return;
-
+    // Order matters. The learner record is now the ONLY place the address
+    // lives, and backfillLatestMissionEmail triggers a notify that reads it
+    // back server-side - so persist here first or that email finds no address
+    // and silently skips.
+    //
+    // Deliberately not gated on `sessionId`: the document id comes from
+    // learnerDocId(), not session state, and skipping this write would leave
+    // the learner reachable by nothing at all.
     try {
       const db = getFirestoreClient();
-      const learnerRef = doc(db, 'learners', sessionId);
+      const learnerRef = doc(db, 'learners', learnerDocId());
       await setDoc(
         learnerRef,
         { learnerEmail: email, lastActiveAt: new Date().toISOString() },
@@ -127,6 +150,8 @@ export function LearnerProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.warn('Failed to persist learner email to Firestore:', error);
     }
+
+    if (email) await backfillLatestMissionEmail(email);
   }
 
   const openEmailPrompt = () => setShowEmailPrompt(true);
@@ -143,7 +168,7 @@ export function LearnerProvider({ children }: { children: ReactNode }) {
 
       // Try to fetch existing learner from Firestore
       const db = getFirestoreClient();
-      const learnerRef = doc(db, 'learners', session.sessionId);
+      const learnerRef = doc(db, 'learners', learnerDocId());
       const learnerSnap = await getDoc(learnerRef);
 
       if (learnerSnap.exists()) {
@@ -197,7 +222,7 @@ export function LearnerProvider({ children }: { children: ReactNode }) {
 
     try {
       const db = getFirestoreClient();
-      const learnerRef = doc(db, 'learners', sessionId);
+      const learnerRef = doc(db, 'learners', learnerDocId());
 
       await updateDoc(learnerRef, {
         displayName: sanitized,
