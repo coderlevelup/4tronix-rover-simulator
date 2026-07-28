@@ -5,7 +5,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "learnerEmail",
+          "fieldPath": "learnerEmailHash",
           "order": "ASCENDING"
         },
         {

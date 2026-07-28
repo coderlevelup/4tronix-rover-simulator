@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore';
 import { getFirestoreClient } from '@/lib/firebase';
 import { Mission } from '@/core/domain/entities/Mission';
+import { hashLearnerEmail } from '@/core/domain/services/learnerEmailHash';
 
 /**
  * Get all missions for a learner with real-time updates
@@ -67,19 +68,26 @@ export function subscribeMissionsByLearnerId(
  * Used by the history page so a learner can see every mission they have ever
  * submitted under the same email, across devices/browsers.
  *
+ * The address is hashed in the browser and the query matches on the hash:
+ * mission documents are world-readable, so they never carry the address itself.
+ * Hashing is async, so this returns the unsubscribe via a promise rather than
+ * synchronously.
+ *
  * @param learnerEmail - Email the learner identified with
  * @param callback - Function called when missions update
- * @returns Unsubscribe function to stop listening
+ * @returns Promise of an unsubscribe function
  */
-export function subscribeMissionsByLearnerEmail(
+export async function subscribeMissionsByLearnerEmail(
   learnerEmail: string,
   callback: (missions: Mission[]) => void
-): Unsubscribe {
+): Promise<Unsubscribe> {
+  const learnerEmailHash = await hashLearnerEmail(learnerEmail);
+
   const db = getFirestoreClient();
   const missionsRef = collection(db, 'missions');
   const q = query(
     missionsRef,
-    where('learnerEmail', '==', learnerEmail),
+    where('learnerEmailHash', '==', learnerEmailHash),
     orderBy('submittedAt', 'desc')
   );
 

@@ -72,12 +72,15 @@ describe('completion notification', () => {
       yardId: 'yard-1',
       learnerId: 'learner-1',
       sessionId: 'session-1',
-      learnerEmail: 'ada@school.edu',
       name: 'Orbital Nomad',
       code: 'rover.forward(100)',
       status: 'processing',
       submittedAt: '2026-01-01T00:00:00.000Z',
     });
+
+    // The address lives on the learner record, not the mission: missions are
+    // world-readable and carry only learnerEmailHash.
+    learners.set('learner-1', { learnerEmail: 'ada@school.edu', displayName: 'Ada' });
   });
 
   it('fires a completion email after the mission status update', async () => {

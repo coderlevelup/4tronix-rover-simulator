@@ -179,6 +179,14 @@ export class FirestoreMissionRepository implements IMissionRepository {
 
     delete persistedFields.queuePosition;
     delete persistedFields.estimatedWait;
+
+    // Mission documents are world-readable. A plaintext learner address must
+    // never reach one - only learnerEmailHash. The Mission type no longer has
+    // the field, so this is a backstop against an untyped or legacy caller
+    // (e.g. a partial update assembled from raw Firestore data) reintroducing
+    // it silently.
+    delete (persistedFields as Record<string, unknown>).learnerEmail;
+
     return this.removeUndefinedValues(persistedFields) as Record<string, unknown>;
   }
 
@@ -359,7 +367,7 @@ export class FirestoreMissionRepository implements IMissionRepository {
       yardId: data.yardId as string,
       learnerId: (data.learnerId as string) || (data.sessionId as string),
       sessionId: data.sessionId as string,
-      learnerEmail: data.learnerEmail as string | undefined,
+      learnerEmailHash: data.learnerEmailHash as string | undefined,
       learnerUid: data.learnerUid as string | undefined,
       name: data.name as string | undefined,
       code: data.code as string,

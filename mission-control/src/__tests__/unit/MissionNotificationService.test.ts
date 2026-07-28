@@ -55,27 +55,50 @@ function makeMission(overrides: Partial<Mission> = {}): Mission {
 
 const HISTORY_URL = 'http://localhost:3000/history';
 
+/**
+ * The address now comes from the learner record, not the mission - mission
+ * documents are world-readable, so they carry only a hash. These stubs model
+ * learners/{learnerId}.
+ */
 describe('MissionNotificationService', () => {
-  it('does nothing when the mission has no learnerEmail', async () => {
-    const sender = new MockEmailSender();
-    const firestore = makeFirestoreStub(undefined);
-    const service = new MissionNotificationService(sender, firestore as never, HISTORY_URL);
-
-    await service.notifyStatusChange(makeMission({ learnerEmail: undefined }), 'processing');
-
-    expect(sender.calls).toHaveLength(0);
-    expect(firestore.collection).not.toHaveBeenCalled();
-  });
-
-  it('sends a templated email to the learner for the given status', async () => {
+  it('skips when the learner record has no email', async () => {
     const sender = new MockEmailSender();
     const firestore = makeFirestoreStub({ displayName: 'Ada' });
     const service = new MissionNotificationService(sender, firestore as never, HISTORY_URL);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
-    await service.notifyStatusChange(
-      makeMission({ learnerEmail: 'ada@school.edu' }),
-      'completed'
-    );
+    await expect(service.notifyStatusChange(makeMission(), 'processing')).resolves.toEqual({
+      sent: false,
+      reason: 'no-learner-email',
+    });
+
+    expect(sender.calls).toHaveLength(0);
+    warn.mockRestore();
+  });
+
+  it('skips when the learner record does not exist at all', async () => {
+    const sender = new MockEmailSender();
+    const firestore = makeFirestoreStub(undefined);
+    const service = new MissionNotificationService(sender, firestore as never, HISTORY_URL);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(service.notifyStatusChange(makeMission(), 'processing')).resolves.toEqual({
+      sent: false,
+      reason: 'no-learner-email',
+    });
+
+    expect(sender.calls).toHaveLength(0);
+    warn.mockRestore();
+  });
+
+  it('sends a templated email to the address on the learner record', async () => {
+    const sender = new MockEmailSender();
+    const firestore = makeFirestoreStub({ learnerEmail: 'ada@school.edu', displayName: 'Ada' });
+    const service = new MissionNotificationService(sender, firestore as never, HISTORY_URL);
+
+    await expect(service.notifyStatusChange(makeMission(), 'completed')).resolves.toEqual({
+      sent: true,
+    });
 
     expect(sender.calls).toHaveLength(1);
     expect(sender.calls[0].to).toBe('ada@school.edu');
@@ -84,44 +107,88 @@ describe('MissionNotificationService', () => {
     expect(sender.calls[0].html).toContain(HISTORY_URL);
   });
 
-  it('falls back to the mission id when the mission has no name', async () => {
+  it('greets by display name from the same record the address came from', async () => {
+    // Regression: the address used to be read off the mission while the name
+    // was looked up under a different id, so every email said "Space Explorer".
     const sender = new MockEmailSender();
-    const firestore = makeFirestoreStub({ displayName: 'Ada' });
+    const firestore = makeFirestoreStub({ learnerEmail: 'ada@school.edu', displayName: 'Ada' });
     const service = new MissionNotificationService(sender, firestore as never, HISTORY_URL);
 
-    await service.notifyStatusChange(
-      makeMission({ learnerEmail: 'ada@school.edu', name: undefined, id: 'mission-xyz' }),
-      'completed'
-    );
+    await service.notifyStatusChange(makeMission(), 'completed');
 
-    expect(sender.calls[0].subject).toContain('mission-xyz');
+    expect(sender.calls[0].html).toContain('Hi Ada,');
+    expect(sender.calls[0].html).not.toContain('Space Explorer');
   });
 
-  it('falls back to "Space Explorer" when the learner has no displayName', async () => {
+  it('falls back to "Space Explorer" when the record has an email but no name', async () => {
     const sender = new MockEmailSender();
-    const firestore = makeFirestoreStub(undefined);
+    const firestore = makeFirestoreStub({ learnerEmail: 'ada@school.edu' });
     const service = new MissionNotificationService(sender, firestore as never, HISTORY_URL);
 
-    await service.notifyStatusChange(
-      makeMission({ learnerEmail: 'ada@school.edu' }),
-      'completed'
-    );
+    await service.notifyStatusChange(makeMission(), 'completed');
 
     expect(sender.calls[0].html).toContain('Hi Space Explorer,');
   });
 
-  it('swallows sender errors instead of throwing', async () => {
+  it('falls back to the mission id when the mission has no name', async () => {
+    const sender = new MockEmailSender();
+    const firestore = makeFirestoreStub({ learnerEmail: 'ada@school.edu', displayName: 'Ada' });
+    const service = new MissionNotificationService(sender, firestore as never, HISTORY_URL);
+
+    await service.notifyStatusChange(makeMission({ name: undefined, id: 'mission-xyz' }), 'completed');
+
+    expect(sender.calls[0].subject).toContain('mission-xyz');
+  });
+
+  it('never puts a plaintext address on the mission it reads', async () => {
+    const sender = new MockEmailSender();
+    const firestore = makeFirestoreStub({ learnerEmail: 'ada@school.edu' });
+    const service = new MissionNotificationService(sender, firestore as never, HISTORY_URL);
+    const mission = makeMission();
+
+    await service.notifyStatusChange(mission, 'completed');
+
+    expect(Object.keys(mission)).not.toContain('learnerEmail');
+  });
+
+  it('reports sender errors instead of throwing', async () => {
     const sender = new MockEmailSender();
     sender.failOnNextSend();
-    const firestore = makeFirestoreStub({ displayName: 'Ada' });
+    const firestore = makeFirestoreStub({ learnerEmail: 'ada@school.edu', displayName: 'Ada' });
     const service = new MissionNotificationService(sender, firestore as never, HISTORY_URL);
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(
-      service.notifyStatusChange(makeMission({ learnerEmail: 'ada@school.edu' }), 'failed')
-    ).resolves.toBeUndefined();
+    await expect(service.notifyStatusChange(makeMission(), 'failed')).resolves.toEqual({
+      sent: false,
+      reason: 'send-failed',
+      error: expect.any(String),
+    });
 
     expect(consoleErrorSpy).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('reports a failure when the learner lookup itself throws', async () => {
+    const sender = new MockEmailSender();
+    const firestore = {
+      collection: jest.fn(() => ({
+        doc: jest.fn(() => ({
+          get: jest.fn(async () => {
+            throw new Error('Firestore unavailable');
+          }),
+        })),
+      })),
+    };
+    const service = new MissionNotificationService(sender, firestore as never, HISTORY_URL);
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(service.notifyStatusChange(makeMission(), 'queued')).resolves.toEqual({
+      sent: false,
+      reason: 'send-failed',
+      error: 'Firestore unavailable',
+    });
+
+    expect(sender.calls).toHaveLength(0);
     consoleErrorSpy.mockRestore();
   });
 });
