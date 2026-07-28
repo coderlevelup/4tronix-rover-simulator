@@ -143,7 +143,19 @@
             color: var(--bad);
             font-size: 0.8rem;
         }
-    </style>
+    
+        #conflictSection { margin-top: 2rem; }
+        .conflict-heading { color: var(--heading); font-size: 1rem; font-weight: 700; }
+        .conflict-note { color: var(--text-dim); font-size: .82rem; margin: .25rem 0 .8rem; max-width: 60ch; }
+        .conflict-row {
+            display: flex; gap: .6rem; flex-wrap: wrap; align-items: baseline;
+            border: 1px solid var(--border); border-radius: 10px;
+            padding: .6rem .8rem; margin-bottom: .5rem; background: var(--surface);
+            font-family: var(--mono); font-size: .78rem; color: var(--text-dim);
+        }
+        .conflict-row b { color: var(--heading); font-weight: 600; }
+        .conflict-win { color: var(--warn); }
+</style>
 </head>
 <body>
     {% set nav_active = 'status' %}{% include "_nav.html" %}
@@ -195,10 +207,38 @@
         </div>
     </div>
 
+    <section id="conflictSection" hidden>
+        <h2 class="conflict-heading">Sync conflicts</h2>
+        <p class="conflict-note">Reconciliations where the losing side had already finished.
+            Normal progress is not listed.</p>
+        <div id="conflictList"></div>
+    </section>
+
     <div class="footer" id="footer">Checking&hellip;</div>
     </main>
 
     <script>
+        // Conflict log. Read-only: this exists so a reconciliation decision is
+        // visible to the team rather than silently made (plan PR 4).
+        async function loadConflicts() {
+            try {
+                const resp = await fetch('/operator/api/conflicts');
+                if (!resp.ok) return;   // not signed in, or offline
+                const rows = (await resp.json()).conflicts || [];
+                const section = document.getElementById('conflictSection');
+                section.hidden = rows.length === 0;
+                document.getElementById('conflictList').innerHTML = rows.map(c => `
+                    <div class="conflict-row">
+                        <b>${c.mission_id}</b>
+                        <span>local <b>${c.local_state}</b> vs remote <b>${c.remote_state}</b></span>
+                        <span class="conflict-win">&rarr; ${c.resolution} won</span>
+                        <span>${c.logged_at}</span>
+                    </div>`).join('');
+            } catch (e) { /* offline: leave it hidden */ }
+        }
+        loadConflicts();
+        setInterval(loadConflicts, 60000);
+
         const BADGE_ICONS = {
             green: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
             amber: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',

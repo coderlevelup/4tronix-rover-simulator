@@ -1252,3 +1252,90 @@ def test_youtube_poll_writes_when_nothing_is_pending(
     assert firestore_missions['c1']['youtubeUrl'] == 'https://www.youtube.com/watch?v=vid123'
     # The mirror is updated too, so the console shows it without a pull.
     assert mission_store.get_mission('c1')['youtube_url'] == 'https://www.youtube.com/watch?v=vid123'
+
+
+# ---------------------------------------------------------------------------
+# Needs-review surface (plan PR 4)
+# ---------------------------------------------------------------------------
+
+def test_needs_review_lists_only_flagged_missions(client, missions):
+    import mission_store
+    sign_in(client)
+
+    assert client.get('/operator/api/missions/needs-review').get_json()['missions'] == []
+
+    mission_store.flag_for_review('p1', 'interrupted')
+    listed = client.get('/operator/api/missions/needs-review').get_json()['missions']
+
+    assert [m['id'] for m in listed] == ['p1']
+
+
+def test_resolving_as_completed_closes_it_out(client, missions, monkeypatch):
+    import mission_store
+    sign_in(client)
+    mission_store.flag_for_review('p1', 'interrupted')
+
+    resp = client.post('/operator/api/missions/p1/resolve', json={'outcome': 'completed'})
+    assert resp.status_code == 200
+
+    row = mission_store.get_mission('p1')
+    assert row['status'] == 'completed'
+    assert row['needs_review'] == 0
+    assert row['lock_owner'] is None
+
+
+def test_requeuing_returns_it_to_the_queue_without_touching_the_rover(client, missions, monkeypatch):
+    """Re-queue makes it available for a human to send again. It must not
+    dispatch by itself - physical actions are not replayable (plan 2.3)."""
+    import mission_store
+    sign_in(client)
+    mission_store.flag_for_review('p1', 'interrupted')
+
+    rover_calls = []
+    monkeypatch.setattr(
+        operator_console.requests, 'post',
+        lambda url, json=None, timeout=None: (rover_calls.append(url), FakeResponse(200))[1],
+    )
+
+    resp = client.post('/operator/api/missions/p1/resolve', json={'outcome': 'requeue'})
+    assert resp.status_code == 200
+
+    row = mission_store.get_mission('p1')
+    assert row['status'] == 'queued'
+    assert row['needs_review'] == 0
+    assert not any('queue/add' in u for u in rover_calls), 'must not re-dispatch'
+
+
+def test_resolve_rejects_an_unknown_outcome(client, missions):
+    import mission_store
+    sign_in(client)
+    mission_store.flag_for_review('p1', 'interrupted')
+
+    assert client.post('/operator/api/missions/p1/resolve',
+                       json={'outcome': 'delete'}).status_code == 400
+
+
+def test_resolve_rejects_a_mission_not_under_review(client, missions):
+    sign_in(client)
+    assert client.post('/operator/api/missions/q1/resolve',
+                       json={'outcome': 'completed'}).status_code == 400
+
+
+def test_conflicts_endpoint_exposes_the_log(client, missions):
+    import mission_store
+    sign_in(client)
+
+    assert client.get('/operator/api/conflicts').get_json()['conflicts'] == []
+
+    mission_store.log_conflict('q1', 'completed', 'cancelled', 'local')
+    conflicts = client.get('/operator/api/conflicts').get_json()['conflicts']
+
+    assert len(conflicts) == 1
+    assert conflicts[0]['resolution'] == 'local'
+
+
+def test_review_endpoints_require_an_operator(client, missions):
+    assert client.get('/operator/api/missions/needs-review').status_code == 401
+    assert client.post('/operator/api/missions/p1/resolve',
+                       json={'outcome': 'completed'}).status_code == 401
+    assert client.get('/operator/api/conflicts').status_code == 401
