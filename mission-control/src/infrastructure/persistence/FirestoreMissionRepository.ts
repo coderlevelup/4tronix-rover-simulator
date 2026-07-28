@@ -380,6 +380,18 @@ export class FirestoreMissionRepository implements IMissionRepository {
       submittedAt: data.submittedAt as string,
       startedAt: data.startedAt as string | undefined,
       completedAt: data.completedAt as string | undefined,
-    };
+
+       // Locking
+      lockOwner: (data.lockOwner as string | null) ?? null,
+      lockedAt: (data.lockedAt as string | null) ?? null,
+      leaseExpiresAt: (data.leaseExpiresAt as string | null) ?? null,
+
+      // Review
+      needsReview: (data.needsReview as boolean) ?? false,
+      reviewReason: (data.reviewReason as string | null) ?? null,
+
+      // Conflict resolution — fall back to submittedAt for legacy docs
+      statusUpdatedAt: (data.statusUpdatedAt as string) ?? (data.submittedAt as string),
+      };
   }
 }
