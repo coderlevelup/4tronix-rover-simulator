@@ -323,12 +323,18 @@ if __name__ == '__main__':
     from sync_worker import start_sync_worker
 
     init_db()
-    try:
-        firestore_client = operator_console._firestore()
-    except Exception as e:
-        print(f"[satellite] Firestore sync disabled: {e}")
-    else:
-        start_sync_worker(firestore_client, interval=30)
+    # Started unconditionally, with a FACTORY rather than a client. Building the
+    # client here and bailing on failure would mean a satellite powered on with
+    # no internet - the exact situation this whole feature exists for - never
+    # starts syncing at all, so missions run offline would sit in the outbox
+    # until someone restarted the process.
+    #
+    # Same reasoning as start_polling above: the first pull is a synchronous
+    # Firestore call, so it must not block server startup.
+    threading.Thread(
+        target=start_sync_worker, args=(operator_console._firestore,),
+        kwargs={'interval': 30}, daemon=True,
+    ).start()
 
     app.run(host='0.0.0.0', port=port, threaded=True, use_reloader=False)
 

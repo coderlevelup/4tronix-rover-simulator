@@ -63,8 +63,7 @@ const python = fs.existsSync(venvPython)
     : 'python3';
 
 (async () => {
-  // Preflight: the satellite needs its Python deps (firebase-admin, flask,
-  // python-dotenv) in
+  // Preflight: the satellite needs its Python deps (firebase-admin, flask, dotenv) in
   // the interpreter we run. Without them the operator login fails at runtime
   // with a cryptic "could not verify token", so install them on first run.
   // (These live in yard/satellite/requirements.txt, separate from the desktop

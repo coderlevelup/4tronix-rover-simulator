@@ -30,6 +30,15 @@ resource "google_secret_manager_secret" "firebase_private_key" {
   }
 }
 
+# Resend sends the learner mission-status emails. Without this the app throws
+# on every status change (visible as `[mission-email] FAILED` in the logs).
+resource "google_secret_manager_secret" "resend_api_key" {
+  secret_id = "resend-api-key"
+  replication {
+    auto {}
+  }
+}
+
 # Bootstrap seed: Cloud Run mounts these at version "latest", and a secret
 # with zero versions makes the very first revision fail to start. The seed
 # lets the initial apply succeed; the REAL values are added out-of-band
@@ -37,8 +46,9 @@ resource "google_secret_manager_secret" "firebase_private_key" {
 # hello image never reads them.
 resource "google_secret_manager_secret_version" "seed" {
   for_each = {
-    client_email = google_secret_manager_secret.firebase_client_email.id
-    private_key  = google_secret_manager_secret.firebase_private_key.id
+    client_email   = google_secret_manager_secret.firebase_client_email.id
+    private_key    = google_secret_manager_secret.firebase_private_key.id
+    resend_api_key = google_secret_manager_secret.resend_api_key.id
   }
   secret      = each.value
   secret_data = "CHANGE_ME-set-real-value-via-gcloud-secrets-versions-add"
@@ -48,7 +58,22 @@ locals {
   secrets = {
     FIREBASE_CLIENT_EMAIL = google_secret_manager_secret.firebase_client_email
     FIREBASE_PRIVATE_KEY  = google_secret_manager_secret.firebase_private_key
+    RESEND_API_KEY        = google_secret_manager_secret.resend_api_key
   }
+
+  # Non-secret runtime config. RESEND_SANDBOX_RECIPIENT is only emitted when
+  # set: while it has a value, every mission email is redirected to that one
+  # inbox and no learner receives mail, so it must stay unset in prod once a
+  # sending domain is verified.
+  plain_env = merge(
+    {
+      FIREBASE_PROJECT_ID = var.project_id
+      RESEND_FROM_EMAIL   = var.resend_from_email
+    },
+    var.resend_sandbox_recipient == "" ? {} : {
+      RESEND_SANDBOX_RECIPIENT = var.resend_sandbox_recipient
+    },
+  )
 }
 
 # --- Per-environment runtime identity + service ---------------------------
@@ -103,9 +128,12 @@ resource "google_cloud_run_v2_service" "mission_control" {
         }
       }
 
-      env {
-        name  = "FIREBASE_PROJECT_ID"
-        value = var.project_id
+      dynamic "env" {
+        for_each = local.plain_env
+        content {
+          name  = env.key
+          value = env.value
+        }
       }
 
       dynamic "env" {

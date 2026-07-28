@@ -43,7 +43,7 @@ type FirestoreLike = AdminFirestore | ClientFirestore;
 type MissionDocData = Record<string, unknown>;
 type MissionDocSnapshot = { id: string; data: () => MissionDocData };
 type QuerySnapshotLike = { docs: MissionDocSnapshot[] };
-type DocSnapshotLike = { exists: () => boolean; data: () => MissionDocData | undefined };
+type DocSnapshotLike = { exists: boolean; data: () => MissionDocData | undefined };
 type CountSnapshotLike = { data: () => { count: number } };
 
 export class FirestoreMissionRepository implements IMissionRepository {
@@ -74,7 +74,7 @@ export class FirestoreMissionRepository implements IMissionRepository {
   async findById(id: string): Promise<Mission | null> {
     const snapshot = await this.getMissionDoc(id);
 
-    if (!snapshot.exists()) {
+    if (!snapshot.exists) {
       return null;
     }
 
@@ -115,7 +115,7 @@ export class FirestoreMissionRepository implements IMissionRepository {
   async update(id: string, updates: Partial<Mission>): Promise<Mission | null> {
     const snapshot = await this.getMissionDoc(id);
 
-    if (!snapshot.exists()) {
+    if (!snapshot.exists) {
       return null;
     }
 
@@ -179,6 +179,14 @@ export class FirestoreMissionRepository implements IMissionRepository {
 
     delete persistedFields.queuePosition;
     delete persistedFields.estimatedWait;
+
+    // Mission documents are world-readable. A plaintext learner address must
+    // never reach one - only learnerEmailHash. The Mission type no longer has
+    // the field, so this is a backstop against an untyped or legacy caller
+    // (e.g. a partial update assembled from raw Firestore data) reintroducing
+    // it silently.
+    delete (persistedFields as Record<string, unknown>).learnerEmail;
+
     return this.removeUndefinedValues(persistedFields) as Record<string, unknown>;
   }
 
@@ -207,10 +215,12 @@ export class FirestoreMissionRepository implements IMissionRepository {
 
   private async getMissionDoc(id: string): Promise<DocSnapshotLike> {
     if (this.isAdminFirestore()) {
-      return (await this.adminDb().collection(MISSIONS_COLLECTION).doc(id).get()) as unknown as DocSnapshotLike;
+      const snapshot = await this.adminDb().collection(MISSIONS_COLLECTION).doc(id).get();
+      return { exists: snapshot.exists, data: () => snapshot.data() as MissionDocData | undefined };
     }
 
-    return (await getDoc(doc(this.clientDb(), MISSIONS_COLLECTION, id))) as unknown as DocSnapshotLike;
+    const snapshot = await getDoc(doc(this.clientDb(), MISSIONS_COLLECTION, id));
+    return { exists: snapshot.exists(), data: () => snapshot.data() as MissionDocData | undefined };
   }
 
   private async writeMission(id: string, mission: Partial<Mission>): Promise<void> {
@@ -357,6 +367,7 @@ export class FirestoreMissionRepository implements IMissionRepository {
       yardId: data.yardId as string,
       learnerId: (data.learnerId as string) || (data.sessionId as string),
       sessionId: data.sessionId as string,
+      learnerEmailHash: data.learnerEmailHash as string | undefined,
       learnerUid: data.learnerUid as string | undefined,
       name: data.name as string | undefined,
       code: data.code as string,
@@ -369,6 +380,18 @@ export class FirestoreMissionRepository implements IMissionRepository {
       submittedAt: data.submittedAt as string,
       startedAt: data.startedAt as string | undefined,
       completedAt: data.completedAt as string | undefined,
-    };
+
+       // Locking
+      lockOwner: (data.lockOwner as string | null) ?? null,
+      lockedAt: (data.lockedAt as string | null) ?? null,
+      leaseExpiresAt: (data.leaseExpiresAt as string | null) ?? null,
+
+      // Review
+      needsReview: (data.needsReview as boolean) ?? false,
+      reviewReason: (data.reviewReason as string | null) ?? null,
+
+      // Conflict resolution — fall back to submittedAt for legacy docs
+      statusUpdatedAt: (data.statusUpdatedAt as string) ?? (data.submittedAt as string),
+      };
   }
 }

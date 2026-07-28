@@ -37,6 +37,9 @@ module "mission_control" {
   region       = var.region
   environments = var.environments
 
+  resend_from_email        = var.resend_from_email
+  resend_sandbox_recipient = var.resend_sandbox_recipient
+
   deploy_service_account_email = module.github_wif.deploy_service_account_email
 
   depends_on = [google_project_service.apis]

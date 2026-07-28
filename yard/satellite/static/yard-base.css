@@ -5,40 +5,98 @@
  * on every page so all five read as one control room.
  */
 
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 :root {
-  --bg: #0b0b0e;
-  --bg-2: #101015;
-  --surface: #16161d;
-  --surface-2: #1c1c25;
-  --surface-3: #22222c;
-  --border: #262631;
-  --border-strong: #37374480;
-  --text: #e9e9ee;
-  --text-dim: #9a9aa7;
-  --text-faint: #6a6a77;
-  --heading: #ffffff;
-  --accent: #f97316;
-  --accent-2: #fb923c;
-  --accent-weak: rgba(249, 115, 22, 0.14);
+  --radius: 1rem;
+
+  --background: oklch(0.16 0.04 270);
+  --foreground: oklch(0.97 0.02 260);
+
+  --card: oklch(0.21 0.05 270);
+  --card-foreground: oklch(0.97 0.02 260);
+  --popover: oklch(0.21 0.05 270);
+  --popover-foreground: oklch(0.97 0.02 260);
+
+  --primary: oklch(0.72 0.19 45);
+  --primary-foreground: oklch(0.16 0.04 270);
+
+  --secondary: oklch(0.28 0.06 270);
+  --secondary-foreground: oklch(0.97 0.02 260);
+  --muted: oklch(0.26 0.04 270);
+  --muted-foreground: oklch(0.75 0.04 260);
+  --accent: oklch(0.74 0.18 175);
+  --accent-foreground: oklch(0.16 0.04 270);
+
+  --destructive: oklch(0.65 0.24 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.32 0.05 270);
+  --input: oklch(0.32 0.05 270);
+  --ring: oklch(0.72 0.19 45);
+
+  --mars: oklch(0.68 0.21 35);
+  --mars-glow: oklch(0.78 0.18 55);
+  --buzz: oklch(0.72 0.21 145);
+  --buzz-glow: oklch(0.85 0.18 155);
+  --cosmic: oklch(0.55 0.22 285);
+  --stardust: oklch(0.92 0.06 95);
+
+  --bg: var(--background);
+  /* Matches mission-control's [data-theme="dark"] --background, one step deeper
+     than --bg, so the command bar reads as a recessed surface on the same hue. */
+  --bg-2: oklch(0.13 0.04 270);
+  --surface: var(--card);
+  --surface-2: var(--popover);
+  --surface-3: var(--muted);
+  --border-strong: color-mix(in oklab, var(--border) 75%, var(--background) 25%);
+  --text: var(--foreground);
+  --text-dim: var(--muted-foreground);
+  --text-faint: oklch(0.75 0.03 270);
+  --heading: var(--foreground);
+  --accent-2: color-mix(in oklab, var(--accent) 70%, var(--primary) 30%);
+  /* Derived from --primary rather than a hardcoded orange, so the warm tints
+     track the shared token if mission-control ever retunes it. */
+  --accent-weak: color-mix(in oklab, var(--primary) 22%, transparent);
   --ok: #34d399;
   --warn: #fbbf24;
   --bad: #f87171;
-  --radius: 14px;
-  --mono: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Fredoka", "Baloo 2", system-ui, sans-serif;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans);
   color: var(--text);
-  background:
-    radial-gradient(900px 480px at 50% -160px, var(--accent-weak), transparent 70%),
-    linear-gradient(rgba(255, 255, 255, 0.016) 1px, transparent 1px) 0 0 / 100% 44px,
-    linear-gradient(90deg, rgba(255, 255, 255, 0.016) 1px, transparent 1px) 0 0 / 44px 100%,
-    var(--bg);
+  /* Console grid only. The ambient colour wash lives on ::before below, the
+     same way mission-control does it - a multi-layer `background` shorthand
+     containing var() is dropped at computed-value time, so the longhands and
+     the pseudo-element are what actually paint. */
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.016) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.016) 1px, transparent 1px);
+  background-size: 100% 44px, 44px 100%;
+  min-height: 100vh;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Cosmic-above / mars-below wash, mirroring mission-control's body::before so
+   the two apps read as one continuous space. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -20;
+  pointer-events: none;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, color-mix(in oklab, var(--cosmic) 40%, transparent), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 100% 100%, color-mix(in oklab, var(--mars) 35%, transparent), transparent 60%);
+}
+
+h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0.01em; }
 
 .mono, code, pre { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
@@ -53,15 +111,20 @@ body {
   gap: 1.1rem;
   padding: 0 1.5rem;
   height: 62px;
-  background: color-mix(in srgb, var(--bg-2) 82%, transparent);
+  background: color-mix(in srgb, var(--bg-2) 86%, transparent);
   backdrop-filter: blur(10px) saturate(1.2);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-strong);
 }
 .brand { display: inline-flex; align-items: center; gap: 0.65rem; text-decoration: none; }
 .brand-mark {
-  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
-  background: linear-gradient(140deg, var(--accent-2), #ea580c);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 3px 12px rgba(249, 115, 22, 0.35);
+  width: 30px; height: 30px; border-radius: 12px; flex-shrink: 0;
+  background-color: var(--surface);
+  background-image: url('/static/rover-hero.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 8px 22px rgba(0, 0, 0, 0.22);
 }
 .brand-txt { display: flex; flex-direction: column; line-height: 1.05; }
 .brand-txt b { color: var(--heading); font-size: 0.98rem; font-weight: 700; letter-spacing: 0.01em; }
@@ -72,8 +135,8 @@ body {
   color: var(--text-dim); text-decoration: none; font-size: 0.85rem; font-weight: 500;
   padding: 0.42rem 0.72rem; border-radius: 9px; transition: color 0.15s, background 0.15s;
 }
-.topnav a:hover { color: var(--text); background: var(--surface); }
-.topnav a.active { color: var(--accent); background: var(--accent-weak); font-weight: 600; }
+.topnav a:hover { color: var(--text); background: var(--surface-2); }
+.topnav a.active { color: var(--primary); background: color-mix(in oklab, var(--primary) 12%, transparent); font-weight: 600; }
 
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 0.75rem; }
 .op-email { color: var(--text-faint); font-size: 0.78rem; font-family: var(--mono); }
@@ -96,7 +159,7 @@ body {
   color: var(--text-dim); background: var(--surface); border: 1px solid var(--border);
   border-radius: 10px; transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.iconbtn:hover { color: var(--text); border-color: var(--accent); background: var(--surface-2); }
+.iconbtn:hover { color: var(--text); border-color: var(--primary); background: var(--surface-2); }
 .iconbtn svg { width: 18px; height: 18px; }
 
 /* Kiosk home button (code / monitor) */
@@ -106,7 +169,7 @@ body {
   color: var(--text-dim); background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.yard-home:hover { color: var(--text); border-color: var(--accent); background: var(--surface-2); }
+.yard-home:hover { color: var(--text); border-color: var(--primary); background: var(--surface-2); }
 .yard-home svg { width: 22px; height: 22px; }
 
 /* ---- Page shell + hub --------------------------------------------------- */
@@ -124,9 +187,9 @@ body {
   padding: 1.35rem; transition: transform 0.16s, border-color 0.16s, background 0.16s;
 }
 .station:hover { transform: translateY(-3px); border-color: var(--border-strong); background: var(--surface-2); }
-.station.hero { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 1.4rem; background: linear-gradient(120deg, rgba(249, 115, 22, 0.1), var(--surface) 55%); border-color: rgba(249, 115, 22, 0.35); }
+.station.hero { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 1.4rem; background: linear-gradient(120deg, color-mix(in oklab, var(--primary) 10%, transparent), var(--surface) 55%); border-color: color-mix(in oklab, var(--primary) 35%, transparent); }
 .station.hero:hover { border-color: var(--accent); }
-.station.hero::after { content: ""; position: absolute; right: -60px; top: -60px; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(249, 115, 22, 0.18), transparent 70%); pointer-events: none; }
+.station.hero::after { content: ""; position: absolute; right: -60px; top: -60px; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, color-mix(in oklab, var(--primary) 18%, transparent), transparent 70%); pointer-events: none; }
 
 .station .ic {
   flex-shrink: 0; width: 52px; height: 52px; border-radius: 14px;
@@ -134,7 +197,7 @@ body {
   color: var(--text-dim); background: var(--surface-3); border: 1px solid var(--border);
 }
 .station .ic svg { width: 26px; height: 26px; }
-.station.hero .ic { width: 60px; height: 60px; color: var(--accent); background: #2a1305; border-color: rgba(249, 115, 22, 0.5); }
+.station.hero .ic { width: 60px; height: 60px; color: var(--accent); background: color-mix(in oklab, var(--primary) 18%, var(--card)); border-color: color-mix(in oklab, var(--primary) 50%, transparent); }
 .station.hero .ic svg { width: 30px; height: 30px; }
 
 .station-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.35rem; }
@@ -144,7 +207,7 @@ body {
 .station-meta { display: flex; align-items: center; justify-content: space-between; margin-top: auto; }
 
 .tag { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; padding: 0.26rem 0.55rem; border-radius: 999px; color: var(--text-faint); background: var(--surface-3); border: 1px solid var(--border); }
-.tag.accent { color: var(--accent); background: var(--accent-weak); border-color: rgba(249, 115, 22, 0.3); }
+.tag.accent { color: var(--accent); background: var(--accent-weak); border-color: color-mix(in oklab, var(--primary) 30%, transparent); }
 .station .arrow { color: var(--text-faint); display: inline-flex; transition: color 0.16s, transform 0.16s; }
 .station .arrow svg { width: 20px; height: 20px; }
 .station:hover .arrow { color: var(--accent); transform: translateX(3px); }
