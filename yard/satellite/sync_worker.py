@@ -1,7 +1,8 @@
+import json
 import threading
 from datetime import datetime, timezone
 
-from mission_store import upsert_missions
+from mission_store import upsert_missions, peek_outbox, delete_outbox, mark_attempt
 
 
 def _now_iso():
@@ -33,7 +34,7 @@ def start_sync_worker(firestore_client, interval=30):
     """Poll Firestore every `interval` seconds. Same pattern as start_polling."""
     def _loop():
         try:
-            sync_from_firestore(firestore_client)
+            sync_cycle(firestore_client)
         except Exception as e:
             print(f'[sync] Unexpected error: {e}')
 

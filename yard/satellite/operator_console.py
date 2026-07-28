@@ -265,8 +265,6 @@ def _mission_to_dict(doc):
 @operator_bp.route('/api/missions', methods=['GET'])
 @require_operator
 def api_missions():
-    from .mission_store import get_missions
-
     missions, last_synced = get_missions()
 
     # Determine staleness (stale if last sync > 60 seconds ago or never synced)
@@ -276,8 +274,6 @@ def api_missions():
         synced_time = datetime.fromisoformat(last_synced.replace('Z', '+00:00'))
         age = (datetime.now(timezone.utc) - synced_time).total_seconds()
         stale = age > 60
-
-    from .mission_store import outbox_count
 
     return jsonify({
         'missions': missions,
@@ -326,8 +322,6 @@ def _dispatch_to_rover(mission):
 @require_operator
 def api_send_to_rover(mission_id):
     """Push the mission's Python onto the rover queue; mission -> processing."""
-    from .mission_store import get_mission, write_and_enqueue
-
     mission = get_mission(mission_id)
     if mission is None:
         return jsonify({'error': 'Mission not found'}), 404
@@ -354,8 +348,6 @@ def api_send_to_rover(mission_id):
 @require_operator
 def api_rerun(mission_id):
     """Re-queue a completed or failed mission on the rover."""
-    from .mission_store import get_mission, write_and_enqueue
-
     mission = get_mission(mission_id)
     if mission is None:
         return jsonify({'error': 'Mission not found'}), 404
@@ -393,8 +385,6 @@ def api_rerun(mission_id):
 @operator_bp.route('/api/missions/<mission_id>/complete', methods=['POST'])
 @require_operator
 def api_mark_complete(mission_id):
-    from .mission_store import get_mission, write_and_enqueue
-
     mission = get_mission(mission_id)
     if mission is None:
         return jsonify({'error': 'Mission not found'}), 404
@@ -415,8 +405,6 @@ def api_mark_complete(mission_id):
 @operator_bp.route('/api/missions/<mission_id>/youtube', methods=['POST'])
 @require_operator
 def api_attach_youtube(mission_id):
-    from .mission_store import get_mission, write_and_enqueue
-
     data = request.get_json(silent=True) or {}
     url = (data.get('url') or '').strip()
     if not url or not any(p.match(url) for p in YOUTUBE_URL_PATTERNS):
