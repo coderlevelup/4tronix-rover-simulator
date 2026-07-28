@@ -41,8 +41,10 @@ from functools import wraps
 import requests
 from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session
 
-from .mission_store import get_mission, get_missions, write_and_enqueue, outbox_count
-from .mission_store import get_missions, outbox_count
+try:
+    from .mission_store import get_mission, get_missions, write_and_enqueue, outbox_count
+except ImportError:
+    from mission_store import get_mission, get_missions, write_and_enqueue, outbox_count
 
 operator_bp = Blueprint('operator', __name__, url_prefix='/operator')
 # Timeouts (seconds)
