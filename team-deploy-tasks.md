@@ -32,12 +32,15 @@ https://console.cloud.google.com before starting.
   and select `bt-impact-academy`.
 - Decline Google Analytics unless David wants it.
 
-### 2. Create the Firestore database
-- Firebase console -> Build -> Firestore Database -> Create.
-- **Production mode** (we deploy real rules in step 5, do not use test mode).
-- Location: `africa-south1` (Johannesburg) if it appears in the list,
-  otherwise `europe-west1`. **This choice is permanent**, ask in the group
-  chat before clicking if unsure.
+### 2. Create the Firestore database - DONE
+- Werner created it in `europe-west1` (`africa-south1` is not offered for
+  Firestore). This choice is permanent.
+- Still to confirm: that it is the **`(default)`** database and not a named
+  one. Nothing in the app passes a database id - mission-control's client and
+  admin SDKs and the yard satellite all resolve it from the project id alone -
+  so a named database would need code changes in all three.
+- `infra/variables.tf` now defaults `region` to `europe-west1` to match, so
+  Cloud Run and Firestore stay co-located.
 
 ### 3. Enable operator sign-in
 - Build -> Authentication -> Get started -> Sign-in method.
