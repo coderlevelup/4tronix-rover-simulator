@@ -334,43 +334,51 @@ def api_logout():
 # Missions API
 # ---------------------------------------------------------------------------
 
-def _mission_to_dict(doc):
-    data = doc.to_dict() or {}
+def _mirror_row_to_dict(row):
+    """Map a mission_mirror SQLite row (snake_case) to the API's camelCase
+    shape - the frontend (operator.html) contract predates the mirror and is
+    unchanged by it.
+    """
     return {
-        'id': doc.id,
-        'name': data.get('name'),
-        'yardId': data.get('yardId'),
-        'code': data.get('code') or '',
-        'blocklyState': data.get('blocklyState'),
-        'status': data.get('status'),
-        'submittedAt': data.get('submittedAt'),
-        'startedAt': data.get('startedAt'),
-        'completedAt': data.get('completedAt'),
-        'youtubeUrl': data.get('youtubeUrl'),
+        'id': row['id'],
+        'name': row.get('name'),
+        'yardId': row.get('yard_id'),
+        'code': row.get('code') or '',
+        'blocklyState': row.get('blockly_state'),
+        'status': row.get('status'),
+        'submittedAt': row.get('submitted_at'),
+        'startedAt': row.get('started_at'),
+        'completedAt': row.get('completed_at'),
+        'youtubeUrl': row.get('youtube_url'),
     }
+
+
+def _mirror_is_stale(last_synced_at):
+    """Stale if we've never synced, or the last pull was over 60s ago."""
+    if not last_synced_at:
+        return True
+    synced_time = datetime.fromisoformat(last_synced_at.replace('Z', '+00:00'))
+    age = (datetime.now(timezone.utc) - synced_time).total_seconds()
+    return age > 60
 
 
 @operator_bp.route('/api/missions', methods=['GET'])
 @require_operator
 def api_missions():
-    if not _admin_configured():
-        return jsonify({'error': 'Firestore is not configured'}), 503
-    try:
-        docs = (
-            _firestore()
-            .collection(MISSIONS_COLLECTION)
-            # 'DESCENDING' is the value of firestore Query.DESCENDING; using the
-            # string avoids importing google.cloud here.
-            .order_by('submittedAt', direction='DESCENDING')
-            .limit(MISSION_LIST_LIMIT)
-            .stream()
-        )
-        missions = [_mission_to_dict(doc) for doc in docs]
-    except Exception as e:
-        return jsonify({'error': f'Failed to load missions: {e}'}), 502
+    from mission_store import get_missions, outbox_count
+    from satellite_identity import yard_id
 
-    missions = [m for m in missions if m['status'] != 'cancelled']
-    return jsonify({'missions': missions})
+    # Scoped to this satellite's own yard (plan 3.3) so a second yard's
+    # missions can never appear in, or be dispatched from, this console.
+    rows, last_synced = get_missions(MISSION_LIST_LIMIT, yard_id=yard_id())
+
+    return jsonify({
+        'missions': [_mirror_row_to_dict(row) for row in rows],
+        'stale': _mirror_is_stale(last_synced),
+        'lastSyncedAt': last_synced,
+        'pendingWrites': outbox_count(),
+    })
+
 
 
 def _get_mission_ref(mission_id):
@@ -472,8 +480,8 @@ def _dispatch_to_rover(mission, mission_id=None):
 @operator_bp.route('/api/missions/<mission_id>/send', methods=['POST'])
 @require_operator
 def api_send_to_rover(mission_id):
-    operator = current_operator()
-    owner = operator['uid']
+    from satellite_identity import satellite_id
+    owner = satellite_id()
     now = _now_iso()
     expires = _expires_iso()
 
@@ -532,8 +540,8 @@ def _acquire_for_rerun(transaction, ref, owner, now_iso, expires_iso):
 @operator_bp.route('/api/missions/<mission_id>/rerun', methods=['POST'])
 @require_operator
 def api_rerun(mission_id):
-    operator = current_operator()
-    owner = operator['uid']
+    from satellite_identity import satellite_id
+    owner = satellite_id()
     now = _now_iso()
     expires = _expires_iso()
 
