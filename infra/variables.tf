@@ -5,9 +5,21 @@ variable "project_id" {
 }
 
 variable "region" {
-  description = "Region for Cloud Run + Artifact Registry (Johannesburg)"
+  description = "Region for Cloud Run + Artifact Registry. Co-located with Firestore, which is in europe-west1 because africa-south1 is not offered for Firestore."
   type        = string
-  default     = "africa-south1"
+  default     = "europe-west1"
+}
+
+variable "resend_from_email" {
+  description = "From address for learner mission emails."
+  type        = string
+  default     = "onboarding@resend.dev"
+}
+
+variable "resend_sandbox_recipient" {
+  description = "Redirects ALL mission email to one inbox while no sending domain is verified. Empty means normal delivery. Set via TF_VAR_resend_sandbox_recipient, never committed."
+  type        = string
+  default     = ""
 }
 
 variable "github_repository" {

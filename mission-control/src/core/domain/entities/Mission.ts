@@ -37,7 +37,12 @@ export interface Mission {
   // Learner tracking
   learnerId: string;                 // Direct link to learner (formerly sessionId)
   sessionId: string;                 // Browser fingerprint for history tracking (kept for backward compatibility)
-  learnerEmail?: string;             // Optional - lets a learner see history across devices by email
+  // One-way hash of the learner's email, NEVER the address itself: mission
+  // documents are world-readable, so a plaintext address here is public. Lets a
+  // learner find their missions from another device by hashing the address they
+  // already know. The real address lives on the learner record.
+  // See core/domain/services/learnerEmailHash.ts
+  learnerEmailHash?: string;
   learnerUid?: string;               // Optional - for when auth is added in future iterations
 
   // Payload
@@ -53,6 +58,18 @@ export interface Mission {
   // Execution results (populated after execution)
   executionResult?: ExecutionResult;
   executionMetadata?: ExecutionMetadata;
+
+  //Locking (offline-sync lease mechanisms)
+  lockOwner?: string | null;                 // Which rover is currently executing this mission (if any)
+  lockedAt?: string | null;                   // When the mission was locked for execution (if any)
+  leaseExpiresAt?: string | null;             // When the lock lease expires (if any)
+
+  //Review
+  needsReview?: boolean;              // Whether the mission needs review (e.g., for failed missions)
+  reviewReason?: string | null;              // Optional - reason for review (e.g., "syntax error", "failed test case")
+
+  //Confilct Resolution
+  statusUpdatedAt?: string | null;          // When the status was last updated (for conflict resolution)
 
   // Media artifacts
   videoUrl?: string;                 // Google Cloud Storage URL

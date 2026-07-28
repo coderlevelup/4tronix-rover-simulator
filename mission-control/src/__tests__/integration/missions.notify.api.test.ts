@@ -78,13 +78,12 @@ describe('POST /api/missions/[id]/notify Integration Tests', () => {
       yardId: 'yard-1',
       learnerId: 'learner-1',
       sessionId: 'session-1',
-      learnerEmail: 'ada@school.edu',
       name: 'Orbital Nomad',
       code: 'rover.forward(100)',
       status: 'processing',
       submittedAt: '2026-01-01T00:00:00.000Z',
     });
-    learners.set('learner-1', { displayName: 'Ada' });
+    learners.set('learner-1', { learnerEmail: 'ada@school.edu', displayName: 'Ada' });
   });
 
   it('sends the status email without writing to the mission document', async () => {
@@ -124,7 +123,7 @@ describe('POST /api/missions/[id]/notify Integration Tests', () => {
     expect(sendMock).not.toHaveBeenCalled();
   });
 
-  it('does not send an email when the mission has no learnerEmail', async () => {
+  it('does not send an email when the learner record has no address', async () => {
     missions.set('mission-1', {
       yardId: 'yard-1',
       learnerId: 'learner-1',
@@ -134,6 +133,10 @@ describe('POST /api/missions/[id]/notify Integration Tests', () => {
       status: 'processing',
       submittedAt: '2026-01-01T00:00:00.000Z',
     });
+
+    // Reachability now depends entirely on the learner record: the mission
+    // carries only a hash, so an address-less learner means no email.
+    learners.set('learner-1', { displayName: 'Ada' });
 
     const response = await POST(notifyRequest('mission-1', { status: 'completed' }), {
       params: Promise.resolve({ id: 'mission-1' }),

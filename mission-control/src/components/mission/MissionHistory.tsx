@@ -47,11 +47,34 @@ export function MissionHistory() {
       return;
     }
     setEmailLoaded(false);
-    const unsubscribe = subscribeMissionsByLearnerEmail(learnerEmail, (missions) => {
+
+    // Hashing the address is async, so the subscription is established after an
+    // await. Guard against the effect being torn down (or the email changing)
+    // before it resolves, which would otherwise leak a live listener.
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+
+    subscribeMissionsByLearnerEmail(learnerEmail, (missions) => {
       setByEmail(missions);
       setEmailLoaded(true);
-    });
-    return () => unsubscribe();
+    })
+      .then((unsub) => {
+        if (cancelled) {
+          unsub();
+          return;
+        }
+        unsubscribe = unsub;
+      })
+      .catch((error) => {
+        console.error('Failed to subscribe to missions by email:', error);
+        setByEmail([]);
+        setEmailLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, [learnerEmail]);
 
   const missions = useMemo(() => {

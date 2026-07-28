@@ -38,11 +38,19 @@ class FakeDocRef:
         self._store = store
         self._id = mission_id
 
-    def get(self):
+    def get(self, transaction=None):
         return FakeSnapshot(self._store.get(self._id))
 
     def update(self, fields):
         self._store[self._id].update(fields)
+
+
+class FakeTransaction:
+    """Applies writes immediately. The fake has no rollback, which is fine:
+    these tests exercise the lock decision logic, not Firestore's atomicity."""
+
+    def update(self, ref, fields):
+        ref.update(fields)
 
 
 class FakeCollection:
@@ -59,6 +67,9 @@ class FakeFirestore:
 
     def collection(self, name):
         return FakeCollection(self._store)
+
+    def transaction(self):
+        return FakeTransaction()
 
 
 class FakeStreamDoc:
@@ -106,6 +117,36 @@ class FakeResponse:
         return self._payload
 
 
+class RecordingTimer:
+    """threading.Timer stand-in for handler tests.
+
+    Records instead of scheduling, so lease-renewal timers neither fire during
+    a test nor leak into the next one. Needed because the `client` fixture
+    swaps threading.Thread for SyncThread, and the real threading.Timer calls
+    Thread.__init__ internally - so a real Timer blows up once Thread is faked.
+    """
+
+    instances = []
+
+    def __init__(self, interval, function, args=None, kwargs=None):
+        self.interval = interval
+        self.function = function
+        self.args = args or ()
+        self.started = False
+        self.cancelled = False
+        RecordingTimer.instances.append(self)
+
+    def start(self):
+        self.started = True
+
+    def cancel(self):
+        self.cancelled = True
+
+    @classmethod
+    def reset(cls):
+        cls.instances = []
+
+
 class SyncThread:
     """threading.Thread stand-in that runs its target immediately and
     synchronously in start(), so tests asserting on side effects of
@@ -124,6 +165,15 @@ class SyncThread:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _plain_transactional(monkeypatch):
+    """operator_console applies @firestore.transactional lazily at call time so
+    the module imports without firebase-admin. Tests replace it with a
+    pass-through: the fake transaction applies writes directly, and what is
+    under test is the lock decision, not Firestore's transaction machinery."""
+    monkeypatch.setattr(operator_console, '_transactional', lambda fn: fn)
+
 
 @pytest.fixture
 def missions():
@@ -177,6 +227,11 @@ def client(missions, monkeypatch, tmp_path):
     # thread; run it inline instead so assertions right after client.post()
     # aren't racing it.
     monkeypatch.setattr(operator_console.threading, 'Thread', SyncThread)
+    # Lease renewal schedules real timers; record them instead (see
+    # RecordingTimer for why a real Timer cannot survive the Thread fake).
+    RecordingTimer.reset()
+    operator_console._active_leases.clear()
+    monkeypatch.setattr(operator_console.threading, 'Timer', RecordingTimer)
     flask_app.config['TESTING'] = True
     with flask_app.test_client() as c:
         yield c
@@ -331,11 +386,13 @@ def test_send_pushes_run_python_and_marks_processing(client, missions, monkeypat
 
     url, payload = calls[0]
     assert url.endswith('/queue/add')
+    # mission_id rides along so the rover can report which mission it is running.
     assert payload == [{
         'cmd': 'run_python',
         'params': {
             'code': 'rover.forward(60)\nrover.stop()',
             'blockly_state': '{"blocks":{}}',
+            'mission_id': 'q1',
         },
     }]
 
@@ -736,3 +793,258 @@ def test_mission_control_url_defaults_to_localhost(monkeypatch):
 
     with flask_app.app_context():
         assert operator_console._mission_control_url() == 'http://localhost:3000'
+
+
+# ---------------------------------------------------------------------------
+# Mission locking / leases
+#
+# The point of the lock is that exactly one operator drives a mission at a
+# time, and that a mission is never stranded when the operator holding it
+# disappears. These cover both halves.
+# ---------------------------------------------------------------------------
+
+def _ok_rover(monkeypatch, calls=None):
+    def fake_post(url, json=None, timeout=None):
+        if calls is not None:
+            calls.append((url, json))
+        return FakeResponse(200, {'status': 'ok', 'added': 1})
+    monkeypatch.setattr(operator_console.requests, 'post', fake_post)
+
+
+def _no_rover(monkeypatch):
+    def fake_post(url, json=None, timeout=None):
+        raise operator_console.requests.exceptions.ConnectionError('rover offline')
+    monkeypatch.setattr(operator_console.requests, 'post', fake_post)
+
+
+def test_send_takes_the_lock_and_records_the_lease(client, missions, monkeypatch):
+    sign_in(client)
+    _ok_rover(monkeypatch)
+
+    assert client.post('/operator/api/missions/q1/send').status_code == 200
+
+    m = missions['q1']
+    assert m['status'] == 'processing'
+    assert m['lockOwner'], 'an owner must be recorded or the lock means nothing'
+    assert re.match(r'\d{4}-\d{2}-\d{2}T', m['lockedAt'])
+    assert m['leaseExpiresAt'] > m['lockedAt'], 'lease must expire in the future'
+    assert m['statusUpdatedAt']
+
+
+def test_second_operator_is_refused_while_the_lease_is_live(client, missions, monkeypatch):
+    sign_in(client)
+    _ok_rover(monkeypatch)
+
+    missions['q1'].update({
+        'lockOwner': 'someone-else',
+        'lockedAt': '2026-07-14T08:00:00Z',
+        'leaseExpiresAt': '2099-01-01T00:00:00Z',  # far future = still held
+    })
+
+    resp = client.post('/operator/api/missions/q1/send')
+    assert resp.status_code == 409
+    assert 'locked by another operator' in resp.get_json()['error']
+    assert missions['q1']['lockOwner'] == 'someone-else', 'must not steal a live lock'
+
+
+def test_expired_lease_lets_another_operator_reclaim(client, missions, monkeypatch):
+    """The whole reason a lease exists: an operator crashed mid-run and the
+    in-process renewal timer died with them. Without this the mission is stuck
+    in 'processing' forever - send says not-queued, rerun says not-terminal."""
+    sign_in(client)
+    _ok_rover(monkeypatch)
+
+    missions['q1'].update({
+        'status': 'processing',
+        'lockOwner': 'operator-who-crashed',
+        'lockedAt': '2026-07-14T08:00:00Z',
+        'leaseExpiresAt': '2026-07-14T08:05:00Z',  # long past
+    })
+
+    assert client.post('/operator/api/missions/q1/send').status_code == 200
+    assert missions['q1']['lockOwner'] != 'operator-who-crashed'
+    assert missions['q1']['leaseExpiresAt'] > '2026-07-14T08:05:00Z'
+
+
+def test_processing_mission_with_no_lease_is_not_silently_grabbed(client, missions, monkeypatch):
+    """Legacy rows written before locking existed have no lease. Treating those
+    as free would let two operators drive the same mission."""
+    sign_in(client)
+    _ok_rover(monkeypatch)
+
+    assert missions['p1']['status'] == 'processing'
+    assert 'leaseExpiresAt' not in missions['p1']
+
+    assert client.post('/operator/api/missions/p1/send').status_code == 400
+
+
+def test_the_holder_can_re_send_their_own_locked_mission(client, missions, monkeypatch):
+    sign_in(client)
+    _ok_rover(monkeypatch)
+
+    client.post('/operator/api/missions/q1/send')
+    owner = missions['q1']['lockOwner']
+
+    # Same operator, lease still live, but the mission is now 'processing'
+    # without an expired lease - so it is correctly refused rather than
+    # double-dispatched to the rover.
+    assert client.post('/operator/api/missions/q1/send').status_code == 400
+    assert missions['q1']['lockOwner'] == owner
+
+
+def test_failed_dispatch_releases_the_lock_and_requeues(client, missions, monkeypatch):
+    """A lock held by a dispatch that never landed would strand the mission for
+    a full lease period."""
+    sign_in(client)
+    _no_rover(monkeypatch)
+
+    resp = client.post('/operator/api/missions/q1/send')
+    assert resp.status_code != 200
+
+    m = missions['q1']
+    assert m['status'] == 'queued', 'must go back in the queue, not stay processing'
+    assert m['lockOwner'] is None
+    assert m['leaseExpiresAt'] is None
+
+
+def test_send_starts_a_lease_renewal_timer(client, missions, monkeypatch):
+    sign_in(client)
+    _ok_rover(monkeypatch)
+
+    client.post('/operator/api/missions/q1/send')
+
+    assert 'q1' in operator_console._active_leases
+    timer = operator_console._active_leases['q1']
+    assert timer.started
+    assert timer.interval == operator_console.LEASE_RENEW_INTERVAL
+
+
+def test_completing_a_mission_clears_the_lock_and_stops_renewal(client, missions, monkeypatch):
+    """A lease left renewing after completion would keep a finished mission
+    looking locked forever."""
+    sign_in(client)
+    _ok_rover(monkeypatch)
+
+    client.post('/operator/api/missions/q1/send')
+    timer = operator_console._active_leases['q1']
+
+    assert client.post('/operator/api/missions/q1/complete').status_code == 200
+
+    m = missions['q1']
+    assert m['status'] == 'completed'
+    assert m['lockOwner'] is None
+    assert m['lockedAt'] is None
+    assert m['leaseExpiresAt'] is None
+    assert timer.cancelled, 'renewal timer must be cancelled'
+    assert 'q1' not in operator_console._active_leases
+
+
+def test_rerun_takes_the_lock_on_a_completed_mission(client, missions, monkeypatch):
+    sign_in(client)
+    _ok_rover(monkeypatch)
+
+    assert client.post('/operator/api/missions/c1/rerun').status_code == 200
+
+    m = missions['c1']
+    assert m['status'] == 'processing'
+    assert m['lockOwner']
+    assert m['leaseExpiresAt']
+    assert m['completedAt'] is None, 'stale completion must be cleared'
+
+
+def test_rerun_restores_the_previous_status_when_dispatch_fails(client, missions, monkeypatch):
+    """An unreachable rover is not a failed mission. Marking it 'failed' would
+    also surface to the learner as a run that went wrong."""
+    sign_in(client)
+    _no_rover(monkeypatch)
+
+    assert missions['c1']['status'] == 'completed'
+
+    resp = client.post('/operator/api/missions/c1/rerun')
+    assert resp.status_code != 200
+
+    m = missions['c1']
+    assert m['status'] == 'completed', 'must not be left marked failed'
+    assert m['lockOwner'] is None
+    assert m['leaseExpiresAt'] is None
+
+
+def test_rerun_is_refused_while_another_operator_holds_the_lease(client, missions, monkeypatch):
+    sign_in(client)
+    _ok_rover(monkeypatch)
+
+    missions['c1'].update({
+        'lockOwner': 'someone-else',
+        'leaseExpiresAt': '2099-01-01T00:00:00Z',
+    })
+
+    assert client.post('/operator/api/missions/c1/rerun').status_code == 409
+    assert missions['c1']['status'] == 'completed'
+
+
+def test_send_still_notifies_mission_control_after_locking(client, missions, monkeypatch):
+    """Regression guard: feat/MissionLock rewrote these handlers off a base that
+    predated the notify calls, and dropped all three. Nothing fails when they
+    go missing - learners just stop getting email."""
+    sign_in(client)
+    _ok_rover(monkeypatch)
+    calls = []
+    monkeypatch.setattr(
+        operator_console, '_notify_mission_control',
+        lambda mission_id, status: calls.append((mission_id, status)),
+    )
+
+    client.post('/operator/api/missions/q1/send')
+
+    assert calls == [('q1', 'processing')]
+
+
+def test_complete_still_notifies_mission_control_after_locking(client, missions, monkeypatch):
+    sign_in(client)
+    _ok_rover(monkeypatch)
+    calls = []
+    monkeypatch.setattr(
+        operator_console, '_notify_mission_control',
+        lambda mission_id, status: calls.append((mission_id, status)),
+    )
+
+    client.post('/operator/api/missions/q1/send')
+    calls.clear()
+    client.post('/operator/api/missions/q1/complete')
+
+    assert calls == [('q1', 'completed')]
+
+
+def test_rerun_still_notifies_mission_control_after_locking(client, missions, monkeypatch):
+    sign_in(client)
+    _ok_rover(monkeypatch)
+    calls = []
+    monkeypatch.setattr(
+        operator_console, '_notify_mission_control',
+        lambda mission_id, status: calls.append((mission_id, status)),
+    )
+
+    client.post('/operator/api/missions/c1/rerun')
+
+    assert calls == [('c1', 'processing')]
+
+
+def test_failed_dispatch_does_not_notify(client, missions, monkeypatch):
+    """Nothing ran, so the learner must not be told their mission launched."""
+    sign_in(client)
+    _no_rover(monkeypatch)
+    calls = []
+    monkeypatch.setattr(
+        operator_console, '_notify_mission_control',
+        lambda mission_id, status: calls.append((mission_id, status)),
+    )
+
+    client.post('/operator/api/missions/q1/send')
+    assert calls == []
+
+
+def test_lease_expiry_window_is_longer_than_the_renewal_interval(client):
+    """If the lease could expire before the next renewal fired, a live mission
+    would look abandoned and could be stolen mid-run."""
+    assert operator_console.LEASE_TTL_SECONDS > operator_console.LEASE_RENEW_INTERVAL * 2
+
