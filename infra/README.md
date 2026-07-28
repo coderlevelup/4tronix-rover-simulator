@@ -41,7 +41,7 @@ terraform plan
 terraform apply
 ```
 
-**Expected plan: `19 to add, 0 to change, 1 to destroy`.**
+**Expected plan: `23 to add, 0 to change, 1 to destroy`.**
 
 The one destroy is the Artifact Registry repo. `location` is a force-new
 attribute and the region moves `africa-south1 -> europe-west1` to co-locate
@@ -64,6 +64,11 @@ terraform output
 # plus the NEXT_PUBLIC_FIREBASE_* values from the NEW Firebase web app
 # (Part B). The deploy workflow reads all of these; it will fail without the
 # NEXT_PUBLIC_FIREBASE_* set, so they gate the first deploy, not the apply.
+#
+# Also set NEXT_PUBLIC_APP_URL to the service's own URL (get it from
+# `terraform output service_urls`). It is inlined at `next build` time, so it
+# has to be a GitHub *variable* read by the build - a Cloud Run runtime env
+# var is too late. Unset means every email link points at localhost.
 ```
 
 ### Not the apply operator's job: the real secret values
@@ -77,23 +82,36 @@ echo -n 'firebase-adminsdk-...@bt-impact-academy.iam.gserviceaccount.com' | \
   gcloud secrets versions add firebase-client-email --data-file=-
 # private key: paste the PEM (real newlines) into a temp file, then:
 gcloud secrets versions add firebase-private-key --data-file=key.pem && rm key.pem
+# Resend API key (from the Resend dashboard):
+echo -n 're_...' | gcloud secrets versions add resend-api-key --data-file=-
 ```
+
+All three secrets are seeded with `CHANGE_ME` by the apply so the first Cloud
+Run revision can start. Until the real values are added, Firestore access and
+mission emails both fail at runtime.
 
 After that, a push to main auto-deploys staging via
 `.github/workflows/deploy-staging.yml`; prod is a manual, approval-gated
 promotion via `deploy-prod.yml`.
 
-### Known gaps in what gets deployed (not blockers for the apply)
+### Email sending while no domain is verified
 
-- **Resend is not provisioned at all**: no Secret Manager secret, no Cloud Run
-  env var, nothing in the workflows. Mission status emails will throw on every
-  status change in staging and prod (visible in logs as `[mission-email]
-  FAILED`). Needs `RESEND_API_KEY` + `RESEND_FROM_EMAIL` adding before email
-  works off a laptop.
-- **`NEXT_PUBLIC_APP_URL` is not a build arg** in the Dockerfile or the deploy
-  workflow, so email CTA links fall back to `http://localhost:3000`. It is
-  inlined at `next build` time, so it has to be a GitHub *variable* available
-  to the build, not a Cloud Run runtime env var.
+`RESEND_FROM_EMAIL` defaults to `onboarding@resend.dev`, Resend's shared
+sandbox sender. While that is the from address, Resend rejects every recipient
+except the address that owns the API key, so **no learner receives mail**.
+
+To demo end to end before a domain is verified, set the redirect variable
+out-of-band (it is a personal address, so it is not committed):
+
+```bash
+export TF_VAR_resend_sandbox_recipient='owner@example.com'
+terraform apply
+```
+
+Every mission email then goes to that one inbox with the intended recipient
+prefixed into the subject. Unset it and re-apply once `sapient.rocks` is
+verified and `RESEND_FROM_EMAIL` points at it, or learners silently get
+nothing.
 
 GitHub settings to flip once (repo Settings):
 - Branches -> main -> required status checks: both CI jobs

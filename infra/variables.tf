@@ -10,6 +10,18 @@ variable "region" {
   default     = "europe-west1"
 }
 
+variable "resend_from_email" {
+  description = "From address for learner mission emails."
+  type        = string
+  default     = "onboarding@resend.dev"
+}
+
+variable "resend_sandbox_recipient" {
+  description = "Redirects ALL mission email to one inbox while no sending domain is verified. Empty means normal delivery. Set via TF_VAR_resend_sandbox_recipient, never committed."
+  type        = string
+  default     = ""
+}
+
 variable "github_repository" {
   description = "GitHub repo allowed to deploy via Workload Identity Federation (owner/name)"
   type        = string
