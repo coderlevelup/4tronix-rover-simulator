@@ -59,7 +59,7 @@ def test_upsert_inserts_new_missions():
     mission_store.upsert_missions(
         [_mission('a'), _mission('b'), _mission('c')], '2026-07-14T09:00:00Z',
     )
-    missions, _ = mission_store.get_missions()
+    missions, _, _total = mission_store.get_missions()
     assert {m['id'] for m in missions} == {'a', 'b', 'c'}
 
 
@@ -87,7 +87,7 @@ def test_upsert_does_not_overwrite_a_dirty_row():
 
 def test_upsert_stores_last_synced_at_in_sync_meta():
     mission_store.upsert_missions([_mission('a')], '2026-07-14T09:00:00Z')
-    _, last_synced = mission_store.get_missions()
+    _, last_synced, _total = mission_store.get_missions()
     assert last_synced == '2026-07-14T09:00:00Z'
 
 
@@ -110,7 +110,7 @@ def test_get_missions_orders_by_submitted_at_descending():
         _mission('old', submittedAt='2026-07-14T06:00:00Z'),
         _mission('new', submittedAt='2026-07-14T09:00:00Z'),
     ], '2026-07-14T09:00:00Z')
-    missions, _ = mission_store.get_missions()
+    missions, _, _total = mission_store.get_missions()
     assert missions[0]['id'] == 'new'
 
 
@@ -119,17 +119,27 @@ def test_get_missions_excludes_cancelled():
         _mission('a', status='queued'),
         _mission('b', status='cancelled'),
     ], '2026-07-14T09:00:00Z')
-    missions, _ = mission_store.get_missions()
+    missions, _, _total = mission_store.get_missions()
     assert {m['id'] for m in missions} == {'a'}
 
 
-def test_get_missions_respects_limit():
+def test_the_limit_applies_to_finished_missions_only():
+    """The cap exists to stop the console rendering an unbounded backlog of old
+    completed runs. It must not apply to work the operator still has to do."""
     mission_store.upsert_missions(
-        [_mission(str(i), submittedAt=f'2026-07-14T08:{i:02d}:00Z') for i in range(10)],
-        '2026-07-14T09:00:00Z',
+        [_mission(f'done{i}', status='completed', submittedAt=f'2026-07-14T08:{i:02d}:00Z')
+         for i in range(10)]
+        + [_mission(f'todo{i}', status='queued', submittedAt=f'2026-07-15T08:{i:02d}:00Z')
+           for i in range(4)],
+        '2026-07-16T09:00:00Z',
     )
-    missions, _ = mission_store.get_missions(limit=3)
-    assert len(missions) == 3
+
+    missions, _, _total = mission_store.get_missions(limit=3)
+
+    finished = [m for m in missions if m['status'] == 'completed']
+    queued = [m for m in missions if m['status'] == 'queued']
+    assert len(finished) == 3, 'finished missions are capped'
+    assert len(queued) == 4, 'queued missions are all shown'
 
 
 def test_get_mission_returns_none_for_unknown_id():
@@ -163,8 +173,44 @@ def test_get_missions_scopes_to_a_yard(tmp_path, monkeypatch):
         {'id': 'b', 'yardId': 'durban-rover-1', 'status': 'queued', 'submittedAt': '2026-01-01'},
     ], '2026-01-03T00:00:00Z')
 
-    scoped, _ = mission_store.get_missions(yard_id='uct-rover-1')
+    scoped, _, _total = mission_store.get_missions(yard_id='uct-rover-1')
     assert [m['id'] for m in scoped] == ['a']
 
-    unscoped, _ = mission_store.get_missions()
+    unscoped, _, _total = mission_store.get_missions()
     assert {m['id'] for m in unscoped} == {'a', 'b'}
+
+
+def test_actionable_missions_are_never_capped(tmp_path, monkeypatch):
+    """A flat newest-N cap drops the oldest rows, which are exactly the ones an
+    operator still has work to do on. Queued work must never be hidden."""
+    import mission_store
+    monkeypatch.setattr(mission_store, 'DB_PATH', str(tmp_path / 'm.db'))
+    mission_store.init_db()
+
+    # 30 finished missions, all newer than the queued one.
+    mission_store.upsert_missions(
+        [{'id': f'done{i}', 'yardId': 'uct-rover-1', 'status': 'completed',
+          'submittedAt': f'2026-07-{i+1:02d}T08:00:00Z'} for i in range(30)]
+        + [{'id': 'old-queued', 'yardId': 'uct-rover-1', 'status': 'queued',
+            'submittedAt': '2020-01-01T08:00:00Z'}],
+        '2026-07-31T00:00:00Z',
+    )
+
+    rows, _, _total = mission_store.get_missions(limit=5, yard_id='uct-rover-1')
+    ids = {r['id'] for r in rows}
+
+    assert 'old-queued' in ids, 'a queued mission must never fall off the list'
+    assert len([r for r in rows if r['status'] == 'completed']) == 5, 'finished ones are capped'
+
+
+def test_cancelled_missions_stay_hidden(tmp_path, monkeypatch):
+    import mission_store
+    monkeypatch.setattr(mission_store, 'DB_PATH', str(tmp_path / 'm.db'))
+    mission_store.init_db()
+    mission_store.upsert_missions(
+        [{'id': 'x', 'yardId': 'uct-rover-1', 'status': 'cancelled', 'submittedAt': '2026-07-01'}],
+        '2026-07-02',
+    )
+
+    rows, _, _total = mission_store.get_missions(yard_id='uct-rover-1')
+    assert rows == []

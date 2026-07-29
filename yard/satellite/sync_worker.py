@@ -15,17 +15,62 @@ truth with staleness and silently erase the fact that a mission ran.
 """
 
 import json
+import os
 import threading
 from datetime import datetime, timezone
 
 from mission_store import (
     clear_dirty,
     delete_outbox,
+    get_meta,
     log_conflict,
     mark_attempt,
+    active_mission_ids,
+    forget_mission,
+    newest_submitted_at,
     peek_outbox,
+    set_meta,
     upsert_missions,
 )
+
+# Read-cost budget. Firestore's free tier allows 50,000 document reads a day,
+# shared with every learner loading the public feed.
+#
+# The naive version of this worker pulled 200 documents every 30 seconds:
+#
+#     2,880 cycles/day x 200 docs = 576,000 reads/day
+#
+# which is 11x the entire daily quota, from one satellite, before a single
+# learner opens the site. What follows keeps the same 30-second freshness at
+# roughly 1/100th of the cost:
+#
+#   - Incremental pull. New missions only, via submittedAt > cursor. A quiet
+#     cycle reads nothing (an empty query result is billed as one read), so the
+#     floor is ~2,880 reads/day.
+#   - Active reconcile. Missions can also change remotely (mission-control
+#     PATCH, the YouTube poll), and an incremental-by-submittedAt query cannot
+#     see that. So every RECONCILE_EVERY cycles, re-read only the missions that
+#     can still change - queued and processing. Terminal missions are not
+#     re-read, because they do not move.
+#   - A bounded first pull seeds an empty mirror.
+
+FIRST_PULL_LIMIT = 200
+INCREMENTAL_LIMIT = 100
+
+# Every Nth cycle re-reads the missions that are still unfinished. At the
+# default 30s interval that is every 5 minutes, well inside the time it takes
+# an operator to notice anything.
+#
+# Both are tunable without a code change, because the right trade-off differs
+# by day: during an event, freshness matters and there is an operator watching;
+# on a quiet day the same settings just burn quota for nobody. Roughly:
+#
+#   SYNC_INTERVAL=30,  SYNC_RECONCILE_EVERY=10  ->  ~10,000 reads/day
+#   SYNC_INTERVAL=60,  SYNC_RECONCILE_EVERY=10  ->  ~5,000 reads/day
+#   SYNC_INTERVAL=120, SYNC_RECONCILE_EVERY=5   ->  ~4,000 reads/day
+RECONCILE_EVERY = int(os.environ.get('SYNC_RECONCILE_EVERY', 10))
+DEFAULT_INTERVAL = int(os.environ.get('SYNC_INTERVAL', 30))
+_CYCLE_KEY = 'sync_cycle_count'
 
 # Higher wins. A mission only ever moves up this ladder, never back down, so
 # most reconnect conflicts resolve themselves with no coordination.
@@ -128,30 +173,93 @@ def flush_one(firestore_client, entry, collection_name='missions'):
         return False
 
 
-def sync_from_firestore(firestore_client, collection_name='missions'):
-    """Pull missions into the mirror. Rows with pending local writes are
-    protected by `local_dirty` inside upsert_missions."""
+def sync_from_firestore(firestore_client, collection_name='missions', yard_id=None):
+    """Pull only what changed, rather than the whole collection every cycle.
+
+    Returns True on success. Rows with pending local writes are protected by
+    `local_dirty` inside upsert_missions.
+    """
     try:
-        docs = (
-            firestore_client.collection(collection_name)
-            .order_by('submittedAt', direction='DESCENDING')
-            .limit(200)
-            .stream()
-        )
+        col = firestore_client.collection(collection_name)
+        cursor = newest_submitted_at()
+
+        if cursor:
+            # Incremental: missions submitted since the newest one we hold.
+            query = (
+                col.where('submittedAt', '>', cursor)
+                .order_by('submittedAt')
+                .limit(INCREMENTAL_LIMIT)
+            )
+        else:
+            # Empty mirror (first boot, or the db was cleared): seed it.
+            query = col.order_by('submittedAt', direction='DESCENDING').limit(FIRST_PULL_LIMIT)
+
         missions = []
-        for doc in docs:
+        for doc in query.stream():
             data = doc.to_dict() or {}
             data['id'] = doc.id
             missions.append(data)
 
-        upsert_missions(missions, _now_iso())
+        if missions:
+            upsert_missions(missions, _now_iso())
+        else:
+            # Nothing new, but the console still needs to know we reached
+            # Firestore just now or it will report itself as stale.
+            set_meta('last_synced_at', _now_iso())
+
         return True
     except Exception as e:
         print(f'[sync] Failed to pull from Firestore: {e}')
         return False
 
 
-def sync_cycle(firestore_client, collection_name='missions'):
+def reconcile_active(firestore_client, collection_name='missions', yard_id=None):
+    """Re-read the missions the MIRROR still considers unfinished.
+
+    An incremental pull keyed on submittedAt cannot see a mission whose status
+    changed remotely - mission-control marking one complete, or the YouTube
+    poll attaching a video.
+
+    It reads the locally-active documents by id rather than querying Firestore
+    for remotely-active ones, because the transition that matters most is a
+    mission FINISHING elsewhere: once it does, it no longer matches an "active"
+    filter, so a remote query would never return it and the mirror would keep
+    showing it as queued forever.
+
+    Cost is exactly one read per unfinished mission, which is tens of documents
+    on a busy day rather than the whole collection.
+    """
+    try:
+        ids = active_mission_ids(yard_id)
+        if not ids:
+            return True
+
+        col = firestore_client.collection(collection_name)
+        missions = []
+        for mission_id in ids:
+            snap = col.document(mission_id).get()
+            if not getattr(snap, 'exists', False):
+                # Deleted remotely. Nothing else prunes the mirror, so without
+                # this the console shows a mission that no longer exists - and
+                # an operator can still try to dispatch it. Free to do here:
+                # the document was read either way. forget_mission refuses if
+                # local writes are still queued for it.
+                if forget_mission(mission_id):
+                    print(f'[sync] {mission_id} no longer exists remotely; removed from the mirror')
+                continue
+            data = snap.to_dict() or {}
+            data['id'] = mission_id
+            missions.append(data)
+
+        if missions:
+            upsert_missions(missions, _now_iso())
+        return True
+    except Exception as e:
+        print(f'[sync] Failed to reconcile active missions: {e}')
+        return False
+
+
+def sync_cycle(firestore_client, collection_name='missions', yard_id=None):
     """One cycle: flush the outbox completely, and only then pull.
 
     A failed flush stops the whole cycle rather than skipping ahead. Entries
@@ -167,10 +275,18 @@ def sync_cycle(firestore_client, collection_name='missions'):
             # overwritten with a Firestore state that predates this entry.
             return False
 
-    return sync_from_firestore(firestore_client, collection_name)
+    ok = sync_from_firestore(firestore_client, collection_name, yard_id=yard_id)
+
+    # Periodically re-read the missions that can still change remotely.
+    count = int(get_meta(_CYCLE_KEY, '0') or 0) + 1
+    set_meta(_CYCLE_KEY, str(count))
+    if ok and count % RECONCILE_EVERY == 0:
+        reconcile_active(firestore_client, collection_name, yard_id=yard_id)
+
+    return ok
 
 
-def start_sync_worker(client_factory, interval=30):
+def start_sync_worker(client_factory, interval=None):
     """Poll on a background timer.
 
     Takes a FACTORY, not a client: a satellite that boots with no internet
@@ -181,10 +297,17 @@ def start_sync_worker(client_factory, interval=30):
     Mirrors start_polling's shape - the body can never kill the loop, so one
     bad cycle does not stop syncing forever.
     """
+    interval = DEFAULT_INTERVAL if interval is None else interval
+
     def _loop():
         try:
             client = client_factory() if callable(client_factory) else client_factory
-            sync_cycle(client)
+            try:
+                from satellite_identity import yard_id as _yard_id
+                yard = _yard_id()
+            except Exception:
+                yard = None
+            sync_cycle(client, yard_id=yard)
         except Exception as e:
             print(f'[sync] Unexpected error: {e}')
 

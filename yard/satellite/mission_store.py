@@ -6,6 +6,11 @@ import uuid as uuid_mod
 from datetime import datetime, timezone
 
 DB_PATH = os.environ.get('MISSION_MIRROR_DB', 'missions.db')
+
+# Finished missions are paged rather than capped. This is only a page size:
+# the console asks for more as the operator scrolls, and it all comes from
+# local SQLite, so a larger page costs DOM nodes and nothing else.
+DEFAULT_FINISHED_PAGE = 40
 _db_lock = threading.Lock()
 
 
@@ -140,35 +145,58 @@ def upsert_missions(missions, synced_at):
         conn.close()
 
 
-def get_missions(limit=100, yard_id=None):
-    """Read missions from the local mirror.
+def get_missions(limit=DEFAULT_FINISHED_PAGE, yard_id=None):
+    """Missions for the operator console, read from the local mirror.
 
-    `yard_id` scopes the list to this satellite's own yard (plan 3.3). It is
-    applied here rather than in the Firestore pull because a
-    `yardId + submittedAt` query needs a composite index that does not exist,
-    and with one yard the difference is only how much gets mirrored. If a
-    second yard is ever added, move this into the sync query and add the index.
+    `limit` caps only the FINISHED missions - it is the page size, not a
+    ceiling. Everything still actionable (queued, processing, needs-review) is
+    always returned in full.
+
+    A flat "newest N" cap drops the oldest rows first, and the oldest rows are
+    exactly the ones with work outstanding: a completed mission whose video was
+    never attached, or a mission queued days ago and never run. Those would
+    vanish from the console with no way to reach them.
+
+    Returns (missions, last_synced_at, finished_total) so the caller can offer
+    "show more" rather than silently truncating.
+
+    `yard_id` scopes the list to this satellite's own yard (plan 3.3).
     """
+    yard_clause = ' AND yard_id = ?' if yard_id else ''
+    yard_params = [yard_id] if yard_id else []
+
     with _db_lock:
         conn = _connect()
-        if yard_id:
-            rows = conn.execute(
-                "SELECT * FROM mission_mirror WHERE status != 'cancelled' AND yard_id = ?"
-                " ORDER BY submitted_at DESC LIMIT ?",
-                (yard_id, limit)
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM mission_mirror WHERE status != 'cancelled'"
-                " ORDER BY submitted_at DESC LIMIT ?",
-                (limit,)
-            ).fetchall()
+
+        active = conn.execute(
+            "SELECT * FROM mission_mirror"
+            " WHERE status IN ('queued','processing')" + yard_clause +
+            " ORDER BY submitted_at DESC",
+            yard_params,
+        ).fetchall()
+
+        # 'cancelled' stays hidden from the console entirely.
+        finished = conn.execute(
+            "SELECT * FROM mission_mirror"
+            " WHERE status IN ('completed','failed')" + yard_clause +
+            " ORDER BY submitted_at DESC LIMIT ?",
+            yard_params + [limit],
+        ).fetchall()
+
+        finished_total = conn.execute(
+            "SELECT COUNT(*) AS n FROM mission_mirror"
+            " WHERE status IN ('completed','failed')" + yard_clause,
+            yard_params,
+        ).fetchone()['n']
+
         meta = conn.execute("SELECT value FROM sync_meta WHERE key = 'last_synced_at'").fetchone()
         conn.close()
 
+    missions = [dict(r) for r in active] + [dict(r) for r in finished]
+    missions.sort(key=lambda m: m.get('submitted_at') or '', reverse=True)
+
     last_synced = meta[0] if meta else None
-    missions = [dict(row) for row in rows]
-    return missions, last_synced
+    return missions, last_synced, finished_total
 
 
 def get_mission(mission_id):
@@ -602,3 +630,71 @@ def resolve_review(mission_id, status, now_iso):
             raise
         finally:
             conn.close()
+
+
+# --- Sync cursors (read-cost control) --------------------------------------
+
+def get_meta(key, default=None):
+    with _db_lock:
+        conn = _connect()
+        row = conn.execute('SELECT value FROM sync_meta WHERE key = ?', (key,)).fetchone()
+        conn.close()
+    return row['value'] if row else default
+
+
+def set_meta(key, value):
+    with _db_lock:
+        conn = _connect()
+        conn.execute('INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?,?)', (key, value))
+        conn.commit()
+        conn.close()
+
+
+def newest_submitted_at():
+    """Highest submittedAt in the mirror - the incremental pull cursor."""
+    with _db_lock:
+        conn = _connect()
+        row = conn.execute('SELECT MAX(submitted_at) AS m FROM mission_mirror').fetchone()
+        conn.close()
+    return row['m'] if row and row['m'] else None
+
+
+def active_mission_ids(yard_id=None):
+    """Ids the mirror still considers non-terminal.
+
+    Reconciliation reads these specific documents. Querying Firestore for
+    remotely-active missions instead would miss the transition that matters
+    most - a mission that finished elsewhere no longer matches an "active"
+    filter, so the mirror would never learn it was done.
+    """
+    with _db_lock:
+        conn = _connect()
+        sql = "SELECT id FROM mission_mirror WHERE status IN ('queued','processing')"
+        params = []
+        if yard_id:
+            sql += ' AND yard_id = ?'
+            params.append(yard_id)
+        rows = conn.execute(sql, params).fetchall()
+        conn.close()
+    return [r['id'] for r in rows]
+
+
+def forget_mission(mission_id):
+    """Drop a mirror row for a mission that no longer exists in Firestore.
+
+    Only ever called for a row with nothing queued for it - see the guard in
+    the sync worker. Removing a row with pending writes would silently discard
+    a local change that was never pushed.
+    """
+    with _db_lock:
+        conn = _connect()
+        pending = conn.execute(
+            'SELECT 1 FROM outbox WHERE mission_id = ? LIMIT 1', (mission_id,)
+        ).fetchone()
+        if pending:
+            conn.close()
+            return False
+        conn.execute('DELETE FROM mission_mirror WHERE id = ?', (mission_id,))
+        conn.commit()
+        conn.close()
+        return True
