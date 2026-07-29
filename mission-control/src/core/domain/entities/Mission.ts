@@ -50,10 +50,7 @@ export interface Mission {
   code: string;                      // Python code submitted by learner
   blocklyState?: string;             // Serialized Blockly workspace JSON (block-built missions only)
 
-  // Queue management (inspired by yard/rover/service.py)
   status: MissionStatus;
-  queuePosition?: number;            // Dynamic position in queue (calculated on read)
-  estimatedWait?: number;            // Estimated wait time in seconds
 
   // Execution results (populated after execution)
   executionResult?: ExecutionResult;

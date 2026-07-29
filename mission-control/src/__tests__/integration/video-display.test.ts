@@ -192,8 +192,6 @@ describe('Video Display Integration', () => {
         code: 'rover.forward(50)',
         status: 'queued',
         submittedAt: '2026-04-20T12:00:00Z',
-        queuePosition: 3,
-        estimatedWait: 180,
       };
 
       expect(queuedMission.status).toBe('queued');

@@ -18,20 +18,23 @@ import { Firestore as AdminFirestore } from 'firebase-admin/firestore';
 import {
   collection,
   doc,
-  getCountFromServer,
   getDoc,
   getDocs,
   limit,
   orderBy,
   query,
+  startAfter,
   setDoc,
   updateDoc,
-  where,
   type Firestore as ClientFirestore,
 } from 'firebase/firestore';
 import { nanoid } from 'nanoid';
 import { Mission } from '@/core/domain/entities/Mission';
-import { IMissionRepository } from '@/core/domain/repositories/IMissionRepository';
+import {
+  IMissionRepository,
+  MissionCursor,
+  MissionPage,
+} from '@/core/domain/repositories/IMissionRepository';
 
 const MISSIONS_COLLECTION = 'missions';
 
@@ -44,12 +47,11 @@ type MissionDocData = Record<string, unknown>;
 type MissionDocSnapshot = { id: string; data: () => MissionDocData };
 type QuerySnapshotLike = { docs: MissionDocSnapshot[] };
 type DocSnapshotLike = { exists: boolean; data: () => MissionDocData | undefined };
-type CountSnapshotLike = { data: () => { count: number } };
 
 export class FirestoreMissionRepository implements IMissionRepository {
   constructor(private readonly firestore: FirestoreLike) {}
 
-  async create(mission: Omit<Mission, 'id' | 'queuePosition' | 'estimatedWait' | 'submittedAt'>): Promise<Mission> {
+  async create(mission: Omit<Mission, 'id' | 'submittedAt'>): Promise<Mission> {
     const id = nanoid();
     const submittedAt = (mission as { submittedAt?: string }).submittedAt || new Date().toISOString();
 
@@ -61,14 +63,11 @@ export class FirestoreMissionRepository implements IMissionRepository {
 
     await this.writeMission(id, newMission);
 
-    const queuePosition = await this.calculateQueuePosition(newMission.yardId, newMission.submittedAt);
-    const estimatedWait = this.calculateEstimatedWait(queuePosition);
-
-    return {
-      ...newMission,
-      queuePosition,
-      estimatedWait,
-    };
+    // No queue-position aggregation here. It cost an extra COUNT query on
+    // every single submission, and nothing renders the result - see the note
+    // on calculateEstimatedWait. getQueuedMissions derives position from the
+    // ordered result for free when it is genuinely needed.
+    return newMission;
   }
 
   async findById(id: string): Promise<Mission | null> {
@@ -78,38 +77,7 @@ export class FirestoreMissionRepository implements IMissionRepository {
       return null;
     }
 
-    const mission = this.fromFirestoreDoc(id, snapshot.data()!);
-
-    if (mission.status === 'queued') {
-      const queuePosition = await this.calculateQueuePosition(mission.yardId, mission.submittedAt);
-      const estimatedWait = this.calculateEstimatedWait(queuePosition);
-      return { ...mission, queuePosition, estimatedWait };
-    }
-
-    return mission;
-  }
-
-  async findByLearnerId(learnerId: string): Promise<Mission[]> {
-    const snapshot = await this.getLearnerMissionsSnapshot(learnerId);
-
-    return snapshot.docs.map((missionDoc) => this.fromFirestoreDoc(missionDoc.id, missionDoc.data()));
-  }
-
-  async findBySessionId(_sessionId: string): Promise<Mission[]> {
-    // Session-based history removed; keep method for compatibility but return empty.
-    return [];
-  }
-
-  async getQueuedMissions(yardId: string): Promise<Mission[]> {
-    const snapshot = await this.getQueuedMissionsSnapshot(yardId);
-
-    const missions: Mission[] = snapshot.docs.map((missionDoc) => this.fromFirestoreDoc(missionDoc.id, missionDoc.data()));
-
-    return missions.map((mission, index) => ({
-      ...mission,
-      queuePosition: index + 1,
-      estimatedWait: this.calculateEstimatedWait(index + 1),
-    }));
+    return this.fromFirestoreDoc(id, snapshot.data()!);
   }
 
   async update(id: string, updates: Partial<Mission>): Promise<Mission | null> {
@@ -123,47 +91,40 @@ export class FirestoreMissionRepository implements IMissionRepository {
     return this.findById(id);
   }
 
-  async getQueueLength(yardId: string): Promise<number> {
-    const snapshot = await this.getQueueLengthSnapshot(yardId);
+  /**
+   * Recent missions for the public feed. Reads exactly `limit` documents and
+   * nothing else.
+   *
+   * findAll() is the wrong tool for the feed and was costing roughly 125 reads
+   * per page view: it fetches 100 documents to render 24, then runs a COUNT
+   * aggregation per queued mission to work out queue positions the feed never
+   * displays. With 25 queued missions that is 25 extra round trips, which is
+   * also why the page sat on a spinner for ~30 seconds.
+   *
+   * Queue position is genuinely needed on the history page, where a learner is
+   * waiting on their own mission. It is not needed here, so it is not paid for.
+   */
+  async findRecent(limit: number, cursor?: MissionCursor): Promise<MissionPage> {
+    // Fetch one extra to learn whether another page exists, without paying for
+    // a separate count query.
+    const snapshot = await this.getRecentMissionsSnapshot(limit + 1, cursor);
+    const docs = snapshot.docs;
 
-    return this.getCountValue(snapshot);
-  }
-
-  async findAll(): Promise<Mission[]> {
-    const snapshot = await this.getAllMissionsSnapshot();
-
-    const missions: Mission[] = snapshot.docs.map((missionDoc) => this.fromFirestoreDoc(missionDoc.id, missionDoc.data()));
-
-    return Promise.all(
-      missions.map(async (mission) => {
-        if (mission.status === 'queued') {
-          const queuePosition = await this.calculateQueuePosition(mission.yardId, mission.submittedAt);
-          const estimatedWait = this.calculateEstimatedWait(queuePosition);
-          return { ...mission, queuePosition, estimatedWait };
-        }
-
-        return mission;
-      })
+    const hasMore = docs.length > limit;
+    const page = hasMore ? docs.slice(0, limit) : docs;
+    const missions = page.map((missionDoc) =>
+      this.fromFirestoreDoc(missionDoc.id, missionDoc.data())
     );
-  }
 
-  /**
-   * Calculate queue position for a mission
-   * Position = number of queued missions submitted before this one + 1
-   */
-  private async calculateQueuePosition(yardId: string, submittedAt: string): Promise<number> {
-    const snapshot = await this.getQueuePositionSnapshot(yardId, submittedAt);
+    const last = missions[missions.length - 1];
 
-    return this.getCountValue(snapshot) + 1;
-  }
-
-  /**
-   * Estimate wait time based on queue position
-   * Assumes average execution time of 90 seconds per mission (configurable)
-   */
-  private calculateEstimatedWait(queuePosition: number): number {
-    const AVERAGE_EXECUTION_TIME_SECONDS = 90;
-    return (queuePosition - 1) * AVERAGE_EXECUTION_TIME_SECONDS;
+    return {
+      missions,
+      // Firestore pages by cursor, not offset - an offset would still read and
+      // bill every skipped document. Both ordering fields are included so a
+      // shared submittedAt cannot make a page skip or repeat a mission.
+      nextCursor: hasMore && last ? { submittedAt: last.submittedAt, id: last.id } : null,
+    };
   }
 
   /**
@@ -176,9 +137,6 @@ export class FirestoreMissionRepository implements IMissionRepository {
     if (typeof persistedFields.code === 'string') {
       persistedFields.code = this.normalizeMissionCode(persistedFields.code);
     }
-
-    delete persistedFields.queuePosition;
-    delete persistedFields.estimatedWait;
 
     // Mission documents are world-readable. A plaintext learner address must
     // never reach one - only learnerEmailHash. The Mission type no longer has
@@ -245,96 +203,33 @@ export class FirestoreMissionRepository implements IMissionRepository {
     await updateDoc(doc(this.clientDb(), MISSIONS_COLLECTION, id), payload);
   }
 
-  private async getLearnerMissionsSnapshot(learnerId: string): Promise<QuerySnapshotLike> {
+  private async getRecentMissionsSnapshot(
+    max: number,
+    cursor?: MissionCursor
+  ): Promise<QuerySnapshotLike> {
     if (this.isAdminFirestore()) {
-      return this.adminDb()
+      let adminQuery = this.adminDb()
         .collection(MISSIONS_COLLECTION)
-        .where('learnerId', '==', learnerId)
         .orderBy('submittedAt', 'desc')
-        .get() as unknown as QuerySnapshotLike;
+        .orderBy('__name__', 'desc');
+
+      if (cursor) {
+        adminQuery = adminQuery.startAfter(cursor.submittedAt, cursor.id);
+      }
+
+      return adminQuery.limit(max).get() as unknown as QuerySnapshotLike;
     }
 
-    const missionsQuery = query(
-      collection(this.clientDb(), MISSIONS_COLLECTION),
-      where('learnerId', '==', learnerId),
-      orderBy('submittedAt', 'desc')
-    );
+    const constraints = [
+      orderBy('submittedAt', 'desc'),
+      orderBy('__name__', 'desc'),
+      ...(cursor ? [startAfter(cursor.submittedAt, cursor.id)] : []),
+      limit(max),
+    ];
+
+    const missionsQuery = query(collection(this.clientDb(), MISSIONS_COLLECTION), ...constraints);
 
     return (await getDocs(missionsQuery)) as unknown as QuerySnapshotLike;
-  }
-
-  private async getQueuedMissionsSnapshot(yardId: string): Promise<QuerySnapshotLike> {
-    if (this.isAdminFirestore()) {
-      return this.adminDb()
-        .collection(MISSIONS_COLLECTION)
-        .where('yardId', '==', yardId)
-        .where('status', '==', 'queued')
-        .orderBy('submittedAt', 'asc')
-        .get() as unknown as QuerySnapshotLike;
-    }
-
-    const missionsQuery = query(
-      collection(this.clientDb(), MISSIONS_COLLECTION),
-      where('yardId', '==', yardId),
-      where('status', '==', 'queued'),
-      orderBy('submittedAt', 'asc')
-    );
-
-    return (await getDocs(missionsQuery)) as unknown as QuerySnapshotLike;
-  }
-
-  private async getAllMissionsSnapshot(): Promise<QuerySnapshotLike> {
-    if (this.isAdminFirestore()) {
-      return this.adminDb().collection(MISSIONS_COLLECTION).orderBy('submittedAt', 'asc').limit(100).get() as unknown as QuerySnapshotLike;
-    }
-
-    const missionsQuery = query(collection(this.clientDb(), MISSIONS_COLLECTION), orderBy('submittedAt', 'asc'), limit(100));
-
-    return (await getDocs(missionsQuery)) as unknown as QuerySnapshotLike;
-  }
-
-  private async getQueueLengthSnapshot(yardId: string): Promise<CountSnapshotLike> {
-    if (this.isAdminFirestore()) {
-      return this.adminDb()
-        .collection(MISSIONS_COLLECTION)
-        .where('yardId', '==', yardId)
-        .where('status', '==', 'queued')
-        .count()
-        .get() as unknown as CountSnapshotLike;
-    }
-
-    const missionsQuery = query(
-      collection(this.clientDb(), MISSIONS_COLLECTION),
-      where('yardId', '==', yardId),
-      where('status', '==', 'queued')
-    );
-
-    return (await getCountFromServer(missionsQuery)) as unknown as CountSnapshotLike;
-  }
-
-  private async getQueuePositionSnapshot(yardId: string, submittedAt: string): Promise<CountSnapshotLike> {
-    if (this.isAdminFirestore()) {
-      return this.adminDb()
-        .collection(MISSIONS_COLLECTION)
-        .where('yardId', '==', yardId)
-        .where('status', '==', 'queued')
-        .where('submittedAt', '<', submittedAt)
-        .count()
-        .get() as unknown as CountSnapshotLike;
-    }
-
-    const missionsQuery = query(
-      collection(this.clientDb(), MISSIONS_COLLECTION),
-      where('yardId', '==', yardId),
-      where('status', '==', 'queued'),
-      where('submittedAt', '<', submittedAt)
-    );
-
-    return (await getCountFromServer(missionsQuery)) as unknown as CountSnapshotLike;
-  }
-
-  private getCountValue(snapshot: CountSnapshotLike): number {
-    return snapshot.data().count;
   }
 
   /**

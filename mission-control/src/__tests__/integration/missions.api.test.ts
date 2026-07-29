@@ -95,8 +95,11 @@ describe('POST /api/missions Integration Tests', () => {
       expect(data.mission.sessionId).toBe('test-session-123');
       expect(data.mission.code).toBe('rover.forward(100)\nrover.wait(2)');
       expect(data.mission.status).toBe('queued');
-      expect(data.mission.queuePosition).toBeDefined();
-      expect(data.mission.estimatedWait).toBeDefined();
+      // Deliberately NOT queuePosition/estimatedWait. Computing them cost a
+      // COUNT aggregation on every submission and nothing has ever rendered
+      // them. If a "you are 3rd in line" feature is wanted, getQueuedMissions
+      // derives the position from an already-ordered result for free.
+      expect(data.mission.queuePosition).toBeUndefined();
     });
 
     it('should accept mission without optional challengeId', async () => {

@@ -77,27 +77,6 @@ export class MissionService {
     return this.missionRepository.findById(id);
   }
 
-  /**
-   * Get mission history for a learner
-   * Used for /history page
-   *
-   * @param learnerId - Learner ID
-   * @returns Array of missions for this learner
-   */
-  async getMissionHistory(learnerId: string): Promise<Mission[]> {
-    return this.missionRepository.findByLearnerId(learnerId);
-  }
-
-  /**
-   * Get all queued missions for a yard
-   * Used by operator console
-   *
-   * @param yardId - Yard ID
-   * @returns Array of queued missions in FIFO order
-   */
-  async getQueueForYard(yardId: string): Promise<Mission[]> {
-    return this.missionRepository.getQueuedMissions(yardId);
-  }
 
   /**
    * Update mission status and results

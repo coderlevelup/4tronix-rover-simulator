@@ -6,7 +6,11 @@
  */
 
 import { MissionService } from '@/core/application/services/MissionService';
-import { IMissionRepository } from '@/core/domain/repositories/IMissionRepository';
+import {
+  IMissionRepository,
+  MissionCursor,
+  MissionPage,
+} from '@/core/domain/repositories/IMissionRepository';
 import { Mission } from '@/core/domain/entities/Mission';
 import { CreateMissionDto } from '@/infrastructure/validation/schemas';
 
@@ -19,8 +23,6 @@ class MockMissionRepository implements IMissionRepository {
     const newMission: Mission = {
       ...mission,
       id,
-      queuePosition: 1,
-      estimatedWait: 0,
     };
     this.missions.set(id, newMission);
     return newMission;
@@ -61,6 +63,27 @@ class MockMissionRepository implements IMissionRepository {
     return Array.from(this.missions.values()).filter(
       (m) => m.yardId === yardId && m.status === 'queued'
     ).length;
+  }
+
+  async findRecent(limit: number, cursor?: MissionCursor): Promise<MissionPage> {
+    const ordered = Array.from(this.missions.values()).sort((a, b) => {
+      const byDate = b.submittedAt.localeCompare(a.submittedAt);
+      return byDate !== 0 ? byDate : b.id.localeCompare(a.id);
+    });
+
+    const start = cursor
+      ? ordered.findIndex((m) => m.submittedAt === cursor.submittedAt && m.id === cursor.id) + 1
+      : 0;
+    const page = ordered.slice(start, start + limit);
+    const last = page[page.length - 1];
+
+    return {
+      missions: page,
+      nextCursor:
+        start + limit < ordered.length && last
+          ? { submittedAt: last.submittedAt, id: last.id }
+          : null,
+    };
   }
 
   async findAll(): Promise<Mission[]> {
@@ -128,14 +151,6 @@ describe('MissionService', () => {
       expect(result.mission?.status).toBe('queued');
     });
 
-    it('should include queue position and estimated wait', async () => {
-      const result = await service.submitMission(
-        makeDto({ yardId: 'yard-1', code: 'rover.forward(100)' })
-      );
-
-      expect(result.mission?.queuePosition).toBeDefined();
-      expect(result.mission?.estimatedWait).toBeDefined();
-    });
   });
 
   describe('getMissionById', () => {
@@ -152,77 +167,6 @@ describe('MissionService', () => {
       const retrieved = await service.getMissionById('non-existent-id');
 
       expect(retrieved).toBeNull();
-    });
-  });
-
-  describe('getMissionHistory', () => {
-    it('should retrieve all missions for a learner', async () => {
-      await service.submitMission(
-        makeDto({ yardId: 'yard-1', learnerId: 'learner-123', code: 'rover.forward(100)' })
-      );
-
-      await service.submitMission(
-        makeDto({ yardId: 'yard-2', learnerId: 'learner-123', code: 'rover.backward(50)' })
-      );
-
-      const history = await service.getMissionHistory('learner-123');
-
-      expect(history).toHaveLength(2);
-      expect(history.every((m) => m.learnerId === 'learner-123')).toBe(true);
-    });
-
-    it('should return empty array for learner with no missions', async () => {
-      const history = await service.getMissionHistory('unknown-learner');
-
-      expect(history).toEqual([]);
-    });
-
-    it('should not return missions from other learners', async () => {
-      await service.submitMission(
-        makeDto({ yardId: 'yard-1', learnerId: 'learner-123', code: 'rover.forward(100)' })
-      );
-
-      await service.submitMission(
-        makeDto({ yardId: 'yard-1', learnerId: 'learner-456', code: 'rover.backward(50)' })
-      );
-
-      const history = await service.getMissionHistory('learner-123');
-
-      expect(history).toHaveLength(1);
-      expect(history[0].learnerId).toBe('learner-123');
-    });
-  });
-
-  describe('getQueueForYard', () => {
-    it('should retrieve all queued missions for a yard', async () => {
-      await service.submitMission(
-        makeDto({ yardId: 'yard-1', learnerId: 'learner-123', code: 'rover.forward(100)' })
-      );
-
-      await service.submitMission(
-        makeDto({ yardId: 'yard-1', learnerId: 'learner-456', code: 'rover.backward(50)' })
-      );
-
-      const queue = await service.getQueueForYard('yard-1');
-
-      expect(queue).toHaveLength(2);
-      expect(queue.every((m) => m.yardId === 'yard-1')).toBe(true);
-      expect(queue.every((m) => m.status === 'queued')).toBe(true);
-    });
-
-    it('should not return missions from other yards', async () => {
-      await service.submitMission(
-        makeDto({ yardId: 'yard-1', code: 'rover.forward(100)' })
-      );
-
-      await service.submitMission(
-        makeDto({ yardId: 'yard-2', code: 'rover.backward(50)' })
-      );
-
-      const queue = await service.getQueueForYard('yard-1');
-
-      expect(queue).toHaveLength(1);
-      expect(queue[0].yardId).toBe('yard-1');
     });
   });
 
