@@ -194,7 +194,8 @@ def monitor():
     """TV display interface"""
     return render_template('monitor.html',
                            server_hostname=socket.gethostname(),
-                           server_ip=_local_ip())
+                           server_ip=_local_ip(),
+                           camera_port=CAMERA_PORT)
 
 
 @app.route('/api/queue/add', methods=['POST'])

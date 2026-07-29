@@ -718,6 +718,16 @@
         // Camera WebSocket Client
         // ============================================================
 
+        // The camera runs on the same machine as this web server in both
+        // deployments - the Pi in the yard, a laptop in development - so the
+        // host is taken from wherever this page was served rather than named.
+        //
+        // It used to be pinned to the Pi's mDNS name, so the stream only ever
+        // worked for someone reaching the Pi by that exact name: opening the
+        // monitor by IP, or on a dev machine, left it dialling a host that does
+        // not resolve and sitting on "Connecting..." forever with no clue why.
+        const CAMERA_WS_URL = `ws://${window.location.hostname}:{{ camera_port }}`;
+
         class CameraClient {
             constructor(canvasId) {
                 this.canvas = document.getElementById(canvasId);
@@ -732,7 +742,7 @@
                 this.cameraMessage = document.getElementById('cameraMessage');
             }
 
-            connect(url = 'ws://mro.local:8890') {
+            connect(url = CAMERA_WS_URL) {
                 this.updateStatus('connecting', 'Connecting...');
 
                 try {

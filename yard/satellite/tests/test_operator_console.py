@@ -1670,3 +1670,53 @@ def test_camera_control_never_builds_a_shell_command(monkeypatch):
     assert seen['shell'] in (None, False), 'shell=True would be injectable'
     assert all('3' not in part for part in seen['cmd'][1:]), 'index must not reach argv'
     assert seen['env']['CAMERA_INDEX'] == '3', 'it travels in the environment'
+
+
+def _camera_server_module():
+    """camera_server imported by path: it is a script, not a package member."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        'camera_server_under_test',
+        os.path.join(os.path.dirname(__file__), '..', 'camera_server.py'),
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_a_port_probe_does_not_fill_the_camera_log_with_tracebacks():
+    """Readiness is checked by opening a socket and closing it, which makes
+    websockets log a full traceback per probe. A console polling every few
+    seconds then buries every real message - including the failed-start
+    explanation camera_control reads back out of this same log."""
+    import logging
+    noise_filter = _camera_server_module()._ProbeNoiseFilter()
+
+    class Boom(Exception):
+        pass
+
+    def record(message, exc=None):
+        return logging.LogRecord(
+            'websockets.server', logging.ERROR, '', 0, message, (), exc)
+
+    probe = (Boom, Boom('did not receive a valid HTTP request'), None)
+    assert not noise_filter.filter(record('opening handshake failed', probe))
+
+
+def test_a_genuine_handshake_failure_is_still_logged():
+    """The filter has to stay narrow: only a connection that sent nothing at
+    all is a probe. A real client failing the handshake is a bug someone needs
+    to see."""
+    import logging
+    noise_filter = _camera_server_module()._ProbeNoiseFilter()
+
+    class Boom(Exception):
+        pass
+
+    real = (Boom, Boom('invalid Sec-WebSocket-Key header'), None)
+    kept = logging.LogRecord(
+        'websockets.server', logging.ERROR, '', 0, 'opening handshake failed', (), real)
+
+    assert noise_filter.filter(kept)
+    assert noise_filter.filter(
+        logging.LogRecord('websockets.server', logging.INFO, '', 0, 'connection open', (), None))

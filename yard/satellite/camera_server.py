@@ -23,6 +23,40 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+class _ProbeNoiseFilter(logging.Filter):
+    """Drop the traceback a TCP health check provokes.
+
+    Readiness is checked by opening a socket and closing it - here, in
+    web_server and in camera_control. websockets sees a connection that closed
+    before sending a request line and logs a full traceback for each one, so a
+    console polling every few seconds buries every real message in noise. It
+    also actively hurts: camera_control scans this log to explain a failed
+    start, and the explanation has to be findable.
+
+    Narrow on purpose. Only a connection that sent nothing at all is dropped,
+    which is exactly a port probe; a genuine handshake that fails still logs.
+    """
+
+    _PROBE_SIGNS = (
+        'did not receive a valid HTTP request',
+        'connection closed while reading HTTP request line',
+    )
+
+    def filter(self, record):
+        text = record.getMessage()
+        if record.exc_info and record.exc_info[1]:
+            text += ' ' + str(record.exc_info[1])
+        return not any(sign in text for sign in self._PROBE_SIGNS)
+
+
+def _quiet_probe_logger():
+    ws_logger = logging.getLogger('websockets.server')
+    if not any(isinstance(f, _ProbeNoiseFilter) for f in ws_logger.filters):
+        ws_logger.addFilter(_ProbeNoiseFilter())
+    return ws_logger
+
+
 # Global state
 camera = None
 imx500 = None
@@ -350,9 +384,14 @@ async def main():
     # Start frame producer task
     producer_task = asyncio.create_task(frame_producer())
 
-    # Start WebSocket server
-    logger.info("Starting WebSocket server on port 8890")
-    async with websockets.serve(handle_client, "0.0.0.0", 8890):
+    # Start WebSocket server. The port is read from the environment because
+    # every client of it already is - web_server, camera_control and the
+    # monitor page - so hardcoding it here would let CAMERA_PORT point all of
+    # them at a port nothing is serving.
+    port = int(os.environ.get('CAMERA_PORT', 8890))
+    logger.info(f"Starting WebSocket server on port {port}")
+    async with websockets.serve(handle_client, "0.0.0.0", port,
+                                logger=_quiet_probe_logger()):
         while running:
             await asyncio.sleep(0.1)
 

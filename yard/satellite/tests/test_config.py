@@ -97,3 +97,28 @@ def test_rover_url_cannot_be_changed_without_an_operator(tmp_path, monkeypatch):
 
     assert resp.status_code == 401
     assert web_server.ROVER_URL == original_url, 'the URL must not have changed'
+
+
+def test_the_monitor_does_not_hardcode_the_camera_host(client):
+    """The camera websocket URL was pinned to ws://mro.local:8890, so the feed
+    only worked for someone reaching the Pi by that exact mDNS name. Opening
+    the monitor by IP - or on any dev machine - left it dialling a host that
+    does not resolve, sitting on "Connecting..." forever with nothing in the
+    UI to say why."""
+    page = client.get('/monitor/').get_data(as_text=True)
+
+    assert 'mro.local:8890' not in page, 'the camera host must not be pinned'
+    # Derived from wherever the page was served: the camera always runs on the
+    # same machine as this web server, on the Pi and in development alike.
+    assert 'window.location.hostname' in page
+    assert f':{web_server.CAMERA_PORT}`' in page
+
+
+def test_the_monitor_uses_the_configured_camera_port(client, monkeypatch):
+    """CAMERA_PORT is env-tunable, so a page that renders 8890 regardless would
+    silently ignore it."""
+    monkeypatch.setattr(web_server, 'CAMERA_PORT', 9999)
+
+    page = client.get('/monitor/').get_data(as_text=True)
+
+    assert 'ws://${window.location.hostname}:9999' in page
