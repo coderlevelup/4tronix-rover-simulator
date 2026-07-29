@@ -24,6 +24,13 @@ interface RoverSimulatorProps {
   onReset?: () => void;
   editorMode?: 'manual' | 'blockly' | 'code';
   resetVersion?: number;
+  /**
+   * Rendered inside this card, below the playback controls. A slot rather than
+   * anything simulator-specific: the arena is drawn letterboxed with vertical
+   * slack, which makes this the cheapest place on the page to spend height.
+   * The simulator does not need to know what goes in it.
+   */
+  footer?: React.ReactNode;
 }
 
 export function RoverSimulator({
@@ -32,6 +39,7 @@ export function RoverSimulator({
   onReset,
   editorMode,
   resetVersion = 0,
+  footer,
 }: RoverSimulatorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -275,6 +283,8 @@ export function RoverSimulator({
           </div>
         </div>
       )}
+
+      {footer}
     </div>
   );
 }

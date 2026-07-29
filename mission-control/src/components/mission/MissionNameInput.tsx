@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Dices, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Dices, AlertTriangle } from 'lucide-react';
 import { generateRandomMissionName, isValidMissionName } from '@/lib/missionNameGenerator';
 
 interface MissionNameInputProps {
@@ -60,53 +60,58 @@ export function MissionNameInput({
   };
 
   const hasError = showError && error;
-  const isEmpty = value.trim().length === 0;
 
+  // A single row so the name and the submit button can sit side by side. The
+  // card chrome, the standalone label and the always-present status line cost
+  // 99px of height between them, in a workspace locked to the viewport where
+  // the block canvas only had 311px to work with.
+  //
+  // The label is kept for screen readers rather than deleted: the placeholder
+  // alone is not an accessible name, and it disappears as soon as you type.
   return (
-    <div className="rounded-xl border border-border/70 bg-secondary/30 p-2.5">
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <label className="block text-[11px] font-bold text-foreground">
-          Mission name <span className="text-destructive">*</span>
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-1.5">
+        <label htmlFor="mission-name" className="sr-only">
+          Mission name (required)
         </label>
+        <input
+          id="mission-name"
+          type="text"
+          value={value}
+          onChange={handleInputChange}
+          placeholder="Name your mission..."
+          maxLength={100}
+          required
+          aria-invalid={hasError ? true : undefined}
+          aria-describedby={hasError ? 'mission-name-error' : undefined}
+          className={`h-9 w-full min-w-0 rounded-lg border bg-background/70 px-2.5 text-xs text-foreground placeholder-muted-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50 ${
+            hasError ? 'border-destructive/60' : 'border-border'
+          }`}
+        />
+        {/* Icon only. The accessible name and tooltip carry the meaning the
+            visible label used to, so the button is still announced and still
+            explains itself on hover. */}
+        <button
+          onClick={handleGenerateRandom}
+          className="clay-press flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-card text-foreground"
+          title="Generate a random mission name"
+          aria-label="Generate a random mission name"
+        >
+          <Dices className="h-4 w-4 text-primary" />
+        </button>
       </div>
 
-      <div className="space-y-1">
-        <div className="flex items-center gap-1.5">
-          <input
-            type="text"
-            value={value}
-            onChange={handleInputChange}
-            placeholder="Enter mission name..."
-            maxLength={100}
-            className={`w-full rounded-lg border bg-background/70 px-2.5 py-1.5 text-xs text-foreground placeholder-muted-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50 ${
-              hasError
-                ? 'border-destructive/50'
-                : 'border-border'
-            }`}
-          />
-          <button
-            onClick={handleGenerateRandom}
-            className="clay-press flex shrink-0 items-center gap-1.5 rounded-lg border border-border/60 bg-card px-3 py-1.5 text-xs font-bold text-foreground"
-            title="Generate a random mission name"
-          >
-            <Dices className="h-3.5 w-3.5 text-primary" />
-            <span>Generate</span>
-          </button>
-        </div>
-
-        {/* Status message */}
-        <div className="min-h-[1.25rem] text-xs">
-          {hasError ? (
-            <span className="flex items-center gap-1 text-destructive">
-              <AlertTriangle className="h-3.5 w-3.5" /> {error}
-            </span>
-          ) : !isEmpty ? (
-            <span className="flex items-center gap-1 text-buzz">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Set ({value.length}/100)
-            </span>
-          ) : null}
-        </div>
-      </div>
+      {/* Rendered only when it fires, so a valid name costs no height. The
+          old "Set (12/100)" confirmation is gone: a filled field already
+          says that, and it reserved 20px permanently to do it. */}
+      {hasError && (
+        <p
+          id="mission-name-error"
+          className="mt-1 flex items-center gap-1 text-[11px] text-destructive"
+        >
+          <AlertTriangle className="h-3 w-3 shrink-0" /> {error}
+        </p>
+      )}
     </div>
   );
 }

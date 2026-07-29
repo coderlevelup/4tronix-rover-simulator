@@ -34,6 +34,7 @@ export function BlocklyEditor({ onGenerateCommands, onCodeChange, onBlocklyState
   // Holds the Blockly workspace instance (untyped CDN global).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const workspaceRef = useRef<any>(null);
+  const flyoutObserverRef = useRef<MutationObserver | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [blocklyLoaded, setBlocklyLoaded] = useState(false);
   const scriptLoadedRef = useRef(false);
@@ -134,6 +135,37 @@ export function BlocklyEditor({ onGenerateCommands, onCodeChange, onBlocklyState
         startWithHat();
       }
 
+      // Blockly hides a flyout but leaves its scrollbar behind. Closing a
+      // category left a 15x322 scrollbar sitting over the workspace, still
+      // display:block with a visible handle, covering blocks underneath and
+      // swallowing clicks meant for them.
+      //
+      // Each flyout is immediately followed in the DOM by its own scrollbar
+      // (toolbox and trashcan each have a pair), so the fix is to mirror the
+      // flyout's display onto the scrollbar whenever Blockly changes it.
+      const syncFlyoutScrollbars = () => {
+        blocklyDivRef.current
+          ?.querySelectorAll<SVGElement>('.blocklyFlyout')
+          .forEach((flyout) => {
+            const scrollbar = flyout.nextElementSibling;
+            if (!scrollbar?.classList.contains('blocklyFlyoutScrollbar')) return;
+            const hidden = getComputedStyle(flyout).display === 'none';
+            (scrollbar as SVGElement).style.display = hidden ? 'none' : '';
+          });
+      };
+
+      // Runs once for the initial state too: the scrollbar ships visible even
+      // before any category has been opened.
+      syncFlyoutScrollbars();
+
+      const flyoutObserver = new MutationObserver(syncFlyoutScrollbars);
+      blocklyDivRef.current
+        ?.querySelectorAll('.blocklyFlyout')
+        .forEach((flyout) =>
+          flyoutObserver.observe(flyout, { attributes: true, attributeFilter: ['style', 'class'] })
+        );
+      flyoutObserverRef.current = flyoutObserver;
+
       // Auto-save serialized state on every change.
       workspace.addChangeListener(() => {
         try {
@@ -147,6 +179,8 @@ export function BlocklyEditor({ onGenerateCommands, onCodeChange, onBlocklyState
 
     return () => {
       clearTimeout(timer);
+      flyoutObserverRef.current?.disconnect();
+      flyoutObserverRef.current = null;
     };
   }, [blocklyLoaded]);
 

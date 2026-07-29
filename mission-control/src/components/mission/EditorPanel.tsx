@@ -1,10 +1,9 @@
 'use client';
 
-import { Gamepad2, Blocks, Code2, Rocket, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Gamepad2, Blocks, Code2, AlertTriangle } from 'lucide-react';
 import { ManualControlRealtime } from '@/components/mission/ManualControlRealtime';
 import { BlocklyEditor } from '@/components/mission/BlocklyEditor';
 import { MonacoCodeEditor } from '@/components/mission/MonacoCodeEditor';
-import { MissionNameInput } from '@/components/mission/MissionNameInput';
 import type { RoverState } from '@/lib/rover-physics';
 
 export type EditorMode = 'manual' | 'blockly' | 'code';
@@ -38,19 +37,6 @@ interface EditorPanelProps {
   onGenerateCommands: (commands: SimulationCommand[]) => void;
   onCodeChange: (code: string) => void;
   onBlocklyStateChange?: (state: string) => void;
-
-  missionName: string;
-  onMissionNameChange: (name: string) => void;
-  missionNameError: string | null;
-  onMissionNameError: (error: string | null) => void;
-  showMissionNameValidation: boolean;
-  onMissionNameValidationChange: (valid: boolean) => void;
-
-  onSubmit: () => void;
-  submitting: boolean;
-  submitSuccess: boolean;
-  currentCode: string;
-  isMissionNameValid: boolean;
 }
 
 export function EditorPanel({
@@ -65,53 +51,7 @@ export function EditorPanel({
   onGenerateCommands,
   onCodeChange,
   onBlocklyStateChange,
-  missionName,
-  onMissionNameChange,
-  missionNameError,
-  onMissionNameError,
-  showMissionNameValidation,
-  onMissionNameValidationChange,
-  onSubmit,
-  submitting,
-  submitSuccess,
-  currentCode,
-  isMissionNameValid,
 }: EditorPanelProps) {
-  // Shared mission-name + submit controls (used by both Blockly and Code modes)
-  const submitBar = (
-    <div className="flex-1 flex flex-col gap-2">
-      <MissionNameInput
-        value={missionName}
-        onChange={onMissionNameChange}
-        onError={onMissionNameError}
-        error={missionNameError}
-        showValidationError={showMissionNameValidation}
-        onValidationChange={onMissionNameValidationChange}
-      />
-
-      <button
-        onClick={onSubmit}
-        disabled={submitting || !currentCode.trim() || !isMissionNameValid}
-        className="clay clay-press flex items-center justify-center gap-2 rounded-2xl bg-gradient-mars px-4 py-2.5 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        {submitting ? (
-          <>
-            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <span>Sending...</span>
-          </>
-        ) : (
-          <>
-            <Rocket className="h-4 w-4" />
-            <span>Send to Rover Queue</span>
-          </>
-        )}
-      </button>
-    </div>
-  );
-
   return (
     <div className="flex h-full flex-col gap-1.5 overflow-hidden rounded-2xl border border-border/60 bg-card/40 p-2.5 clay">
       {/* Panel split control */}
@@ -173,22 +113,6 @@ export function EditorPanel({
         {editorMode === 'code' && <MonacoCodeEditor onGenerateCommands={onGenerateCommands} onCodeChange={onCodeChange} />}
       </div>
 
-      {/* Mission name + submit - Blockly mode */}
-      {editorMode === 'blockly' && <div className="flex flex-shrink-0 gap-2">{submitBar}</div>}
-
-      {/* Mission name + submit - Code mode (the command reference is the
-          insert-on-click palette inside the editor) */}
-      {editorMode === 'code' && <div className="flex flex-shrink-0 gap-2">{submitBar}</div>}
-
-      {submitSuccess && (
-        <div className="flex flex-shrink-0 items-start gap-2 rounded-xl border border-buzz/40 bg-buzz/10 p-2">
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-buzz" />
-          <div className="flex-1">
-            <p className="text-xs font-bold text-buzz">Mission sent!</p>
-            <p className="text-xs text-buzz/80">It is in the queue for the rover to run.</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

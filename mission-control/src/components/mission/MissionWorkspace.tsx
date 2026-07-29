@@ -8,6 +8,7 @@ import { useLearner } from '@/contexts/LearnerContext';
 import { validateMission } from '@/infrastructure/validation/schemas';
 import { EditorPanel, type EditorMode } from '@/components/mission/EditorPanel';
 import { SimulationPanel } from '@/components/mission/SimulationPanel';
+import { MissionSubmitBar } from '@/components/mission/MissionSubmitBar';
 import { simulateCommands } from '@/lib/simulateCommands';
 
 interface TrajectoryPoint {
@@ -213,17 +214,6 @@ export function MissionWorkspace() {
           onGenerateCommands={runSimulation}
           onCodeChange={setCurrentCode}
           onBlocklyStateChange={setBlocklyState}
-          missionName={missionName}
-          onMissionNameChange={setMissionName}
-          missionNameError={missionNameError}
-          onMissionNameError={setMissionNameError}
-          showMissionNameValidation={showMissionNameValidation}
-          onMissionNameValidationChange={setIsMissionNameValid}
-          onSubmit={handleSubmitToQueue}
-          submitting={submitting}
-          submitSuccess={submitSuccess}
-          currentCode={currentCode}
-          isMissionNameValid={isMissionNameValid}
         />
 
         <SimulationPanel
@@ -232,6 +222,26 @@ export function MissionWorkspace() {
           onReset={handleResetSimulation}
           editorMode={editorMode}
           resetVersion={manualResetVersion}
+          // Name and launch live under the simulator so the block canvas keeps
+          // the full height of its own column. Drive mode is excluded: it has
+          // no code to send, and the simulator is on screen in every mode.
+          footer={
+            editorMode === 'manual' ? undefined : (
+              <MissionSubmitBar
+                missionName={missionName}
+                onMissionNameChange={setMissionName}
+                missionNameError={missionNameError}
+                onMissionNameError={setMissionNameError}
+                showMissionNameValidation={showMissionNameValidation}
+                onMissionNameValidationChange={setIsMissionNameValid}
+                onSubmit={handleSubmitToQueue}
+                submitting={submitting}
+                submitSuccess={submitSuccess}
+                currentCode={currentCode}
+                isMissionNameValid={isMissionNameValid}
+              />
+            )
+          }
         />
       </div>
     </div>

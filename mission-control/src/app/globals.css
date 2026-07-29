@@ -342,6 +342,17 @@ html {
 }
 
 /* Blockly Light Theme Overrides */
+
+/*
+ * The workspace container is clipped to a 20px corner radius, and the first
+ * toolbox category sits 4px from the top - so the arc ate roughly 7px of the
+ * 8px coloured border-left that identifies the category ("Uplink" lost most of
+ * its orange bar). Starting the list below where the arc straightens keeps the
+ * full bar visible on every category.
+ */
+.blocklyToolbox {
+  padding-top: 18px !important;
+}
 .blocklySvg {
   background-color: #ffffff !important;
 }
