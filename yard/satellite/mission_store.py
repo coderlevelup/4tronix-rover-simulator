@@ -47,6 +47,8 @@ def init_db():
                 needs_review      INTEGER DEFAULT 0,
                 review_reason     TEXT,
                 status_updated_at TEXT,
+                deleted           INTEGER DEFAULT 0,
+                deleted_at        TEXT,
                 synced_at         TEXT,
                 local_dirty       INTEGER DEFAULT 0
             );
@@ -89,7 +91,11 @@ def init_db():
 # runs this every boot so a satellite that already has a mirror on disk from an
 # earlier version picks them up instead of failing on the first write.
 _ADDED_COLUMNS = {
-    'mission_mirror': {'locked_at': 'TEXT'},
+    'mission_mirror': {
+        'locked_at': 'TEXT',
+        'deleted': 'INTEGER DEFAULT 0',
+        'deleted_at': 'TEXT',
+    },
 }
 
 
@@ -111,8 +117,9 @@ def upsert_missions(missions, synced_at):
                     (id, name, yard_id, code, blockly_state, status,
                      submitted_at, started_at, completed_at, youtube_url,
                      lock_owner, locked_at, lease_expires_at, needs_review,
-                     review_reason, status_updated_at, synced_at, local_dirty)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
+                     review_reason, status_updated_at, deleted, deleted_at,
+                     synced_at, local_dirty)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
                 ON CONFLICT(id) DO UPDATE SET
                     name=excluded.name,
                     yard_id=excluded.yard_id,
@@ -129,6 +136,8 @@ def upsert_missions(missions, synced_at):
                     needs_review=excluded.needs_review,
                     review_reason=excluded.review_reason,
                     status_updated_at=excluded.status_updated_at,
+                    deleted=excluded.deleted,
+                    deleted_at=excluded.deleted_at,
                     synced_at=excluded.synced_at
                 WHERE local_dirty = 0
             """, (
@@ -138,7 +147,9 @@ def upsert_missions(missions, synced_at):
                 m.get('youtubeUrl'), m.get('lockOwner'), m.get('lockedAt'),
                 m.get('leaseExpiresAt'),
                 m.get('needsReview', 0), m.get('reviewReason'),
-                m.get('statusUpdatedAt'), synced_at,
+                m.get('statusUpdatedAt'),
+                1 if m.get('deleted') else 0, m.get('deletedAt'),
+                synced_at,
             ))
         conn.execute("INSERT OR REPLACE INTO sync_meta VALUES ('last_synced_at', ?)", (synced_at,))
         conn.commit()
@@ -170,7 +181,7 @@ def get_missions(limit=DEFAULT_FINISHED_PAGE, yard_id=None):
 
         active = conn.execute(
             "SELECT * FROM mission_mirror"
-            " WHERE status IN ('queued','processing')" + yard_clause +
+            " WHERE deleted = 0 AND status IN ('queued','processing')" + yard_clause +
             " ORDER BY submitted_at DESC",
             yard_params,
         ).fetchall()
@@ -178,14 +189,14 @@ def get_missions(limit=DEFAULT_FINISHED_PAGE, yard_id=None):
         # 'cancelled' stays hidden from the console entirely.
         finished = conn.execute(
             "SELECT * FROM mission_mirror"
-            " WHERE status IN ('completed','failed')" + yard_clause +
+            " WHERE deleted = 0 AND status IN ('completed','failed')" + yard_clause +
             " ORDER BY submitted_at DESC LIMIT ?",
             yard_params + [limit],
         ).fetchall()
 
         finished_total = conn.execute(
             "SELECT COUNT(*) AS n FROM mission_mirror"
-            " WHERE status IN ('completed','failed')" + yard_clause,
+            " WHERE deleted = 0 AND status IN ('completed','failed')" + yard_clause,
             yard_params,
         ).fetchone()['n']
 
@@ -199,13 +210,21 @@ def get_missions(limit=DEFAULT_FINISHED_PAGE, yard_id=None):
     return missions, last_synced, finished_total
 
 
-def get_mission(mission_id):
-    """A single mission from the mirror, or None if it isn't there."""
+def get_mission(mission_id, include_deleted=False):
+    """A single mission from the mirror, or None if it isn't there.
+
+    Deleted missions are excluded by DEFAULT. Every action endpoint reaches a
+    mission through here, so defaulting the other way meant a deleted mission
+    stayed dispatchable to anyone who knew its id - it only disappeared from
+    the lists. Callers that genuinely need to see a deleted row (the delete
+    endpoint's double-delete guard) opt in explicitly.
+    """
+    sql = "SELECT * FROM mission_mirror WHERE id = ?"
+    if not include_deleted:
+        sql += " AND deleted = 0"
     with _db_lock:
         conn = _connect()
-        row = conn.execute(
-            "SELECT * FROM mission_mirror WHERE id = ?", (mission_id,)
-        ).fetchone()
+        row = conn.execute(sql, (mission_id,)).fetchone()
         conn.close()
     return dict(row) if row else None
 
@@ -355,7 +374,7 @@ def acquire_mission(mission_id, owner, now_iso, expires_iso, for_rerun=False):
                 'SELECT * FROM mission_mirror WHERE id = ?', (mission_id,)
             ).fetchone()
 
-            if row is None:
+            if row is None or row['deleted']:
                 conn.rollback()
                 return False, 'not-found', None
 
@@ -669,7 +688,8 @@ def active_mission_ids(yard_id=None):
     """
     with _db_lock:
         conn = _connect()
-        sql = "SELECT id FROM mission_mirror WHERE status IN ('queued','processing')"
+        sql = ("SELECT id FROM mission_mirror"
+               " WHERE deleted = 0 AND status IN ('queued','processing')")
         params = []
         if yard_id:
             sql += ' AND yard_id = ?'
@@ -698,3 +718,50 @@ def forget_mission(mission_id):
         conn.commit()
         conn.close()
         return True
+
+
+def delete_mission(mission_id, now_iso):
+    """Soft-delete: flag the mission and queue that for Firestore.
+
+    Soft rather than hard on purpose. The operator is told this is permanent -
+    and to them it is, there is no undo in the console - but the document
+    survives, so a mis-tap on a child's completed mission with a video attached
+    is recoverable by someone with database access. A hard delete would make
+    a single wrong tap unrecoverable, which is a bad trade for a field that
+    costs one integer.
+
+    Also releases the lock: a deleted mission must never keep a lease alive.
+    """
+    with _db_lock:
+        conn = _connect()
+        try:
+            conn.execute('BEGIN IMMEDIATE')
+            updates = {
+                'deleted': 1,
+                'deleted_at': now_iso,
+                'status_updated_at': now_iso,
+                'lock_owner': None,
+                'locked_at': None,
+                'lease_expires_at': None,
+                'local_dirty': 1,
+            }
+            payload = {
+                'deleted': True,
+                'deletedAt': now_iso,
+                'statusUpdatedAt': now_iso,
+                'lockOwner': None,
+                'lockedAt': None,
+                'leaseExpiresAt': None,
+            }
+            sets = ', '.join(f'{k} = ?' for k in updates)
+            conn.execute(
+                f'UPDATE mission_mirror SET {sets} WHERE id = ?',
+                list(updates.values()) + [mission_id],
+            )
+            _enqueue(conn, mission_id, 'delete', payload)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()

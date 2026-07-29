@@ -1427,3 +1427,86 @@ def test_new_surfaces_require_an_operator(client, missions):
     assert client.post('/operator/api/missions/q1/cancel').status_code == 401
     assert client.get('/operator/api/integrations').status_code == 401
     assert client.get('/operator/api/camera').status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Delete (soft)
+# ---------------------------------------------------------------------------
+
+def test_delete_hides_the_mission_everywhere(client, missions):
+    import mission_store
+    sign_in(client)
+
+    assert client.post('/operator/api/missions/q1/delete').status_code == 200
+
+    listed = client.get('/operator/api/missions').get_json()['missions']
+    assert 'q1' not in [m['id'] for m in listed]
+
+
+def test_delete_is_soft_so_a_mistake_is_recoverable(client, missions):
+    """The operator is told it is permanent - there is no undo in the console -
+    but the record survives for someone with database access. A hard delete
+    would make one wrong tap on a child's completed mission unrecoverable."""
+    import mission_store
+    sign_in(client)
+
+    client.post('/operator/api/missions/q1/delete')
+
+    row = mission_store.get_mission('q1', include_deleted=True)
+    assert row is not None, 'the document must survive'
+    assert row['deleted'] == 1
+    assert row['deleted_at']
+
+
+def test_delete_releases_the_lock(client, missions, monkeypatch):
+    """A deleted mission must never keep a lease alive and block reclaim."""
+    import mission_store
+    sign_in(client)
+    _ok_rover(monkeypatch)
+    client.post('/operator/api/missions/q1/send')
+    assert mission_store.get_mission('q1')['lock_owner']
+
+    client.post('/operator/api/missions/q1/delete')
+
+    row = mission_store.get_mission('q1', include_deleted=True)
+    assert row['lock_owner'] is None
+    assert row['lease_expires_at'] is None
+
+
+def test_delete_queues_the_change_for_firestore(client, missions):
+    import mission_store
+    sign_in(client)
+
+    client.post('/operator/api/missions/q1/delete')
+
+    entry = mission_store.peek_outbox()
+    assert entry['mission_id'] == 'q1'
+    assert entry['op'] == 'delete'
+
+
+def test_deleting_twice_is_refused(client, missions):
+    sign_in(client)
+    assert client.post('/operator/api/missions/q1/delete').status_code == 200
+    assert client.post('/operator/api/missions/q1/delete').status_code == 400
+
+
+def test_delete_404s_for_an_unknown_mission(client, missions):
+    sign_in(client)
+    assert client.post('/operator/api/missions/nope/delete').status_code == 404
+
+
+def test_delete_requires_an_operator(client, missions):
+    assert client.post('/operator/api/missions/q1/delete').status_code == 401
+
+
+def test_a_deleted_mission_is_not_reconciled_or_dispatchable(client, missions, monkeypatch):
+    """It must drop out of the active set, or the sync worker keeps paying to
+    re-read a mission nobody can see."""
+    import mission_store
+    sign_in(client)
+
+    client.post('/operator/api/missions/q1/delete')
+
+    assert 'q1' not in mission_store.active_mission_ids('uct-rover-1')
+    _ok_rover(monkeypatch)
+    assert client.post('/operator/api/missions/q1/send').status_code == 404

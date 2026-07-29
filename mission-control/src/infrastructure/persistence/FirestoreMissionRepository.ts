@@ -77,7 +77,11 @@ export class FirestoreMissionRepository implements IMissionRepository {
       return null;
     }
 
-    return this.fromFirestoreDoc(id, snapshot.data()!);
+    const mission = this.fromFirestoreDoc(id, snapshot.data()!);
+
+    // A deleted mission reads as absent, so a shared link 404s rather than
+    // showing work an operator removed.
+    return mission.deleted ? null : mission;
   }
 
   async update(id: string, updates: Partial<Mission>): Promise<Mission | null> {
@@ -112,9 +116,14 @@ export class FirestoreMissionRepository implements IMissionRepository {
 
     const hasMore = docs.length > limit;
     const page = hasMore ? docs.slice(0, limit) : docs;
-    const missions = page.map((missionDoc) =>
-      this.fromFirestoreDoc(missionDoc.id, missionDoc.data())
-    );
+    const missions = page
+      .map((missionDoc) => this.fromFirestoreDoc(missionDoc.id, missionDoc.data()))
+      // Filtered here rather than in the query: `where('deleted','==',false)`
+      // would need a composite index AND a backfill, since missions written
+      // before soft delete existed have no such field. Deletions are rare, so
+      // a page occasionally rendering fewer than FEED_SIZE cards is a better
+      // trade than an index migration.
+      .filter((mission) => !mission.deleted);
 
     const last = missions[missions.length - 1];
 
@@ -268,6 +277,8 @@ export class FirestoreMissionRepository implements IMissionRepository {
       code: data.code as string,
       blocklyState: data.blocklyState as string | undefined,
       status: data.status as Mission['status'],
+      deleted: (data.deleted as boolean) ?? false,
+      deletedAt: data.deletedAt as string | undefined,
       executionResult: data.executionResult as Mission['executionResult'],
       executionMetadata: data.executionMetadata as Mission['executionMetadata'],
       videoUrl: data.videoUrl as string | undefined,

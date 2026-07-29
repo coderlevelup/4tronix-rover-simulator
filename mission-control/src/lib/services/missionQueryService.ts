@@ -66,7 +66,8 @@ export function subscribeMissionsByLearnerId(
     (snapshot) => {
       const missions: Mission[] = [];
       snapshot.forEach((doc) => {
-        missions.push(convertTimestamps(doc.data() as Mission, doc.id));
+        const mission = convertTimestamps(doc.data() as Mission, doc.id);
+        if (!mission.deleted) missions.push(mission);
       });
       callback(missions);
     },
@@ -112,7 +113,8 @@ export async function subscribeMissionsByLearnerEmail(
     (snapshot) => {
       const missions: Mission[] = [];
       snapshot.forEach((doc) => {
-        missions.push(convertTimestamps(doc.data() as Mission, doc.id));
+        const mission = convertTimestamps(doc.data() as Mission, doc.id);
+        if (!mission.deleted) missions.push(mission);
       });
       callback(missions);
     },
@@ -146,7 +148,8 @@ export async function getMissionsByLearnerId(
 
     const missions: Mission[] = [];
     querySnapshot.forEach((doc) => {
-      missions.push(convertTimestamps(doc.data() as Mission, doc.id));
+      const mission = convertTimestamps(doc.data() as Mission, doc.id);
+      if (!mission.deleted) missions.push(mission);
     });
 
     return missions;

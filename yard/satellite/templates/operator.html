@@ -380,6 +380,27 @@
         .show-more-wrap { display: flex; justify-content: center; padding: .5rem 0 1.5rem; }
         .show-more { min-height: 44px; padding: .6rem 1.2rem; }
         .show-more-count { color: var(--text-faint); font-weight: 400; margin-left: .35rem; }
+
+        .confirm-typed-label {
+            display: block; color: var(--bad); font-size: .8rem;
+            font-weight: 600; margin: .9rem 0 .4rem;
+        }
+        .confirm-typed-input {
+            width: 100%; min-height: 44px; padding: .55rem .7rem;
+            border: 1px solid color-mix(in oklab, var(--bad) 45%, transparent);
+            border-radius: 9px; background: var(--surface);
+            color: var(--text); font-family: var(--mono); letter-spacing: .12em;
+        }
+        .confirm-typed-input:focus-visible { outline: 2px solid var(--bad); outline-offset: 2px; }
+
+        /* Delete is separated from the routine actions so it is not adjacent
+           to Cancel, which is the reversible one operators actually want. */
+        .action-sep { flex-basis: 100%; height: 0; }
+        .btn.danger-solid {
+            color: var(--bad); border-color: color-mix(in oklab, var(--bad) 45%, transparent);
+            background: color-mix(in oklab, var(--bad) 10%, transparent);
+        }
+        .btn.danger-solid:hover { background: color-mix(in oklab, var(--bad) 20%, transparent); border-color: var(--bad); }
 </style>
 </head>
 <body>
@@ -428,6 +449,11 @@
         <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmBody">
             <h2 id="confirmTitle"></h2>
             <p id="confirmBody"></p>
+            <div id="confirmTyped" hidden>
+                <label class="confirm-typed-label" id="confirmTypedLabel" for="confirmTypedInput"></label>
+                <input id="confirmTypedInput" class="confirm-typed-input" type="text"
+                       autocomplete="off" autocapitalize="characters" spellcheck="false">
+            </div>
             <div class="modal-actions">
                 <button class="btn" id="confirmCancel">Cancel</button>
                 <button class="btn danger" id="confirmOk"></button>
@@ -472,8 +498,18 @@
             },
             cancel: {
                 title: 'Cancel this mission?',
-                body: 'It comes out of the queue without running. The learner still sees it as Pending, not rejected.',
+                body: 'It comes out of the queue without running. The learner still sees it as Pending, not rejected. You can put it back afterwards.',
                 confirmLabel: 'Cancel mission',
+            },
+            delete: {
+                title: 'Delete this mission permanently?',
+                body: 'This removes the mission and its attached video link from the platform, '
+                    + 'for the learner as well as here. There is no undo in this console. '
+                    + 'If you only want to keep it out of the queue, use Cancel instead - that can be reversed.',
+                confirmLabel: 'Delete permanently',
+                // An irreversible action next to a reversible one, on a tablet,
+                // in a busy hall. A single tap is not enough friction.
+                requireTyped: 'DELETE',
             },
         };
 
@@ -584,17 +620,21 @@
             const copyBlocks = m.blocklyState
                 ? `<button class="btn" data-act="copyblocks" data-id="${m.id}">Copy blocks</button>` : '';
             const cancel = `<button class="btn danger-quiet" data-act="cancel" data-id="${m.id}" data-confirm="true">Cancel</button>`;
+            // On its own row: Delete has no undo and Cancel does, so they must
+            // not sit side by side under a thumb.
+            const del = `<span class="action-sep"></span>
+                <button class="btn danger-solid" data-act="delete" data-id="${m.id}" data-confirm="true">Delete</button>`;
 
             if (m.status === 'queued') {
                 return `<button class="btn primary" data-act="send" data-id="${m.id}">Send to rover</button>
                         ${copyCode}
                         <button class="btn" data-act="complete" data-id="${m.id}" data-confirm="true">Mark complete</button>
-                        ${cancel}`;
+                        ${cancel}${del}`;
             }
             if (m.status === 'processing') {
                 return `<button class="btn success" data-act="complete" data-id="${m.id}" data-confirm="true">Mark complete</button>
                         ${copyCode}${copyBlocks}
-                        ${cancel}`;
+                        ${cancel}${del}`;
             }
             if (m.status === 'completed' && !m.youtubeUrl) {
                 // Two genuinely different paths, so say so rather than showing
@@ -616,19 +656,19 @@
                             </div>
                         </div>
                         <button class="btn primary" data-act="youtube" data-id="${m.id}" disabled>Attach video</button>
-                        <button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Rerun</button>`;
+                        <button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Rerun</button>${del}`;
             }
             if (m.status === 'completed') {
                 return `<a class="yt-link" href="${esc(m.youtubeUrl)}" target="_blank" rel="noopener">Video attached &#8599;</a>
-                        <button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Rerun</button>`;
+                        <button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Rerun</button>${del}`;
             }
             if (m.status === 'failed') {
                 return `<button class="btn primary" data-act="rerun" data-id="${m.id}">Rerun</button>
-                        ${copyCode}${copyBlocks}`;
+                        ${copyCode}${copyBlocks}${del}`;
             }
             if (m.status === 'cancelled') {
                 return `<button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Put back in queue</button>
-                        ${copyCode}`;
+                        ${copyCode}${del}`;
             }
             return '';
         }
@@ -764,6 +804,9 @@
         const confirmTitle = document.getElementById('confirmTitle');
         const confirmBody = document.getElementById('confirmBody');
         const confirmCancel = document.getElementById('confirmCancel');
+        const confirmTyped = document.getElementById('confirmTyped');
+        const confirmTypedLabel = document.getElementById('confirmTypedLabel');
+        const confirmTypedInput = document.getElementById('confirmTypedInput');
         const confirmOk = document.getElementById('confirmOk');
         let confirmReturnFocus = null;
         let confirmPending = false;
@@ -774,6 +817,21 @@
             confirmOk.textContent = copy.confirmLabel;
             confirmPending = false;
             confirmOk.disabled = false;
+
+            // Irreversible actions require the word typed out. The button stays
+            // disabled until it matches, so a mis-tap cannot destroy a child's
+            // work - which is the whole failure mode worth designing against.
+            confirmTyped.hidden = !copy.requireTyped;
+            if (copy.requireTyped) {
+                confirmTypedLabel.textContent = `Type ${copy.requireTyped} to confirm`;
+                confirmTypedInput.value = '';
+                confirmTypedInput.setAttribute('aria-label', `Type ${copy.requireTyped} to confirm`);
+                confirmOk.disabled = true;
+                confirmTypedInput.oninput = () => {
+                    confirmOk.disabled =
+                        confirmTypedInput.value.trim().toUpperCase() !== copy.requireTyped;
+                };
+            }
             confirmReturnFocus = document.activeElement;
             confirmOverlay.hidden = false;
             confirmCancel.focus(); // default focus is Cancel, not the destructive action
@@ -864,6 +922,7 @@
             youtube: 'Video attached.',
             rerun: 'Mission queued for rerun.',
             cancel: 'Mission cancelled.',
+            delete: 'Mission deleted.',
         };
 
         async function act(action, missionId, btn) {
@@ -897,7 +956,7 @@
                 return;
             }
 
-            const endpoints = { send: 'send', complete: 'complete', youtube: 'youtube', rerun: 'rerun', cancel: 'cancel' };
+            const endpoints = { send: 'send', complete: 'complete', youtube: 'youtube', rerun: 'rerun', cancel: 'cancel', delete: 'delete' };
             let body;
             if (action === 'youtube') body = { url: drafts[missionId] || '' };
 

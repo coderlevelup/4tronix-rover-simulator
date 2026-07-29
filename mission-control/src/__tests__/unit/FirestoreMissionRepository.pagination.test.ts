@@ -126,3 +126,48 @@ describe('findRecent pagination', () => {
     expect(page.nextCursor).toBeNull();
   });
 });
+
+describe('soft-deleted missions', () => {
+  const deletedRow = (id: string, submittedAt: string): Row => ({
+    id,
+    data: {
+      yardId: 'uct-rover-1',
+      status: 'completed',
+      code: 'forward(50)',
+      submittedAt,
+      deleted: true,
+      deletedAt: '2026-07-29T10:00:00.000Z',
+    },
+  });
+
+  it('are kept out of the feed', async () => {
+    const repo = new FirestoreMissionRepository(
+      makeFirestore([
+        row('visible', '2026-07-03T08:00:00.000Z'),
+        deletedRow('removed', '2026-07-02T08:00:00.000Z'),
+      ]) as never
+    );
+
+    const page = await repo.findRecent(24);
+
+    expect(page.missions.map((m) => m.id)).toEqual(['visible']);
+  });
+
+  it('read as absent by id, so a shared link 404s', async () => {
+    const rows = [deletedRow('removed', '2026-07-02T08:00:00.000Z')];
+    const db = {
+      collection: () => ({
+        doc: () => ({
+          get: async () => ({ exists: true, data: () => rows[0].data }),
+        }),
+        orderBy() { return this; },
+        limit() { return this; },
+        async get() { return { docs: [] }; },
+      }),
+    };
+
+    const repo = new FirestoreMissionRepository(db as never);
+
+    await expect(repo.findById('removed')).resolves.toBeNull();
+  });
+});

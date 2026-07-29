@@ -355,6 +355,7 @@ def _mirror_row_to_dict(row):
         'startedAt': row.get('started_at'),
         'completedAt': row.get('completed_at'),
         'youtubeUrl': row.get('youtube_url'),
+        'deleted': bool(row.get('deleted')),
     }
 
 
@@ -672,6 +673,34 @@ def api_camera_status():
             'granted to your terminal.'
         ),
     })
+
+
+@operator_bp.route('/api/missions/<mission_id>/delete', methods=['POST'])
+@require_operator
+def api_delete_mission(mission_id):
+    """Remove a mission from the platform.
+
+    Soft-delete underneath (see mission_store.delete_mission): the console
+    offers no undo, so the operator is warned it is permanent, but the record
+    survives for someone with database access. That asymmetry is deliberate -
+    the warning has to be honest about what the OPERATOR can undo, which is
+    nothing, while a mis-tap on a child's completed mission should still be
+    recoverable by a human who can reach the database.
+
+    Cancel is the reversible option and stays the default for "not going to
+    run this". Delete is for a mission that should not exist at all.
+    """
+    from mission_store import get_mission, delete_mission
+
+    mission = get_mission(mission_id, include_deleted=True)
+    if mission is None:
+        return jsonify({'error': 'Mission not found'}), 404
+    if mission.get('deleted'):
+        return jsonify({'error': 'This mission is already deleted'}), 400
+
+    _stop_lease_renewal(mission_id)
+    delete_mission(mission_id, _now_iso())
+    return jsonify({'status': 'ok', 'missionId': mission_id})
 
 
 @operator_bp.route('/api/integrations', methods=['GET'])

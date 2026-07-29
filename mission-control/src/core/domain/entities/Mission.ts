@@ -52,6 +52,13 @@ export interface Mission {
 
   status: MissionStatus;
 
+  // Soft delete. An operator removed this mission; it stays out of every
+  // learner-facing view. Soft rather than hard so a mis-tap on a child's work
+  // is recoverable by someone with database access - the operator console
+  // offers no undo and says so.
+  deleted?: boolean;
+  deletedAt?: string;
+
   // Execution results (populated after execution)
   executionResult?: ExecutionResult;
   executionMetadata?: ExecutionMetadata;
