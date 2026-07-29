@@ -324,6 +324,62 @@
         }
         .review-card .mission-title { color: var(--heading); font-weight: 650; }
         .review-actions { display: flex; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; }
+
+        /* --- Mission identity ------------------------------------------- */
+        /* The id is the thing an operator actually needs (it goes in the
+           YouTube description); one tap copies it. 44px min target per HIG. */
+        .id-chip {
+            display: inline-flex; align-items: center; gap: .35rem;
+            min-height: 28px; padding: .2rem .45rem; margin: -.2rem -.45rem;
+            border: 1px solid transparent; border-radius: 7px;
+            background: none; cursor: pointer;
+            color: var(--text-dim); font-family: var(--mono);
+            font-size: var(--fs-xs); font-variant-numeric: tabular-nums;
+            transition: color .15s, background .15s, border-color .15s;
+        }
+        .id-chip:hover { color: var(--text); background: var(--surface-2); border-color: var(--border); }
+        .id-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .id-chip svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; flex-shrink: 0; }
+        .id-chip.copied { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 40%, transparent); }
+        .mono-id { font-family: var(--mono); color: var(--text-dim); }
+        .meta-sep { opacity: .5; }
+
+        /* --- YouTube linking help ---------------------------------------- */
+        /* Two genuinely different paths existed but only one was visible. */
+        .yt-help {
+            width: 100%; border: 1px solid var(--border); border-radius: 12px;
+            padding: .85rem .95rem; background: var(--surface-2); margin-bottom: .6rem;
+        }
+        .yt-help-title { color: var(--heading); font-size: .82rem; font-weight: 650; margin-bottom: .5rem; }
+        .yt-steps { margin: 0 0 .6rem 1.05rem; padding: 0; color: var(--text-dim); font-size: .8rem; line-height: 1.7; }
+        .yt-steps li { margin-bottom: .3rem; }
+        .tag-copy {
+            display: inline-flex; align-items: center; gap: .4rem;
+            min-height: 34px; margin-top: .25rem;
+            border: 1px dashed var(--border-strong); border-radius: 8px;
+            background: var(--surface); color: var(--text);
+            padding: .3rem .6rem; cursor: pointer; transition: border-color .15s, background .15s;
+        }
+        .tag-copy:hover { border-style: solid; border-color: var(--primary); background: var(--surface-3); }
+        .tag-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .tag-copy svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; }
+        .tag-copy code { font-family: var(--mono); font-size: .76rem; color: var(--text); }
+        .tag-copy.copied { border-style: solid; border-color: var(--ok); color: var(--ok); }
+
+        /* Cancel is destructive but routine, so it reads as quiet-danger
+           rather than competing with the primary action (HIG primary-action). */
+        .btn.danger-quiet { color: var(--bad); border-color: color-mix(in oklab, var(--bad) 35%, transparent); }
+        .btn.danger-quiet:hover { background: color-mix(in oklab, var(--bad) 12%, transparent); border-color: var(--bad); }
+
+        @media (prefers-reduced-motion: reduce) {
+            .id-chip, .tag-copy, .btn.danger-quiet { transition: none; }
+        }
+
+        /* Paging control. Finished missions page in; queued and running are
+           always shown in full, so this can never hide outstanding work. */
+        .show-more-wrap { display: flex; justify-content: center; padding: .5rem 0 1.5rem; }
+        .show-more { min-height: 44px; padding: .6rem 1.2rem; }
+        .show-more-count { color: var(--text-faint); font-weight: 400; margin-left: .35rem; }
 </style>
 </head>
 <body>
@@ -337,7 +393,7 @@
         <div class="toolbar-row">
             <div class="search-box">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input type="text" id="searchInput" placeholder="Search missions by name or yard ID&hellip;" autocomplete="off">
+                <input type="text" id="searchInput" placeholder="Search by mission name or ID&hellip;" autocomplete="off">
                 <button class="clear-search" id="clearSearch" title="Clear search" aria-label="Clear search">&times;</button>
             </div>
             <select class="sort-select" id="sortSelect" aria-label="Sort missions">
@@ -393,12 +449,14 @@
             processing: { label: 'In Progress', tone: 'warn', icon: 'play' },
             completed:  { label: 'Completed',   tone: 'ok',   icon: 'check' },
             failed:     { label: 'Failed',      tone: 'bad',  icon: 'alert' },
+            cancelled:  { label: 'Cancelled',   tone: '',     icon: 'slash' },
         };
         const ICONS = {
             clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
             play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4V8z"/></svg>',
             check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>',
             alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+            slash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="8.5" y1="15.5" x2="15.5" y2="8.5"/></svg>',
         };
 
         const CONFIRM_COPY = {
@@ -412,7 +470,20 @@
                 body: 'This clears the completed status and any attached video, and sends the mission back into the queue. This cannot be undone.',
                 confirmLabel: 'Rerun',
             },
+            cancel: {
+                title: 'Cancel this mission?',
+                body: 'It comes out of the queue without running. The learner still sees it as Pending, not rejected.',
+                confirmLabel: 'Cancel mission',
+            },
         };
+
+        // How many FINISHED missions to request. Actionable ones always come
+        // back in full, so paging can never hide work. Held here rather than in
+        // render() so the 15-second poll does not collapse the list back to
+        // page one under an operator who has just expanded it.
+        const FINISHED_PAGE = 40;
+        let finishedRequested = FINISHED_PAGE;
+        let finishedTotal = 0;
 
         const missionsEl = document.getElementById('missions');
         const netBanner = document.getElementById('netBanner');
@@ -425,7 +496,7 @@
 
         function matchesSearch(m) {
             if (!searchQuery) return true;
-            const haystack = `${m.name || ''} ${m.yardId || ''}`.toLowerCase();
+            const haystack = `${m.name || ''} ${m.id || ''}`.toLowerCase();
             return haystack.includes(searchQuery);
         }
 
@@ -467,20 +538,82 @@
         // Returns the full row of action buttons for a mission, in display order.
         // The first/primary action gets the .primary style; the rest render as
         // plain buttons right alongside it (no overflow menu).
+        // The MissionID line the YouTube poll matches on. check_for_new_videos
+        // looks for exactly this string in a video's description, so the
+        // operator has to paste it verbatim - which nothing in the console used
+        // to tell them, or give them a way to copy.
+        // Clipboard, including on the tablets.
+        //
+        // navigator.clipboard only exists in a SECURE CONTEXT. The console is
+        // served over plain HTTP on the yard LAN (http://marspi.local:3001), so
+        // on every tablet that API is undefined and a copy silently throws.
+        // localhost is exempt, which is exactly why this never showed up in
+        // development.
+        //
+        // execCommand('copy') is deprecated but is the only thing that works in
+        // an insecure context, so it stays until the satellite serves HTTPS.
+        async function copyText(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch (e) { /* fall through to the legacy path */ }
+            }
+
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            // Keep it off-screen but still selectable; display:none is not.
+            ta.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0;';
+            document.body.appendChild(ta);
+            try {
+                ta.select();
+                ta.setSelectionRange(0, ta.value.length);  // iOS needs the range
+                return document.execCommand('copy');
+            } catch (e) {
+                return false;
+            } finally {
+                ta.remove();
+            }
+        }
+
+        function missionTag(id) { return 'MissionID: ' + id; }
+
         function buildActions(m) {
+            const copyCode = `<button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>`;
+            const copyBlocks = m.blocklyState
+                ? `<button class="btn" data-act="copyblocks" data-id="${m.id}">Copy blocks</button>` : '';
+            const cancel = `<button class="btn danger-quiet" data-act="cancel" data-id="${m.id}" data-confirm="true">Cancel</button>`;
+
             if (m.status === 'queued') {
                 return `<button class="btn primary" data-act="send" data-id="${m.id}">Send to rover</button>
-                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>
-                        <button class="btn" data-act="complete" data-id="${m.id}" data-confirm="true">Mark complete</button>`;
+                        ${copyCode}
+                        <button class="btn" data-act="complete" data-id="${m.id}" data-confirm="true">Mark complete</button>
+                        ${cancel}`;
             }
             if (m.status === 'processing') {
                 return `<button class="btn success" data-act="complete" data-id="${m.id}" data-confirm="true">Mark complete</button>
-                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>${m.blocklyState ? `<button class="btn" data-act="copyblocks" data-id="${m.id}">Copy blocks</button>` : ''}`;
+                        ${copyCode}${copyBlocks}
+                        ${cancel}`;
             }
             if (m.status === 'completed' && !m.youtubeUrl) {
-                return `<div class="field-group">
-                            <input type="url" inputmode="url" placeholder="https://youtube.com/watch?v=..." value="${esc(drafts[m.id] || '')}" data-draft="${m.id}" data-yt-validate="${m.id}" aria-describedby="yt-err-${m.id}">
-                            <div class="field-error" id="yt-err-${m.id}"></div>
+                // Two genuinely different paths, so say so rather than showing
+                // one input and hoping the operator knows about the other.
+                return `<div class="yt-help">
+                            <div class="yt-help-title">Link the video</div>
+                            <ol class="yt-steps">
+                                <li>Put this in the YouTube description and it links itself:
+                                    <button class="btn tag-copy" data-act="copytag" data-id="${m.id}">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+                                        <code>${missionTag(m.id)}</code>
+                                    </button>
+                                </li>
+                                <li>Or paste the video link here now:</li>
+                            </ol>
+                            <div class="field-group">
+                                <input type="url" inputmode="url" placeholder="https://youtube.com/watch?v=..." value="${esc(drafts[m.id] || '')}" data-draft="${m.id}" data-yt-validate="${m.id}" aria-describedby="yt-err-${m.id}" aria-label="YouTube URL for this mission">
+                                <div class="field-error" id="yt-err-${m.id}"></div>
+                            </div>
                         </div>
                         <button class="btn primary" data-act="youtube" data-id="${m.id}" disabled>Attach video</button>
                         <button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Rerun</button>`;
@@ -491,9 +624,36 @@
             }
             if (m.status === 'failed') {
                 return `<button class="btn primary" data-act="rerun" data-id="${m.id}">Rerun</button>
-                        <button class="btn" data-act="copy" data-id="${m.id}">Copy code</button>${m.blocklyState ? `<button class="btn" data-act="copyblocks" data-id="${m.id}">Copy blocks</button>` : ''}`;
+                        ${copyCode}${copyBlocks}`;
+            }
+            if (m.status === 'cancelled') {
+                return `<button class="btn" data-act="rerun" data-id="${m.id}" data-confirm="true">Put back in queue</button>
+                        ${copyCode}`;
             }
             return '';
+        }
+
+        function renderShowMore(visible) {
+            const shownFinished = visible.filter(m => m.status === 'completed' || m.status === 'failed').length;
+            const remaining = finishedTotal - shownFinished;
+            if (remaining <= 0 || searchQuery || statusFilter === 'queued' || statusFilter === 'processing') return;
+
+            const wrap = document.createElement('div');
+            wrap.className = 'show-more-wrap';
+            const next = Math.min(remaining, FINISHED_PAGE);
+            wrap.innerHTML = `<button class="btn show-more">Show ${next} more finished
+                <span class="show-more-count">(${remaining} older)</span></button>`;
+            wrap.querySelector('button').onclick = (ev) => {
+                const btn = ev.currentTarget;
+                btn.disabled = true;
+                btn.textContent = 'Loading\u2026';
+                finishedRequested += FINISHED_PAGE;
+                missionsPoller.refreshNow().catch(() => {
+                    btn.disabled = false;
+                    btn.textContent = 'Show more';
+                });
+            };
+            missionsEl.appendChild(wrap);
         }
 
         function render() {
@@ -513,13 +673,22 @@
                     <div class="mission-head">
                         <div>
                             <div class="mission-title">${esc(m.name) || 'Mission-' + m.id.slice(0, 8)}</div>
-                            <div class="mission-meta">${esc(m.yardId) || ''} &middot; ${relTime(m.submittedAt)}</div>
+                            <div class="mission-meta">
+                                <button class="id-chip" data-act="copyid" data-id="${m.id}"
+                                        title="Copy mission ID" aria-label="Copy mission ID ${m.id}">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+                                    <span>${m.id}</span>
+                                </button>
+                                <span class="meta-sep">&middot;</span> ${relTime(m.submittedAt)}
+                            </div>
                         </div>
                         ${statusBadge(m.status)}
                     </div>
                     <pre>${esc((m.code || '').trim()) || '# No code'}</pre>
                     <div class="mission-actions" data-mission="${m.id}">${buildActions(m)}</div>
                 </div>`).join('');
+
+            renderShowMore(visible);
 
             missionsEl.querySelectorAll('input[data-draft]').forEach(el => {
                 el.oninput = () => { drafts[el.dataset.draft] = el.value; };
@@ -694,24 +863,41 @@
             complete: 'Mission marked complete.',
             youtube: 'Video attached.',
             rerun: 'Mission queued for rerun.',
+            cancel: 'Mission cancelled.',
         };
 
         async function act(action, missionId, btn) {
-            if (action === 'copy' || action === 'copyblocks') {
+            if (action === 'copy' || action === 'copyblocks' || action === 'copyid' || action === 'copytag') {
                 const m = missions.find(x => x.id === missionId);
-                const text = action === 'copyblocks' ? (m.blocklyState || '') : (m.code || '');
+                const text = action === 'copyblocks' ? ((m && m.blocklyState) || '')
+                    : action === 'copyid' ? missionId
+                    : action === 'copytag' ? missionTag(missionId)
+                    : ((m && m.code) || '');
+                const iconButton = action === 'copyid' || action === 'copytag';
                 const label = btn.textContent;
+                const ok = await copyText(text);
+                if (!ok) {
+                    showError(missionId, 'Could not copy. Select the text and copy it manually.');
+                    return;
+                }
                 try {
-                    await navigator.clipboard.writeText(text);
-                    btn.textContent = 'Copied';
-                    setTimeout(() => { btn.textContent = label; }, 1500);
+                    if (iconButton) {
+                        // These contain an icon + code element; replacing
+                        // textContent would wipe them out.
+                        btn.classList.add('copied');
+                        setTimeout(() => btn.classList.remove('copied'), 1500);
+                        showToast('success', 'Copied');
+                    } else {
+                        btn.textContent = 'Copied';
+                        setTimeout(() => { btn.textContent = label; }, 1500);
+                    }
                 } catch {
                     showError(missionId, 'Could not copy to clipboard');
                 }
                 return;
             }
 
-            const endpoints = { send: 'send', complete: 'complete', youtube: 'youtube', rerun: 'rerun' };
+            const endpoints = { send: 'send', complete: 'complete', youtube: 'youtube', rerun: 'rerun', cancel: 'cancel' };
             let body;
             if (action === 'youtube') body = { url: drafts[missionId] || '' };
 
@@ -762,7 +948,7 @@
             reviewList.innerHTML = list.map(m => `
                 <div class="review-card">
                     <div class="mission-title">${esc(m.name) || 'Mission-' + m.id.slice(0, 8)}</div>
-                    <div class="mission-meta">${esc(m.yardId) || ''} &middot; started ${relTime(m.startedAt || m.submittedAt)}</div>
+                    <div class="mission-meta"><span class="mono-id">${m.id}</span> &middot; started ${relTime(m.startedAt || m.submittedAt)}</div>
                     <div class="review-actions">
                         <button class="btn" data-review="completed" data-id="${m.id}">It finished</button>
                         <button class="btn" data-review="requeue" data-id="${m.id}">Re-queue it</button>
@@ -789,11 +975,11 @@
                     body: JSON.stringify({ outcome: btn.dataset.review }),
                 });
                 if (!resp.ok) throw new Error((await resp.json()).error || 'Could not save');
-                toast(btn.dataset.review === 'completed' ? 'Marked complete' : 'Back in the queue');
+                showToast('success', btn.dataset.review === 'completed' ? 'Marked complete' : 'Back in the queue');
                 await loadReview();
                 missionsPoller.refresh && missionsPoller.refresh();
             } catch (e) {
-                toast(e.message || 'Could not save', 'bad');
+                showToast('error', e.message || 'Could not save');
                 btn.disabled = false;
             }
         });
@@ -802,10 +988,11 @@
             interval: 15000,
             maxInterval: 60000,
             fetchFn: async function () {
-                const resp = await fetch('/operator/api/missions');
+                const resp = await fetch(`/operator/api/missions?finished=${finishedRequested}`);
                 if (resp.status === 401) { window.location.href = '/operator/login'; return; }
                 const data = await resp.json();
                 const list = data.missions || [];
+                finishedTotal = data.finishedTotal || 0;
                 consecutiveFailures = 0;
                 YardCache.write('missions', list);
                 applyMissions(list);

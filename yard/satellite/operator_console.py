@@ -56,7 +56,10 @@ ROVER_TIMEOUT = 5.0
 NOTIFY_TIMEOUT = 10.0
 
 MISSIONS_COLLECTION = 'missions'
-MISSION_LIST_LIMIT = 100
+# Upper bound on a single page of finished missions. Not a cap on what the
+# console can reach - the client pages through - just a guard so a stray
+# ?finished=999999 cannot make the satellite render the whole archive at once.
+MAX_FINISHED_PAGE = 200
 
 # Accepts standard watch URLs and short youtu.be links (mirrors what the
 # learner-facing mission page can embed).
@@ -367,18 +370,29 @@ def _mirror_is_stale(last_synced_at):
 @operator_bp.route('/api/missions', methods=['GET'])
 @require_operator
 def api_missions():
-    from mission_store import get_missions, outbox_count
+    from mission_store import get_missions, outbox_count, DEFAULT_FINISHED_PAGE
     from satellite_identity import yard_id
 
     # Scoped to this satellite's own yard (plan 3.3) so a second yard's
     # missions can never appear in, or be dispatched from, this console.
-    rows, last_synced = get_missions(MISSION_LIST_LIMIT, yard_id=yard_id())
+    # `finished` is how many completed/failed missions to include. Actionable
+    # missions are always returned in full regardless of it, so paging can
+    # never hide work an operator still has to do.
+    try:
+        finished = int(request.args.get('finished', DEFAULT_FINISHED_PAGE))
+    except ValueError:
+        finished = DEFAULT_FINISHED_PAGE
+    finished = max(1, min(finished, MAX_FINISHED_PAGE))
+
+    rows, last_synced, finished_total = get_missions(finished, yard_id=yard_id())
 
     return jsonify({
         'missions': [_mirror_row_to_dict(row) for row in rows],
         'stale': _mirror_is_stale(last_synced),
         'lastSyncedAt': last_synced,
         'pendingWrites': outbox_count(),
+        'finishedShown': min(finished, finished_total),
+        'finishedTotal': finished_total,
     })
 
 
@@ -598,6 +612,111 @@ def api_attach_youtube(mission_id):
 
     set_mission_field(mission_id, {'youtube_url': url}, {'youtubeUrl': url})
     return jsonify({'status': 'ok', 'missionId': mission_id})
+
+
+@operator_bp.route('/api/missions/<mission_id>/cancel', methods=['POST'])
+@require_operator
+def api_cancel_mission(mission_id):
+    """Take a mission out of the queue without running it.
+
+    The gap this fills: a learner submits a duplicate, or code that is never
+    going to do anything, and today the only options are run it or leave it in
+    the queue forever.
+
+    Cancel rather than delete, deliberately. The mission is a child's work and
+    the record of it should survive; 'cancelled' also reads as "Pending" on the
+    learner's side (discoveryStatus.ts), so nobody is shown a rejection.
+    """
+    from mission_store import get_mission, release_mission
+
+    mission = get_mission(mission_id)
+    if mission is None:
+        return jsonify({'error': 'Mission not found'}), 404
+    if mission.get('status') not in ('queued', 'processing'):
+        return jsonify({'error': 'Only queued or running missions can be cancelled'}), 400
+
+    _stop_lease_renewal(mission_id)
+    release_mission(mission_id, 'cancelled', _now_iso())
+    return jsonify({'status': 'ok', 'missionId': mission_id})
+
+
+@operator_bp.route('/api/camera', methods=['GET'])
+@require_operator
+def api_camera_status():
+    """Whether the camera feed is up, and which backend is serving it.
+
+    The backend matters to an operator: on the Pi the IMX500 does object
+    detection on its own NPU, whereas a laptop webcam is a plain feed. Showing
+    'no detection' beats someone concluding detection is broken.
+    """
+    port = int(os.environ.get('CAMERA_PORT', 8890))
+    host = os.environ.get('CAMERA_HOST', 'localhost')
+
+    import socket
+    reachable = False
+    try:
+        with socket.create_connection((host, port), timeout=1.0):
+            reachable = True
+    except OSError:
+        pass
+
+    return jsonify({
+        'reachable': reachable,
+        'host': host,
+        'port': port,
+        'wsUrl': f'ws://{host}:{port}',
+        'hint': None if reachable else (
+            'Camera server is not listening. Start it with '
+            '`python3 yard/satellite/camera_server.py`. On a Mac it uses the '
+            'built-in webcam (no object detection) and needs Camera permission '
+            'granted to your terminal.'
+        ),
+    })
+
+
+@operator_bp.route('/api/integrations', methods=['GET'])
+@require_operator
+def api_integrations():
+    """Which integrations are configured - never their values.
+
+    Deliberately read-only. Letting an operator paste API keys into this console
+    would be a security regression: it is reachable by anyone on the venue
+    network and OPERATOR_AUTH=off removes the login entirely on event days. The
+    real need behind "let me configure it here" is "tell me whether it's set up",
+    which this answers without putting a secret on a screen.
+    """
+    def state(configured, detail):
+        return {'configured': bool(configured), 'detail': detail}
+
+    yt_key = bool(_youtube_api_key())
+    yt_channel = bool(_youtube_channel_id())
+
+    return jsonify({
+        'integrations': [
+            {
+                'id': 'firestore',
+                'name': 'Firestore',
+                'why': 'Syncs missions with mission-control.',
+                **state(_admin_configured(),
+                        'Service account present' if _admin_configured()
+                        else 'Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY'),
+            },
+            {
+                'id': 'youtube',
+                'name': 'YouTube auto-link',
+                'why': 'Finds uploaded videos by the MissionID in their description.',
+                **state(yt_key and yt_channel,
+                        'Key and channel set' if yt_key and yt_channel
+                        else 'Set YOUTUBE_API_KEY and YOUTUBE_CHANNEL_ID (manual linking still works)'),
+            },
+            {
+                'id': 'mission_control',
+                'name': 'Mission Control',
+                'why': 'Receives status changes so learners get their emails.',
+                **state(True, _mission_control_url()),
+            },
+        ],
+    })
 
 
 @operator_bp.route('/api/missions/needs-review', methods=['GET'])

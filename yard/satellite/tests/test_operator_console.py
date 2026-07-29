@@ -1339,3 +1339,91 @@ def test_review_endpoints_require_an_operator(client, missions):
     assert client.post('/operator/api/missions/p1/resolve',
                        json={'outcome': 'completed'}).status_code == 401
     assert client.get('/operator/api/conflicts').status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Cancel, camera and setup surfaces
+# ---------------------------------------------------------------------------
+
+def test_cancel_takes_a_queued_mission_out_without_running_it(client, missions, monkeypatch):
+    import mission_store
+    sign_in(client)
+    rover_calls = []
+    monkeypatch.setattr(
+        operator_console.requests, 'post',
+        lambda url, json=None, timeout=None: (rover_calls.append(url), FakeResponse(200))[1],
+    )
+
+    assert client.post('/operator/api/missions/q1/cancel').status_code == 200
+
+    assert mission_store.get_mission('q1')['status'] == 'cancelled'
+    assert not any('queue/add' in u for u in rover_calls)
+
+
+def test_cancel_releases_the_lock(client, missions, monkeypatch):
+    import mission_store
+    sign_in(client)
+    _ok_rover(monkeypatch)
+    client.post('/operator/api/missions/q1/send')
+    assert mission_store.get_mission('q1')['lock_owner']
+
+    client.post('/operator/api/missions/q1/cancel')
+
+    row = mission_store.get_mission('q1')
+    assert row['status'] == 'cancelled'
+    assert row['lock_owner'] is None
+
+
+def test_cancel_is_refused_on_a_finished_mission(client, missions):
+    sign_in(client)
+    assert client.post('/operator/api/missions/c1/cancel').status_code == 400
+
+
+def test_cancel_queues_the_change_for_firestore(client, missions):
+    import mission_store
+    sign_in(client)
+    client.post('/operator/api/missions/q1/cancel')
+    assert mission_store.peek_outbox()['mission_id'] == 'q1'
+
+
+def test_integrations_never_expose_secret_values(client, missions, monkeypatch):
+    """This console is reachable by anyone on the venue network, and
+    OPERATOR_AUTH=off removes the login entirely on event days."""
+    sign_in(client)
+    monkeypatch.setenv('YOUTUBE_API_KEY', 'AIzaSyTOTALLY-SECRET')
+    monkeypatch.setenv('YOUTUBE_CHANNEL_ID', 'UCsecretchannel')
+    monkeypatch.setenv('FIREBASE_PRIVATE_KEY', '-----BEGIN PRIVATE KEY-----abc')
+
+    body = client.get('/operator/api/integrations').get_data(as_text=True)
+
+    assert 'AIzaSyTOTALLY-SECRET' not in body
+    assert 'UCsecretchannel' not in body
+    assert 'BEGIN PRIVATE KEY' not in body
+
+
+def test_integrations_report_youtube_as_unconfigured_when_keys_are_missing(client, missions, monkeypatch):
+    sign_in(client)
+    monkeypatch.delenv('YOUTUBE_API_KEY', raising=False)
+    monkeypatch.delenv('YOUTUBE_CHANNEL_ID', raising=False)
+
+    data = client.get('/operator/api/integrations').get_json()
+    yt = next(i for i in data['integrations'] if i['id'] == 'youtube')
+
+    assert yt['configured'] is False
+    assert 'manual linking still works' in yt['detail']
+
+
+def test_camera_status_reports_unreachable_with_a_hint(client, missions, monkeypatch):
+    sign_in(client)
+    monkeypatch.setenv('CAMERA_PORT', '59999')  # nothing listening
+
+    data = client.get('/operator/api/camera').get_json()
+
+    assert data['reachable'] is False
+    assert data['hint'] and 'camera_server.py' in data['hint']
+
+
+def test_new_surfaces_require_an_operator(client, missions):
+    assert client.post('/operator/api/missions/q1/cancel').status_code == 401
+    assert client.get('/operator/api/integrations').status_code == 401
+    assert client.get('/operator/api/camera').status_code == 401

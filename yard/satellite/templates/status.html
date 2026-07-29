@@ -155,6 +155,20 @@
         }
         .conflict-row b { color: var(--heading); font-weight: 600; }
         .conflict-win { color: var(--warn); }
+
+        #setupSection { margin-top: 2rem; }
+        .setup-row {
+            display: flex; gap: .75rem; align-items: flex-start;
+            border: 1px solid var(--border); border-radius: 10px;
+            padding: .7rem .85rem; margin-bottom: .5rem; background: var(--surface);
+        }
+        .setup-dot { width: 9px; height: 9px; border-radius: 50%; margin-top: .38rem; flex-shrink: 0; }
+        .setup-dot.on { background: var(--ok); }
+        .setup-dot.off { background: var(--warn); }
+        .setup-body { flex: 1; min-width: 0; }
+        .setup-name { color: var(--heading); font-size: .87rem; font-weight: 600; }
+        .setup-why { color: var(--text-dim); font-size: .78rem; margin-top: .1rem; }
+        .setup-detail { color: var(--text-faint); font-size: .75rem; font-family: var(--mono); margin-top: .3rem; word-break: break-word; }
 </style>
 </head>
 <body>
@@ -207,6 +221,13 @@
         </div>
     </div>
 
+    <section id="setupSection">
+        <h2 class="conflict-heading">Setup</h2>
+        <p class="conflict-note">What this satellite can and cannot do right now.
+            Values are never shown here - only whether they are configured.</p>
+        <div id="setupList"></div>
+    </section>
+
     <section id="conflictSection" hidden>
         <h2 class="conflict-heading">Sync conflicts</h2>
         <p class="conflict-note">Reconciliations where the losing side had already finished.
@@ -236,6 +257,44 @@
                     </div>`).join('');
             } catch (e) { /* offline: leave it hidden */ }
         }
+        // Setup panel. Deliberately read-only: this console is reachable by
+        // anyone on the venue network, and OPERATOR_AUTH=off removes the login
+        // entirely on event days, so it must never display or accept secrets.
+        async function loadSetup() {
+            const rows = [];
+            try {
+                const resp = await fetch('/operator/api/integrations');
+                if (resp.ok) rows.push(...((await resp.json()).integrations || []));
+            } catch (e) { /* offline */ }
+            try {
+                const resp = await fetch('/operator/api/camera');
+                if (resp.ok) {
+                    const cam = await resp.json();
+                    rows.push({
+                        id: 'camera', name: 'Camera feed',
+                        why: 'Live view on the monitor page.',
+                        configured: cam.reachable,
+                        detail: cam.reachable ? cam.wsUrl : (cam.hint || 'Not running'),
+                    });
+                }
+            } catch (e) { /* offline */ }
+
+            const el = document.getElementById('setupList');
+            if (!rows.length) { el.innerHTML = '<div class="setup-row"><div class="setup-body"><div class="setup-why">Sign in to see setup status.</div></div></div>'; return; }
+            el.innerHTML = rows.map(r => `
+                <div class="setup-row">
+                    <span class="setup-dot ${r.configured ? 'on' : 'off'}"
+                          role="img" aria-label="${r.configured ? 'Configured' : 'Not configured'}"></span>
+                    <div class="setup-body">
+                        <div class="setup-name">${r.name} &mdash; ${r.configured ? 'ready' : 'not set up'}</div>
+                        <div class="setup-why">${r.why}</div>
+                        <div class="setup-detail">${r.detail}</div>
+                    </div>
+                </div>`).join('');
+        }
+        loadSetup();
+        setInterval(loadSetup, 60000);
+
         loadConflicts();
         setInterval(loadConflicts, 60000);
 

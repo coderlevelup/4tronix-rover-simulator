@@ -45,6 +45,14 @@ def _save_config(cfg):
         json.dump(cfg, f, indent=2)
 
 
+def _notify_within_app(app, mission_id, status):
+    """_notify_mission_control reads current_app config, and Flask's app
+    context is thread-local, so push one inside the watcher's thread."""
+    from operator_console import _notify_mission_control
+    with app.app_context():
+        _notify_mission_control(mission_id, status)
+
+
 def _local_ip():
     # UDP connect never sends a packet — OS just picks the right source
     # interface from the routing table. Try private ranges then fall back.
@@ -333,6 +341,19 @@ if __name__ == '__main__':
     except Exception as e:
         print(f'[recovery] Skipped: {e}')
 
+    # Closes the loop the operator otherwise closes by hand: the rover already
+    # records that it finished, so a mission no longer sits in 'processing'
+    # (holding its lease) because someone turned to the next child.
+    from mission_watcher import start_mission_watcher
+    from operator_console import _notify_mission_control
+    threading.Thread(
+        target=start_mission_watcher,
+        args=(lambda: app.config.get('ROVER_URL_GETTER', lambda: os.environ.get(
+            'ROVER_URL', 'http://marspi.local:8523'))(),),
+        kwargs={'notify': lambda mid, st: _notify_within_app(app, mid, st)},
+        daemon=True,
+    ).start()
+
     # Started unconditionally, with a FACTORY rather than a client. Building the
     # client here and bailing on failure would mean a satellite powered on with
     # no internet - the exact situation this whole feature exists for - never
@@ -343,7 +364,7 @@ if __name__ == '__main__':
     # Firestore call, so it must not block server startup.
     threading.Thread(
         target=start_sync_worker, args=(operator_console._firestore,),
-        kwargs={'interval': 30}, daemon=True,
+        daemon=True,
     ).start()
 
     app.run(host='0.0.0.0', port=port, threaded=True, use_reloader=False)
