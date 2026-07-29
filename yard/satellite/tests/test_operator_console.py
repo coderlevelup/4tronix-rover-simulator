@@ -1420,7 +1420,8 @@ def test_camera_status_reports_unreachable_with_a_hint(client, missions, monkeyp
     data = client.get('/operator/api/camera').get_json()
 
     assert data['reachable'] is False
-    assert data['hint'] and 'camera_server.py' in data['hint']
+    assert data['hint'] and 'Start' in data['hint']
+    assert data['managedBy'] in ('systemd', 'process', 'unknown')
 
 
 def test_new_surfaces_require_an_operator(client, missions):
@@ -1510,3 +1511,162 @@ def test_a_deleted_mission_is_not_reconciled_or_dispatchable(client, missions, m
     assert 'q1' not in mission_store.active_mission_ids('uct-rover-1')
     _ok_rover(monkeypatch)
     assert client.post('/operator/api/missions/q1/send').status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Camera control
+# ---------------------------------------------------------------------------
+
+def test_camera_start_requires_an_operator(client, missions):
+    """Spawning a process is the most powerful thing this console does, on a
+    network anyone at the venue can join."""
+    assert client.post('/operator/api/camera/start').status_code == 401
+    assert client.post('/operator/api/camera/stop').status_code == 401
+
+
+def test_camera_start_rejects_a_non_numeric_index(client, missions, monkeypatch):
+    """The index is the one caller-supplied value near a subprocess. It never
+    reaches a command line, but it is still validated rather than trusted."""
+    sign_in(client)
+    called = []
+    monkeypatch.setattr(operator_console, 'api_camera_start', operator_console.api_camera_start)
+    import camera_control
+    monkeypatch.setattr(camera_control, 'start', lambda camera_index=None: called.append(1) or (True, 'ok'))
+
+    resp = client.post('/operator/api/camera/start', json={'cameraIndex': '; rm -rf /'})
+
+    assert resp.status_code == 400
+    assert called == [], 'nothing should have been started'
+
+
+def test_camera_start_rejects_an_out_of_range_index(client, missions):
+    sign_in(client)
+    assert client.post('/operator/api/camera/start', json={'cameraIndex': 99}).status_code == 400
+    assert client.post('/operator/api/camera/start', json={'cameraIndex': -1}).status_code == 400
+
+
+def test_camera_start_reports_a_failure_rather_than_claiming_success(client, missions, monkeypatch):
+    sign_in(client)
+    import camera_control
+    monkeypatch.setattr(camera_control, 'start',
+                        lambda camera_index=None: (False, 'Access denied'))
+
+    resp = client.post('/operator/api/camera/start')
+
+    assert resp.status_code == 502
+    assert 'Access denied' in resp.get_json()['error']
+
+
+def test_camera_start_persists_the_chosen_index(client, missions, monkeypatch, tmp_path):
+    """So a restart comes back on the same device, like the rover URL."""
+    import camera_control, satellite_identity, json
+    cfg = tmp_path / 'sat.json'
+    monkeypatch.setattr(satellite_identity, 'CONFIG_FILE', str(cfg))
+    monkeypatch.setattr(camera_control, 'start', lambda camera_index=None: (True, 'ok'))
+    sign_in(client)
+
+    assert client.post('/operator/api/camera/start', json={'cameraIndex': 2}).status_code == 200
+
+    assert json.loads(cfg.read_text())['camera_index'] == 2
+
+
+def test_a_failed_camera_start_reports_the_cause_not_the_consequence(tmp_path, monkeypatch):
+    """camera_server's last line is "Failed to initialize camera, exiting",
+    which is true, useless, and mentions systemd even on a Mac. The line above
+    it carries the diagnosis and the fix."""
+    import camera_control
+    log = tmp_path / 'camera.log'
+    log.write_text(
+        "2026-07-29 16:37:58 - INFO - Initializing Pi AI Camera...\n"
+        "2026-07-29 16:37:59 - WARNING - No camera at index 0. On macOS, grant Camera access.\n"
+        "2026-07-29 16:37:59 - ERROR - Failed to initialize camera, exiting (systemd restarts in 10s)\n"
+    )
+    monkeypatch.setattr(camera_control, 'DEV_LOG', str(log))
+
+    line = camera_control._last_log_line()
+
+    assert 'grant Camera access' in line
+    assert 'exiting' not in line
+    assert 'systemd' not in line
+
+
+def test_a_macos_permission_denial_does_not_read_as_a_missing_camera(tmp_path, monkeypatch):
+    """The log carries both "not authorized" and "No camera at index 0". The
+    second reads like absent hardware and sent an operator looking for a
+    device that was plugged in the whole time."""
+    import camera_control
+    log = tmp_path / 'camera.log'
+    log.write_text(
+        "OpenCV: not authorized to capture video (status 0), requesting...\n"
+        "2026-07-29 16:49:30 - WARNING - No camera at index 1. On macOS this is usually permission.\n"
+        "2026-07-29 16:49:30 - ERROR - Failed to initialize camera, exiting\n"
+    )
+    monkeypatch.setattr(camera_control, 'DEV_LOG', str(log))
+
+    line = camera_control._last_log_line()
+
+    assert 'denied camera access' in line
+    assert 'No camera at index' not in line
+    # The advice that wasted the operator's time: there is nothing to approve,
+    # because macOS never prompted.
+    assert 'Start the satellite from Terminal' in line
+
+
+def test_the_permission_message_names_the_app_not_the_interpreter(monkeypatch):
+    """Python lives in a .app inside its own framework, so walking the process
+    tree for a bundle stops on the interpreter and reports "launched by
+    Python" - which tells the operator nothing about what to change."""
+    import camera_control
+    monkeypatch.setattr(camera_control.sys, 'platform', 'darwin')
+
+    tree = {
+        '100': '200 /opt/homebrew/.../Python.framework/Versions/3.13/Resources/Python.app/Contents/MacOS/Python',
+        '200': '300 /Applications/SomeEditor.app/Contents/MacOS/editor',
+    }
+    monkeypatch.setattr(camera_control.os, 'getpid', lambda: 100)
+    monkeypatch.setattr(
+        camera_control.subprocess, 'run',
+        lambda cmd, **kw: type('R', (), {'stdout': tree.get(cmd[-1], '')})(),
+    )
+
+    assert camera_control._launching_app() == 'SomeEditor'
+
+
+def test_walking_the_process_tree_cannot_loop_forever(monkeypatch):
+    """A pid whose parent is itself would otherwise hang the request thread."""
+    import camera_control
+    monkeypatch.setattr(camera_control.sys, 'platform', 'darwin')
+    monkeypatch.setattr(camera_control.os, 'getpid', lambda: 7)
+    monkeypatch.setattr(
+        camera_control.subprocess, 'run',
+        lambda cmd, **kw: type('R', (), {'stdout': '7 /usr/bin/python3'})(),
+    )
+
+    assert camera_control._launching_app() is None
+
+
+def test_camera_start_falls_back_when_the_log_says_nothing_useful(tmp_path, monkeypatch):
+    import camera_control
+    log = tmp_path / 'camera.log'
+    log.write_text("some unstructured output\n")
+    monkeypatch.setattr(camera_control, 'DEV_LOG', str(log))
+
+    assert camera_control._last_log_line() == 'some unstructured output'
+
+
+def test_camera_control_never_builds_a_shell_command(monkeypatch):
+    """The one caller-supplied value must never reach a command line."""
+    import camera_control
+    seen = {}
+    monkeypatch.setattr(camera_control, 'is_systemd_managed', lambda: False)
+    monkeypatch.setattr(camera_control.subprocess, 'Popen',
+                        lambda cmd, **kw: seen.update(cmd=cmd, shell=kw.get('shell'), env=kw.get('env'))
+                        or type('P', (), {'poll': lambda s: None, 'pid': 1})())
+    monkeypatch.setattr(camera_control.time, 'sleep', lambda s: None)
+
+    camera_control.start(camera_index=3)
+
+    assert isinstance(seen['cmd'], list), 'must pass a list, never a string'
+    assert seen['shell'] in (None, False), 'shell=True would be injectable'
+    assert all('3' not in part for part in seen['cmd'][1:]), 'index must not reach argv'
+    assert seen['env']['CAMERA_INDEX'] == '3', 'it travels in the environment'

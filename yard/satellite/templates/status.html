@@ -169,6 +169,19 @@
         .setup-name { color: var(--heading); font-size: .87rem; font-weight: 600; }
         .setup-why { color: var(--text-dim); font-size: .78rem; margin-top: .1rem; }
         .setup-detail { color: var(--text-faint); font-size: .75rem; font-family: var(--mono); margin-top: .3rem; word-break: break-word; }
+
+        .camera-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .7rem; }
+        .camera-index-label { color: var(--text-faint); font-size: .75rem; margin-left: .3rem; }
+        .camera-index {
+            width: 62px; min-height: 34px; padding: .3rem .5rem;
+            border: 1px solid var(--border); border-radius: 8px;
+            background: var(--surface); color: var(--text); font-family: var(--mono);
+        }
+        .camera-managed { color: var(--text-faint); font-size: .72rem; font-family: var(--mono); }
+        .camera-msg { margin-top: .5rem; font-size: .78rem; color: var(--text-dim); min-height: 1.1em; }
+        .camera-msg[data-tone="bad"] { color: var(--bad); }
+        .camera-msg[data-tone="ok"] { color: var(--ok); }
+        .editor-btn[disabled] { opacity: .5; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -217,6 +230,15 @@
                 <div class="card-title">Camera</div>
                 <div class="card-detail" id="detail-camera">Loading&hellip;</div>
                 <div class="status-label grey" id="label-camera">checking</div>
+                <div class="camera-controls">
+                    <button class="editor-btn" id="camera-start">Start camera</button>
+                    <button class="editor-btn" id="camera-stop">Stop</button>
+                    <label class="camera-index-label" for="camera-index">Device</label>
+                    <input class="camera-index" id="camera-index" type="number" min="0" max="15" step="1" value="0"
+                           aria-label="Camera device index">
+                    <span class="camera-managed" id="camera-managed"></span>
+                </div>
+                <div class="camera-msg" id="camera-msg" role="status" aria-live="polite"></div>
             </div>
         </div>
     </div>
@@ -292,6 +314,84 @@
                     </div>
                 </div>`).join('');
         }
+        // --- Camera control ------------------------------------------------
+        // The camera runs as a separate process; starting it used to mean SSH
+        // and a terminal, which at an event means finding a laptop.
+        const camStart = document.getElementById('camera-start');
+        const camStop = document.getElementById('camera-stop');
+        const camIndex = document.getElementById('camera-index');
+        const camMsg = document.getElementById('camera-msg');
+        const camManaged = document.getElementById('camera-managed');
+
+        // Sticky until the operator acts again. The refresh that runs after a
+        // failed start used to overwrite the real reason with the generic
+        // "not running" hint a moment later, so the actionable message
+        // flashed and vanished and the button looked like it did nothing.
+        let camMsgIsError = false;
+
+        function setCamMsg(text, tone) {
+            camMsg.textContent = text || '';
+            if (tone) camMsg.dataset.tone = tone; else delete camMsg.dataset.tone;
+            camMsgIsError = tone === 'bad';
+        }
+
+        async function cameraAction(path, body) {
+            camStart.disabled = camStop.disabled = true;
+            setCamMsg('Working\u2026');
+            try {
+                const resp = await fetch(`/operator/api/camera/${path}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body || {}),
+                });
+                const data = await resp.json().catch(() => ({}));
+                if (resp.status === 401) {
+                    setCamMsg('Sign in on the operator console to control the camera.', 'bad');
+                    return;
+                }
+                if (!resp.ok) throw new Error(data.error || `Failed (HTTP ${resp.status})`);
+                camMsgIsError = false;
+
+                // The server needs a moment to bind its port, so confirm by
+                // polling rather than claiming success the request cannot know.
+                setCamMsg('Waiting for the camera to come up\u2026');
+                for (let i = 0; i < 12; i++) {
+                    await new Promise(r => setTimeout(r, 1000));
+                    const st = await fetch('/operator/api/camera').then(r => r.json()).catch(() => ({}));
+                    if (st.reachable) { setCamMsg('Camera is up.', 'ok'); refresh(); return; }
+                }
+                setCamMsg('Started, but the feed has not come up yet. Check the camera is plugged in.', 'bad');
+            } catch (e) {
+                setCamMsg(e.message || 'Could not reach the satellite.', 'bad');
+            } finally {
+                camStart.disabled = camStop.disabled = false;
+                loadCamera();
+            }
+        }
+
+        camStart.onclick = () => cameraAction('start', { cameraIndex: Number(camIndex.value) });
+        camStop.onclick = () => cameraAction('stop');
+
+        async function loadCamera() {
+            try {
+                const resp = await fetch('/operator/api/camera');
+                if (!resp.ok) return;
+                const cam = await resp.json();
+                if (typeof cam.cameraIndex === 'number') camIndex.value = cam.cameraIndex;
+                camStart.textContent = cam.reachable ? 'Restart camera' : 'Start camera';
+                camStop.hidden = !cam.reachable;
+                // Worth showing: on the Pi systemd owns the lifecycle and will
+                // restart the camera by itself, so a stopped feed there means
+                // something else is wrong.
+                camManaged.textContent = cam.managedBy === 'systemd'
+                    ? 'managed by systemd' : 'managed by this console';
+                // Never replace a specific failure with the generic hint.
+                if (!cam.reachable && cam.hint && !camMsgIsError) setCamMsg(cam.hint);
+            } catch (e) { /* offline */ }
+        }
+        loadCamera();
+        setInterval(loadCamera, 30000);
+
         loadSetup();
         setInterval(loadSetup, 60000);
 

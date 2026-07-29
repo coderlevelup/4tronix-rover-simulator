@@ -190,3 +190,6 @@ yard/satellite/missions.db
 yard/satellite/missions.db-shm
 yard/satellite/missions.db-wal
 yard/satellite/satellite_config.json
+
+# Console-spawned camera output (development only)
+yard/satellite/camera_server.log

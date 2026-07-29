@@ -155,8 +155,16 @@ def api_status():
 
 
 @app.route('/api/config/rover_url', methods=['POST'])
+@operator_console.require_operator
 def api_set_rover_url():
-    """Set the rover URL at runtime (from the /status page) and persist it"""
+    """Set the rover URL at runtime (from the /status page) and persist it.
+
+    Gated because repointing the rover is a control action: anyone on the venue
+    network could otherwise aim this satellite at a different machine, or at
+    nothing, and the console would carry on reporting success. It costs nothing
+    on event days - OPERATOR_AUTH=off makes require_operator a pass-through -
+    so this only bites someone who should not be here.
+    """
     global ROVER_URL
     data = request.get_json(silent=True) or {}
     url = (data.get('url') or '').strip().rstrip('/')

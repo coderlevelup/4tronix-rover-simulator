@@ -84,9 +84,9 @@ def setup_webcam(index=None):
             # it only as "failed to properly initialize".
             if sys.platform == 'darwin':
                 logger.warning(
-                    f"No camera at index {index}. On macOS, grant Camera access to your "
-                    "terminal in System Settings > Privacy & Security > Camera, then "
-                    "restart it. Set CAMERA_INDEX to try a different device."
+                    f"No camera at index {index}. On macOS this is usually permission "
+                    "rather than hardware: whichever app launched the satellite needs "
+                    "Camera access. Set CAMERA_INDEX to try a different device."
                 )
             else:
                 logger.warning(f"No camera at index {index}. Set CAMERA_INDEX to try another.")

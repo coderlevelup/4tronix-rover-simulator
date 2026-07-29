@@ -19,6 +19,10 @@ def client(tmp_path, monkeypatch):
     original_url = web_server.ROVER_URL
     web_server.app.config['TESTING'] = True
     with web_server.app.test_client() as client:
+        # Repointing the rover is now an operator action; these tests exercise
+        # the endpoint's behaviour, not its gate (see the auth test below).
+        with client.session_transaction() as sess:
+            sess['operator'] = {'uid': 'op-1', 'email': 'op@test.com', 'role': 'operator'}
         yield client
     web_server.ROVER_URL = original_url
 
@@ -77,3 +81,19 @@ def test_load_config_precedence(tmp_path, monkeypatch):
     monkeypatch.setattr(web_server, 'CONFIG_FILE', str(cfg))
 
     assert web_server._load_config().get('rover_url') == 'http://saved.local:8523'
+
+
+def test_rover_url_cannot_be_changed_without_an_operator(tmp_path, monkeypatch):
+    """Anyone on the venue network could otherwise aim this satellite at a
+    different machine, or at nothing, and the console would keep reporting
+    success."""
+    monkeypatch.setattr(web_server, 'CONFIG_FILE', str(tmp_path / 'satellite_config.json'))
+    monkeypatch.delenv('OPERATOR_AUTH', raising=False)
+    original_url = web_server.ROVER_URL
+    web_server.app.config['TESTING'] = True
+
+    with web_server.app.test_client() as anon:
+        resp = anon.post('/api/config/rover_url', json={'url': 'http://attacker.local:8523'})
+
+    assert resp.status_code == 401
+    assert web_server.ROVER_URL == original_url, 'the URL must not have changed'
