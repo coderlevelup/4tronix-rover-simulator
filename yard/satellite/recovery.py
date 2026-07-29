@@ -47,12 +47,15 @@ def _rover_completed(rover_url, mission_id):
     except (requests.exceptions.RequestException, ValueError):
         return False
 
+    # The rover nests the id inside the instruction's params - that is where
+    # _dispatch_to_rover puts it - not at the top level of the history entry.
     for entry in data.get('history') or []:
         if not isinstance(entry, dict):
             continue
-        if entry.get('mission_id') != mission_id:
+        params = entry.get('params')
+        if not isinstance(params, dict) or params.get('mission_id') != mission_id:
             continue
-        return entry.get('status') in ('completed', 'done', 'ok')
+        return entry.get('status') == 'completed'
 
     return False
 

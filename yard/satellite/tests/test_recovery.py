@@ -106,7 +106,9 @@ def test_rover_confirmation_resolves_without_a_human(monkeypatch):
     class Resp:
         status_code = 200
         def json(self):
-            return {'history': [{'mission_id': 'm1', 'status': 'completed'}]}
+            # Real shape: the id is inside params (see RoverService.add_instructions).
+            return {'history': [{'cmd': 'run_python', 'status': 'completed',
+                                 'params': {'mission_id': 'm1'}}]}
 
     monkeypatch.setattr(recovery.requests, 'get', lambda *a, **k: Resp())
 
@@ -139,7 +141,8 @@ def test_a_rover_that_does_not_know_the_mission_falls_back_to_review(monkeypatch
     class Resp:
         status_code = 200
         def json(self):
-            return {'history': [{'mission_id': 'something-else', 'status': 'completed'}]}
+            return {'history': [{'cmd': 'run_python', 'status': 'completed',
+                                 'params': {'mission_id': 'something-else'}}]}
 
     monkeypatch.setattr(recovery.requests, 'get', lambda *a, **k: Resp())
 
@@ -153,7 +156,8 @@ def test_a_rover_reporting_a_non_completion_falls_back_to_review(monkeypatch):
     class Resp:
         status_code = 200
         def json(self):
-            return {'history': [{'mission_id': 'm1', 'status': 'aborted'}]}
+            return {'history': [{'cmd': 'run_python', 'status': 'error',
+                                 'params': {'mission_id': 'm1'}}]}
 
     monkeypatch.setattr(recovery.requests, 'get', lambda *a, **k: Resp())
 
@@ -171,3 +175,22 @@ def test_flagging_queues_the_flag_for_firestore():
     assert entry is not None
     assert entry['mission_id'] == 'm1'
     assert entry['op'] == 'review'
+
+
+def test_history_entries_without_params_are_ignored(monkeypatch):
+    """Manual drive commands have no mission_id; they must not be mistaken for
+    a mission's completion."""
+    _seed('m1', 'processing', owner=OWNER)
+
+    class Resp:
+        status_code = 200
+        def json(self):
+            return {'history': [
+                {'cmd': 'forward', 'status': 'completed'},          # no params at all
+                {'cmd': 'stop', 'status': 'completed', 'params': {}},  # params, no id
+            ]}
+
+    monkeypatch.setattr(recovery.requests, 'get', lambda *a, **k: Resp())
+
+    _, flagged = recovery.recover_interrupted_missions(OWNER, rover_url='http://rover')
+    assert flagged == ['m1']
