@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Search, X, Plus, Play, Rocket, Star } from 'lucide-react';
 import { Mission } from '@/core/domain/entities/Mission';
+import { MissionCursor } from '@/core/domain/repositories/IMissionRepository';
 import { getFirestoreClient } from '@/lib/firebase';
 import { FirestoreMissionRepository } from '@/infrastructure/persistence/FirestoreMissionRepository';
 import {
@@ -39,8 +40,17 @@ function formatDuration(ms: number): string {
 
 type StatusFilter = 'all' | 'favorites' | DiscoveryStatus;
 
+/**
+ * Missions per page. Each page costs FEED_SIZE + 1 Firestore reads (the extra
+ * one detects whether another page exists without a separate count query), so
+ * this is pay-as-you-scroll rather than paying up front for rows nobody sees.
+ */
+const FEED_SIZE = 24;
+
 export default function LandingPage() {
   const [missions, setMissions] = useState<Mission[]>([]);
+  const [cursor, setCursor] = useState<MissionCursor | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -55,13 +65,14 @@ export default function LandingPage() {
 
       try {
         const repository = new FirestoreMissionRepository(getFirestoreClient());
-        const loadedMissions = await repository.findAll();
+        // findRecent reads one page. findAll fetched 100 documents to render 24
+        // and then ran a COUNT aggregation per queued mission for positions
+        // this page never displays - roughly 125 reads per view, and why the
+        // feed sat on a spinner for ~30 seconds.
+        const page = await repository.findRecent(FEED_SIZE);
 
-        const recentMissions = loadedMissions
-          .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
-          .slice(0, 24);
-
-        setMissions(recentMissions);
+        setMissions(page.missions);
+        setCursor(page.nextCursor);
         setError(null);
       } catch (err) {
         console.error('[Landing] Failed to load missions:', err);
@@ -89,6 +100,29 @@ export default function LandingPage() {
 
     loadMissions();
   }, []);
+
+  const loadMore = async () => {
+    if (!cursor || loadingMore) return;
+
+    setLoadingMore(true);
+    try {
+      const repository = new FirestoreMissionRepository(getFirestoreClient());
+      const page = await repository.findRecent(FEED_SIZE, cursor);
+
+      // Guard against a mission appearing twice if one was inserted between
+      // pages: the cursor is stable, but a re-render could still double up.
+      setMissions((current) => {
+        const seen = new Set(current.map((m) => m.id));
+        return [...current, ...page.missions.filter((m) => !seen.has(m.id))];
+      });
+      setCursor(page.nextCursor);
+    } catch (err) {
+      console.error('[Landing] Failed to load more missions:', err);
+      setError('Could not load more missions. Check your connection and try again.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const counts = useMemo(() => {
     let completed = 0;
@@ -311,6 +345,22 @@ export default function LandingPage() {
                 </Link>
               );
             })}
+          </div>
+        )}
+
+        {/* Only when another page exists, and never while a filter or search is
+            narrowing the view - "load more" there would look like it failed,
+            since the next page may contain nothing matching. */}
+        {cursor && !query && statusFilter === 'all' && (
+          <div className="mt-8 flex justify-center">
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="clay clay-press min-h-11 rounded-xl border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground transition disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loadingMore ? 'Loading…' : 'Show more missions'}
+            </button>
           </div>
         )}
       </section>

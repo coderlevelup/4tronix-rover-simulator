@@ -17,12 +17,26 @@ import {
   orderBy,
   onSnapshot,
   getDocs,
+  limit,
   Unsubscribe,
   Timestamp,
 } from 'firebase/firestore';
 import { getFirestoreClient } from '@/lib/firebase';
 import { Mission } from '@/core/domain/entities/Mission';
 import { hashLearnerEmail } from '@/core/domain/services/learnerEmailHash';
+
+/**
+ * Upper bound on a learner's history subscription.
+ *
+ * Both history queries were unbounded. A live listener reads every matching
+ * document when it attaches, and re-attaches on every mount - so a learner with
+ * 40 missions paid 40 reads each time they opened the page, doubled because the
+ * page runs two overlapping subscriptions (by id and by email hash).
+ *
+ * Nobody scrolls past their most recent 50 runs, so this caps the exposure
+ * without changing what anyone actually sees.
+ */
+export const HISTORY_LIMIT = 50;
 
 /**
  * Get all missions for a learner with real-time updates
@@ -43,7 +57,8 @@ export function subscribeMissionsByLearnerId(
   const q = query(
     missionsRef,
     where('learnerId', '==', learnerId),
-    orderBy('submittedAt', 'desc')
+    orderBy('submittedAt', 'desc'),
+    limit(HISTORY_LIMIT)
   );
 
   return onSnapshot(
@@ -88,7 +103,8 @@ export async function subscribeMissionsByLearnerEmail(
   const q = query(
     missionsRef,
     where('learnerEmailHash', '==', learnerEmailHash),
-    orderBy('submittedAt', 'desc')
+    orderBy('submittedAt', 'desc'),
+    limit(HISTORY_LIMIT)
   );
 
   return onSnapshot(
@@ -122,7 +138,8 @@ export async function getMissionsByLearnerId(
     const q = query(
       missionsRef,
       where('learnerId', '==', learnerId),
-      orderBy('submittedAt', 'desc')
+      orderBy('submittedAt', 'desc'),
+      limit(HISTORY_LIMIT)
     );
 
     const querySnapshot = await getDocs(q);
