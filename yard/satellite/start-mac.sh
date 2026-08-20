@@ -45,8 +45,10 @@ WEB_PID=$!
 "$PYTHON" mac_camera_server.py &
 CAM_PID=$!
 
-# Wait for either process to exit
-wait -n "$WEB_PID" "$CAM_PID" 2>/dev/null || true
-# If one exited, kill the other
+# Wait for either process to exit, then take the other down with it.
+# Note: `wait -n` needs bash 4.3+, but macOS ships bash 3.2, so we poll instead.
+while kill -0 "$WEB_PID" 2>/dev/null && kill -0 "$CAM_PID" 2>/dev/null; do
+    sleep 1
+done
 kill "$WEB_PID" "$CAM_PID" 2>/dev/null || true
 wait "$WEB_PID" "$CAM_PID" 2>/dev/null || true
